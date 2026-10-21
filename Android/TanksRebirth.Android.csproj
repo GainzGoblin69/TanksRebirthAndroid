@@ -8,7 +8,7 @@
     Android/ContentBuilt (see .github/workflows/android.yml, or BUILD_ANDROID.md for doing it by hand).
   -->
   <PropertyGroup>
-    <TargetFramework>net8.0-android</TargetFramework>
+    <TargetFramework>net10.0-android</TargetFramework>
     <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
     <OutputType>Exe</OutputType>
     <RootNamespace>TanksRebirth</RootNamespace>
@@ -32,7 +32,6 @@
 
     <!-- The game leans on reflection (content IDs, JSON settings, mods), so don't let the trimmer strip anything. -->
     <PublishTrimmed>false</PublishTrimmed>
-    <AndroidLinkMode>None</AndroidLinkMode>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
   </PropertyGroup>
 

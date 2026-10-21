@@ -35,7 +35,7 @@ download updates to it when online.
 
 ## Building locally (Windows)
 
-Requires the .NET 8 SDK (plus the .NET 6 runtime for the content builder), the Android workload (`dotnet workload install android`), and JDK 17.
+Requires the .NET 10 SDK (plus the .NET 6 runtime for the content builder), the Android workload (`dotnet workload install android`), and JDK 17.
 
 ```powershell
 dotnet tool install --global dotnet-mgcb --version 3.8.1.303
@@ -46,8 +46,8 @@ cd Content
 mgcb /@:Content.Android.mgcb /platform:Android /outputDir:../Android/ContentBuilt /intermediateDir:../Android/obj/content /workingDir:.
 cd ..
 
-dotnet publish Android/TanksRebirth.Android.csproj -c Release -f net8.0-android
-# → Android/bin/Release/net8.0-android/publish/com.tanksrebirth.unofficial-Signed.apk
+dotnet publish Android/TanksRebirth.Android.csproj -c Release -f net10.0-android
+# → Android/bin/Release/net10.0-android/publish/com.tanksrebirth.unofficial-Signed.apk
 ```
 
 ## How the port works

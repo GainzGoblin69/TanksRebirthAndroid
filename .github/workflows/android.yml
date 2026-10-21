@@ -15,10 +15,10 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          # 8 builds the app; 6 runs the MonoGame 3.8.1 content builder
+          # 10 builds the app; 6 runs the MonoGame 3.8.1 content builder
           dotnet-version: |
             6.0.x
-            8.0.x
+            10.0.x
 
       - uses: actions/setup-java@v4
         with:
@@ -51,7 +51,7 @@ jobs:
           Invoke-WebRequest "https://github.com/RighteousRyan1/tanks_rebirth_motds/raw/master/Vanilla.campaign" -OutFile Android/Bundled/Vanilla.campaign
 
       - name: Build the APK
-        run: dotnet publish Android/TanksRebirth.Android.csproj -c Release -f net8.0-android
+        run: dotnet publish Android/TanksRebirth.Android.csproj -c Release -f net10.0-android
 
       - name: Collect the APK
         shell: pwsh
