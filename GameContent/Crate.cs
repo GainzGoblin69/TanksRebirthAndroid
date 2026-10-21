@@ -128,7 +128,7 @@ public class Crate
 
                     effect.TextureEnabled = true;
 
-                    effect.Texture = GameResources.GetGameResource<Texture2D>("Assets/Textures/ingame/block_other_c");
+                    effect.Texture = GameResources.GetGameResource<Texture2D>("Assets/textures/ingame/block_other_c");
 
                     //if (IsOpening)
                         //effect.Alpha -= fadeScale;

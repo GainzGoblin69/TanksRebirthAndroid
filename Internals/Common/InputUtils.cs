@@ -24,9 +24,26 @@ public static class InputUtils
         OldKeySnapshot = CurrentKeySnapshot;
         OldMouseSnapshot = CurrentMouseSnapshot;
         OldGamePadSnapshot = CurrentGamePadSnapshot;
+        CurrentGamePadSnapshot = GamePad.GetState(pIndex);
+
+        if (Framework.Input.TouchControls.Enabled) {
+            Framework.Input.TouchControls.Update();
+
+            // touches drive the "mouse" so the existing mouse-based UI and aiming keep working
+            CurrentMouseSnapshot = Framework.Input.TouchControls.GetMouseState(OldMouseSnapshot);
+            // update right away so the turret aims at a fresh tap in the same frame it fires
+            MouseUtils.MousePosition = Framework.Input.TouchControls.PointerPosition;
+
+            // Android's back button and the on-screen pause button both act as Escape (pause / go back)
+            var keys = Keyboard.GetState().GetPressedKeys().ToList();
+            if (Framework.Input.TouchControls.PauseJustPressed || CurrentGamePadSnapshot.IsButtonDown(Buttons.Back))
+                keys.Add(Keys.Escape);
+            CurrentKeySnapshot = new KeyboardState(keys.ToArray());
+            return;
+        }
+
         CurrentKeySnapshot = Keyboard.GetState();
         CurrentMouseSnapshot = Mouse.GetState();
-        CurrentGamePadSnapshot = GamePad.GetState(pIndex);
     }
     public static bool KeyJustPressed(Keys key) {
         bool pressed = CurrentKeySnapshot.IsKeyDown(key) && OldKeySnapshot.IsKeyUp(key);

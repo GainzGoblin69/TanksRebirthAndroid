@@ -226,6 +226,8 @@ public class PlayerTank : Tank {
                 if (CurShootStun <= 0 && CurMineStun <= 0) {
                     if (LastUsedController)
                         ControlHandle_ConsoleController();
+                    else if (TouchControls.Enabled)
+                        ControlHandle_Touch();
                     else
                         ControlHandle_Keybinding();
                 }
@@ -244,7 +246,7 @@ public class PlayerTank : Tank {
     }
     void ProcessPlayerMouse() {
         if (NetPlay.IsClientMatched(PlayerId)) {
-            if (!Difficulties.Types["POV"] || LevelEditorUI.IsActive || MainMenuUI.IsActive) {
+            if (!Difficulties.Types["POV"] || TouchControls.Enabled || LevelEditorUI.IsActive || MainMenuUI.IsActive) {
                 Vector3 mouseWorldPos = MatrixUtils.GetWorldPosition(MouseUtils.MousePosition, -11f);
                 if (!LevelEditorUI.IsActive)
                     TurretRotation = -(new Vector2(mouseWorldPos.X, mouseWorldPos.Z) - Position).ToRotation() + MathHelper.PiOver2;
@@ -357,6 +359,34 @@ public class PlayerTank : Tank {
             Shoot(false);
         if (PlaceMine.JustPressed)
             LayMine();
+    }
+    /// <summary>Movement from the on-screen joystick. Mirrors the keyboard scheme, but with an analog direction.
+    /// Aiming and firing come through the synthesized mouse (tap on the right side of the screen).</summary>
+    private void ControlHandle_Touch() {
+        if (TouchControls.MineJustPressed)
+            LayMine();
+
+        IsTurning = false;
+
+        ChassisRotation %= MathHelper.Tau;
+
+        var move = TouchControls.MoveVector;
+        if (move != Vector2.Zero) {
+            playerControl_isBindPressed = true;
+            DesiredDirection = Vector2.Normalize(move);
+        }
+
+        if (Difficulties.Types["POV"])
+            DesiredDirection = DesiredDirection.Rotate(-TurretRotation + MathHelper.Pi);
+
+        // a zero direction normalizes to NaN, which the base tank treats as "not moving" (same as no keys held)
+        var norm = Vector2.Normalize(DesiredDirection);
+
+        DesiredChassisRotation = norm.ToRotation() - MathHelper.PiOver2;
+
+        ChassisRotation = MathUtils.RoughStep(ChassisRotation, DesiredChassisRotation, Properties.TurningSpeed * RuntimeData.DeltaTime);
+
+        Velocity = Vector2.UnitY.Rotate(ChassisRotation) * Speed;
     }
     private void ControlHandle_Keybinding() {
         if (controlFirePath.JustPressed)

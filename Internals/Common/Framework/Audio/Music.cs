@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Microsoft.Xna.Framework.Audio;
 using System;
 using TanksRebirth.Internals.Common;
-using NVorbis;
 using System.IO;
 using TanksRebirth.Internals.Common.Utilities;
 using TanksRebirth.Internals.Common.Framework.Audio;
