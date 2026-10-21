@@ -186,6 +186,7 @@ public class TankGame : Game {
 
         ClientLog.Write("Save file loaded.", LogType.Info);
 
+        ClientLog.Write("Initializing game systems...", LogType.Info);
         GameHandler.Initialize();
         GameDirectory = Directory.GetCurrentDirectory();
         CameraGlobals.Initialize(GraphicsDevice);
@@ -357,7 +358,9 @@ public class TankGame : Game {
             , default);
     }
     protected override void LoadContent() {
+        ClientLog.Write("Preloading textures and sounds...", LogType.Info);
         PreloadContent();
+        ClientLog.Write("Preload queued.", LogType.Info);
         var s = Stopwatch.StartNew();
 
         RuntimeData.MainThreadId = Environment.CurrentManagedThreadId;
@@ -497,7 +500,9 @@ public class TankGame : Game {
 
         Achievement.MysteryTexture = GameResources.GetGameResource<Texture2D>("Assets/textures/ui/achievement/secret");
     
+        ClientLog.Write("Waiting for preloaded assets...", LogType.Info);
         GameResources.EnsurePreloadedAssetsArePreloaded();
+        ClientLog.Write("Setting up graphics and UI...", LogType.Info);
         GameHandler.SetupGraphics();
         GameUI.Initialize();
         MainMenuUI.InitializeUI();
@@ -520,6 +525,7 @@ public class TankGame : Game {
         MainMenuUI.MenuState = MainMenuUI.UIState.PrimaryMenu;
 
         MainMenuUI.Open();
+        ClientLog.Write("Main menu opened.", LogType.Info);
 
         ModLoader.LoadMods();
 
