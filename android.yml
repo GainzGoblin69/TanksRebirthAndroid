@@ -1,0 +1,69 @@
+name: Android APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Windows, because MonoGame's shader compiler needs it.
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          # 8 builds the app; 6 runs the MonoGame 3.8.1 content builder
+          dotnet-version: |
+            6.0.x
+            8.0.x
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '17'
+
+      - name: Install the .NET Android workload
+        run: dotnet workload install android
+
+      - name: Install the MonoGame content builder
+        run: dotnet tool install --global dotnet-mgcb --version 3.8.1.303
+
+      - name: Compile models and shaders for Android
+        shell: pwsh
+        run: |
+          # Same content list as desktop, but plain (uncompressed) textures for the widest GPU support.
+          (Get-Content Content/Content.mgcb -Raw) -replace 'TextureFormat=Compressed', 'TextureFormat=Color' |
+            Set-Content Content/Content.Android.mgcb
+          Push-Location Content
+          mgcb /@:Content.Android.mgcb /platform:Android /outputDir:../Android/ContentBuilt /intermediateDir:../Android/obj/content /workingDir:.
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+          Get-ChildItem Android/ContentBuilt -Recurse -Filter *.xnb | Measure-Object | ForEach-Object { "Compiled $($_.Count) content files" }
+
+      - name: Bundle the official campaign (playable offline)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          New-Item -ItemType Directory -Force Android/Bundled | Out-Null
+          Invoke-WebRequest "https://github.com/RighteousRyan1/tanks_rebirth_motds/raw/master/Vanilla.campaign" -OutFile Android/Bundled/Vanilla.campaign
+
+      - name: Build the APK
+        run: dotnet publish Android/TanksRebirth.Android.csproj -c Release -f net8.0-android
+
+      - name: Collect the APK
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          $apk = Get-ChildItem Android/bin/Release -Recurse -Filter *-Signed.apk | Select-Object -First 1
+          if (-not $apk) { throw "No signed APK was produced." }
+          Copy-Item $apk.FullName out/TanksRebirth.apk
+          "APK size: {0:N1} MB" -f ($apk.Length / 1MB)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TanksRebirth-android
+          path: out/TanksRebirth.apk
+          if-no-files-found: error

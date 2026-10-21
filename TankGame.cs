@@ -52,7 +52,10 @@ public class TankGame : Game {
     public string MOTD { get; private set; }
     public static string GameDirectory { get; private set; }
     public static readonly string ExePath = Assembly.GetExecutingAssembly().Location.Replace(@$"\{nameof(TanksRebirth)}.dll", string.Empty);
-    public static readonly string SaveDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "Tanks Rebirth");
+    /// <summary>Where saves, settings, logs and campaigns live. The Android launcher points this at the app's own storage.</summary>
+    public static readonly string SaveDirectory = Environment.GetEnvironmentVariable("TANKSREBIRTH_SAVE_DIR") is { Length: > 0 } overrideDir
+        ? overrideDir
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "Tanks Rebirth");
 
     // ### BOOLEANS ###
 
@@ -154,12 +157,15 @@ public class TankGame : Game {
         Graphics = new(this) {
             PreferHalfPixelOffset = true,
             HardwareModeSwitch = false,
-            IsFullScreen = false
+            IsFullScreen = TouchControls.Enabled
         };
+        if (TouchControls.Enabled)
+            Graphics.SupportedOrientations = DisplayOrientation.LandscapeLeft | DisplayOrientation.LandscapeRight;
 
         Content.RootDirectory = "Content";
         Instance = this;
-        Window.AllowUserResizing = true;
+        if (!TouchControls.Enabled)
+            Window.AllowUserResizing = true;
 
         IsMouseVisible = false;
 
@@ -195,8 +201,10 @@ public class TankGame : Game {
         GameHandler.MapEvents();
         ClientLog.Write($"Mapped events...", LogType.Info);
 
-        DiscordRichPresence.Load();
-        ClientLog.Write($"Loaded Discord Rich Presence...", LogType.Info);
+        if (!OperatingSystem.IsAndroid()) {
+            DiscordRichPresence.Load();
+            ClientLog.Write($"Loaded Discord Rich Presence...", LogType.Info);
+        }
 
         // systems = ReflectionUtils.GetInheritedTypesOf<IGameSystem>(Assembly.GetExecutingAssembly());
 
@@ -204,7 +212,7 @@ public class TankGame : Game {
 
         SpriteRenderer = new(GraphicsDevice);
 
-        Graphics.PreferMultiSampling = true;
+        Graphics.PreferMultiSampling = !TouchControls.Enabled;
 
         Graphics.ApplyChanges();
 
@@ -358,7 +366,7 @@ public class TankGame : Game {
         SpectatorCamera = new(MathHelper.ToRadians(100), GraphicsDevice.Viewport.AspectRatio, 0.1f, 5000f);
         PerspectiveCamera = new(MathHelper.ToRadians(90), GraphicsDevice.Viewport.AspectRatio, 0.1f, 5000f);
 
-        Task.Run(() => {
+        if (!OperatingSystem.IsAndroid()) Task.Run(() => {
             RuntimeData.CompSpecs = ComputerSpecs.GetSpecs(out bool error);
 
             if (error) {
@@ -441,7 +449,23 @@ public class TankGame : Game {
         #region Config Initialization
 
         Graphics.SynchronizeWithVerticalRetrace = Settings.Vsync;
-        WindowUtils.ChangeWindowKind(Settings.WindowKind);
+        if (TouchControls.Enabled) {
+            // phones: always fullscreen at the panel's native landscape resolution
+            var bounds = Window.ClientBounds;
+            int w = bounds.Width, h = bounds.Height;
+            if (w <= 0 || h <= 0) {
+                var mode = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
+                w = mode.Width;
+                h = mode.Height;
+            }
+            if (w > 0 && h > 0) {
+                Settings.ResWidth = Math.Max(w, h);
+                Settings.ResHeight = Math.Min(w, h);
+            }
+            Graphics.IsFullScreen = true;
+        }
+        else
+            WindowUtils.ChangeWindowKind(Settings.WindowKind);
         PlayerTank.controlUp.ForceReassign(Settings.UpKeybind);
         PlayerTank.controlDown.ForceReassign(Settings.DownKeybind);
         PlayerTank.controlLeft.ForceReassign(Settings.LeftKeybind);
@@ -610,7 +634,7 @@ public class TankGame : Game {
                 Graphics.ApplyChanges();
             }
 
-            RebirthMouse.ShouldRender = !Difficulties.Types["POV"] || GameUI.Paused || MainMenuUI.IsActive || LevelEditorUI.IsActive;
+            RebirthMouse.ShouldRender = !TouchControls.Enabled && (!Difficulties.Types["POV"] || GameUI.Paused || MainMenuUI.IsActive || LevelEditorUI.IsActive);
 
             UIElement.UpdateElements();
             GameUI.UpdateButtons();
@@ -622,7 +646,7 @@ public class TankGame : Game {
 
         NetPlay.PollEvents();
 
-        if (RuntimeData.RunTime % 60 < RuntimeData.DeltaTime)
+        if (RuntimeData.RunTime % 60 < RuntimeData.DeltaTime && !OperatingSystem.IsAndroid())
             Task.Run(DiscordRichPresence.Update);
 
         LastGameTime = gameTime;
@@ -702,7 +726,7 @@ public class TankGame : Game {
                 str += $"\nThis file was opened for your sake of helping the developer out.";
             ClientLog.Write(str, LogType.Info);
         }
-        if (openFile)
+        if (openFile && !OperatingSystem.IsAndroid())
             Process.Start(new ProcessStartInfo(ClientLog.FileName) {
                 UseShellExecute = true,
                 WorkingDirectory = Path.Combine(SaveDirectory, "Logs"),
@@ -751,6 +775,8 @@ public class TankGame : Game {
 
         DrawCursor();
 
+        TouchControls.Draw(SpriteRenderer);
+
         PostDrawEverything?.Invoke(gameTime);
 
         RuntimeData.RenderTime = gameTime.ElapsedGameTime;
@@ -773,15 +799,15 @@ public class TankGame : Game {
         SpriteRenderer.DrawString(FontGlobals.RebirthFontLarge, RuntimeData.CrashInfo.Reason, new Vector2(100, 500).ToResolution(), Color.White, (Vector2.One * 0.3f).ToResolution());
         SpriteRenderer.DrawString(FontGlobals.RebirthFontLarge, RuntimeData.CrashInfo.Description, new Vector2(100, 550).ToResolution(), Color.White, (Vector2.One * 0.2f).ToResolution());
 
-        var yMsg = "Press 'Y' to proceed with closing the game.";
-        var nMsg = "Press 'N' to attempt to carry on with the game.";
+        var yMsg = TouchControls.Enabled ? "" : "Press 'Y' to proceed with closing the game.";
+        var nMsg = TouchControls.Enabled ? "Tap anywhere to attempt to carry on with the game." : "Press 'N' to attempt to carry on with the game.";
         SpriteRenderer.DrawString(FontGlobals.RebirthFontLarge, yMsg, WindowUtils.WindowBottomLeft + new Vector2(10, -10), Color.White, (Vector2.One * 0.2f).ToResolution(), origin: GameUtils.GetAnchor(Anchor.BottomLeft, FontGlobals.RebirthFontLarge.MeasureString(yMsg)));
         SpriteRenderer.DrawString(FontGlobals.RebirthFontLarge, nMsg, WindowUtils.WindowBottomRight + new Vector2(-10, -10), Color.White, (Vector2.One * 0.2f).ToResolution(), origin: GameUtils.GetAnchor(Anchor.BottomRight, FontGlobals.RebirthFontLarge.MeasureString(nMsg)));
         if (InputUtils.KeyJustPressed(Keys.Y)) {
             ReportError(RuntimeData.CrashInfo.Cause, true, true, false);
             Quit();
         }
-        if (InputUtils.KeyJustPressed(Keys.N)) {
+        if (InputUtils.KeyJustPressed(Keys.N) || (TouchControls.Enabled && InputUtils.CanDetectClick())) {
             IsCrashInfoVisible = false;
             TankMusicSystem.ResumeAll();
         }

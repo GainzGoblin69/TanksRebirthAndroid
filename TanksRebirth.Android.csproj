@@ -1,0 +1,92 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Android build of Tanks! Rebirth.
+    It compiles the same game source as the desktop project (everything under the repo root),
+    plus the few Android-only files in this folder.
+
+    Before building, the content pipeline has to produce the compiled models and shaders into
+    Android/ContentBuilt (see .github/workflows/android.yml, or BUILD_ANDROID.md for doing it by hand).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>TanksRebirth</RootNamespace>
+    <AssemblyName>TanksRebirth</AssemblyName>
+    <AssemblyVersion>1.8.1.1</AssemblyVersion>
+
+    <ApplicationId>com.tanksrebirth.unofficial</ApplicationId>
+    <ApplicationTitle>Tanks! Rebirth</ApplicationTitle>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.8.1</ApplicationDisplayVersion>
+
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CS8618;CS8600;CS8601;CS8602;CS8603;CS8604;CS8625;CA1416;CA1422;XA1027</NoWarn>
+
+    <!-- a plain .apk you can sideload, for phones (arm64/arm) and emulators (x64) -->
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <RuntimeIdentifiers>android-arm64;android-arm;android-x64</RuntimeIdentifiers>
+
+    <!-- The game leans on reflection (content IDs, JSON settings, mods), so don't let the trimmer strip anything. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <AndroidLinkMode>None</AndroidLinkMode>
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- shared game source -->
+    <Compile Include="..\**\*.cs" Exclude="..\Android\**;..\obj\**;..\bin\**;..\.git\**" />
+    <!-- Android-only source -->
+    <Compile Include="*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 3.8.1, not 3.8.2: 3.8.2 changed APIs the game relies on (Vector2.Rotate, Game.OnExiting) -->
+    <PackageReference Include="MonoGame.Framework.Android" Version="3.8.1.303" />
+    <PackageReference Include="Aether.Physics2D.MG" Version="1.6.1" />
+    <PackageReference Include="FontStashSharp.MonoGame" Version="1.2.8" />
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.4" />
+    <PackageReference Include="LiteNetLib" Version="0.9.5.2" />
+    <PackageReference Include="NativeFileDialogSharp" Version="0.5.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="StbVorbisSharp" Version="1.22.4" />
+    <PackageReference Include="System.Management" Version="9.0.0" />
+    <PackageReference Include="TextCopy" Version="6.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Aspose.Zip"><HintPath>..\deps\Aspose.Zip.dll</HintPath></Reference>
+    <Reference Include="DiscordRPC"><HintPath>..\deps\DiscordRPC.dll</HintPath></Reference>
+    <Reference Include="MeltySynth"><HintPath>..\deps\MeltySynth.dll</HintPath></Reference>
+    <Reference Include="Octokit"><HintPath>..\deps\Octokit.dll</HintPath></Reference>
+    <Reference Include="Steamworks.NET"><HintPath>..\deps\Steamworks.NET.dll</HintPath></Reference>
+    <Reference Include="WiimoteLib"><HintPath>..\deps\WiimoteLib.dll</HintPath></Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Raw files the game opens straight from disk (textures, audio, fonts, translations).
+      They ship inside the APK and are copied to the app's storage on first launch (see AssetExtractor.cs).
+    -->
+    <AndroidAsset Include="..\Content\Assets\**\*.png;..\Content\Assets\**\*.ogg;..\Content\Assets\**\*.mp3;..\Content\Assets\**\*.ttf"
+                  Link="Assets\Content\Assets\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\Localization\*.loc"
+                  Link="Assets\Localization\%(Filename)%(Extension)" />
+
+    <!-- Compiled models + shaders (.xnb) from the content pipeline. Loaded directly from the APK. -->
+    <AndroidAsset Include="ContentBuilt\**\*.xnb"
+                  Link="Assets\Content\%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <!-- Optional: the official campaign, so the game is playable offline from the first launch. -->
+    <AndroidAsset Include="Bundled\*.campaign" Condition="Exists('Bundled')"
+                  Link="Assets\Bundled\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <Target Name="CheckCompiledContent" BeforeTargets="Build">
+    <Error Condition="!Exists('ContentBuilt\Assets')"
+           Text="Android/ContentBuilt is missing. Compile the content for Android first (see BUILD_ANDROID.md)." />
+  </Target>
+</Project>

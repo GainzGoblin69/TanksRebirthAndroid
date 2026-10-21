@@ -14,6 +14,13 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <!-- The Android port lives in its own project; keep its files out of the desktop build. -->
+    <Compile Remove="Android\**" />
+    <None Remove="Android\**" />
+    <Content Remove="Android\**" />
+    <EmbeddedResource Remove="Android\**" />
+  </ItemGroup>
+  <ItemGroup>
     <None Remove="Icon.ico" />
     <None Remove="Icon.bmp" />
   </ItemGroup>
