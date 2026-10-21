@@ -80,3 +80,41 @@ jobs:
           gh release delete latest --yes --cleanup-tag 2>$null
           $global:LASTEXITCODE = 0
           gh release create latest out/TanksRebirth.apk --title "Latest Android build" --notes "Built from $env:GITHUB_SHA. Tap TanksRebirth.apk below to download it on your phone." --latest
+
+  # Runs the APK on an Android emulator and publishes screenshots + logs as the "emulator-test" release,
+  # so startup problems can be diagnosed without a phone.
+  emulator-test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: TanksRebirth-android
+          path: apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: bash Android/ci/emulator-test.sh
+
+      - name: Publish diagnostics as the "emulator-test" release
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete emulator-test --yes --cleanup-tag || true
+          gh release create emulator-test diag/* --title "Emulator test results" --notes "Screenshots and logs from running $GITHUB_SHA on an emulator." --prerelease

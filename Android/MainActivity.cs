@@ -232,6 +232,7 @@ public class MainActivity : AndroidGameActivity {
     }
 
     private void LogCrash(string where, Exception? e) {
+        Android.Util.Log.Error("TanksRebirth", $"{where}: {e}");
         try {
             File.AppendAllText(CrashPath, $"[{DateTime.Now:HH:mm:ss}] {where}:\n{e}\n\n");
         }
@@ -239,6 +240,7 @@ public class MainActivity : AndroidGameActivity {
     }
 
     private void Breadcrumb(string what) {
+        Android.Util.Log.Info("TanksRebirth", what);
         try {
             File.AppendAllText(StartupPath, $"[{DateTime.Now:HH:mm:ss.fff}] {what}\n");
         }

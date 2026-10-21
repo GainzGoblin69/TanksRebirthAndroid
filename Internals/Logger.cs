@@ -76,7 +76,7 @@ public sealed class Logger : IDisposable {
             var str = _stringBuilder.ToString();
             sWriter.WriteLine(str);
             Debug.WriteLine(str);
-            if (GameLauncher.IsConsoleAllocated) Console.WriteLine(str);
+            if (GameLauncher.IsConsoleAllocated || OperatingSystem.IsAndroid()) Console.WriteLine(str); // on Android this lands in logcat
             sWriter.Flush();
         }
 
