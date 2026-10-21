@@ -162,7 +162,8 @@ public class TankGame : Game {
         if (TouchControls.Enabled)
             Graphics.SupportedOrientations = DisplayOrientation.LandscapeLeft | DisplayOrientation.LandscapeRight;
 
-        Content.RootDirectory = "Content";
+        // tolerant of "a//b" and backslashes in asset paths, which Android's APK asset lookup is not
+        Content = new PathSafeContentManager(Services, "Content");
         Instance = this;
         if (!TouchControls.Enabled)
             Window.AllowUserResizing = true;
