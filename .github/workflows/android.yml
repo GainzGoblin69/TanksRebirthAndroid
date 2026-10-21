@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write   # lets the build publish the APK as a release
+
 jobs:
   build:
     # Windows, because MonoGame's shader compiler needs it.
@@ -67,3 +70,13 @@ jobs:
           name: TanksRebirth-android
           path: out/TanksRebirth.apk
           if-no-files-found: error
+
+      - name: Publish as the "latest" release (direct APK download link)
+        if: github.ref == 'refs/heads/master'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>$null
+          $global:LASTEXITCODE = 0
+          gh release create latest out/TanksRebirth.apk --title "Latest Android build" --notes "Built from $env:GITHUB_SHA. Tap TanksRebirth.apk below to download it on your phone." --latest
