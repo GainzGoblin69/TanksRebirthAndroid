@@ -69,6 +69,20 @@ public class MainActivity : AndroidGameActivity {
         File.WriteAllText(StartupPath, "");
         Breadcrumb("launch started");
 
+        // Usual case: files already unpacked, so start the game right here in OnCreate. MonoGame then gets the
+        // activity's normal OnResume, which is what activates the game and starts its render loop.
+        if (AssetExtractor.IsUpToDate(this, _gameDir)) {
+            try {
+                AssetExtractor.ExtractIfNeeded(this, _gameDir, _saveDir); // only seeds the campaign if missing
+            }
+            catch (Exception e) {
+                LogCrash("checking game files", e);
+            }
+            Breadcrumb("game files already unpacked");
+            StartGame();
+            return;
+        }
+
         // Shown while the game files are unpacked (a few seconds on first launch only).
         _status = new TextView(this) {
             Text = "Preparing game files…",
@@ -130,10 +144,48 @@ public class MainActivity : AndroidGameActivity {
 
             Breadcrumb("starting game loop");
             _game.Run();
+
+            // After a first-launch unpack the game is created after this activity already resumed, so MonoGame
+            // missed the resume event that marks the game active and starts its render loop (otherwise: black
+            // screen forever). Deliver that event now.
+            if (_resumed)
+                DeliverMissedResume();
         }
         catch (Exception e) {
             LogCrash("starting the game", e);
             ShowReport();
+        }
+    }
+
+    private bool _resumed;
+
+    protected override void OnResume() {
+        base.OnResume();
+        _resumed = true;
+    }
+
+    protected override void OnPause() {
+        _resumed = false;
+        base.OnPause();
+    }
+
+    private void DeliverMissedResume() {
+        try {
+            var field = typeof(AndroidGameActivity).GetField("Resumed",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            if (field?.GetValue(null) is EventHandler handler) {
+                handler(this, EventArgs.Empty);
+                Breadcrumb("delivered resume to MonoGame");
+            }
+            else {
+                // couldn't reach it: restart the activity; the files are unpacked now, so it takes the normal path
+                Breadcrumb("resume event not found, restarting activity");
+                try { File.Delete(MarkerPath); } catch { }
+                Recreate();
+            }
+        }
+        catch (Exception e) {
+            LogCrash("delivering resume", e);
         }
     }
 

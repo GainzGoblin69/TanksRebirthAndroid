@@ -12,17 +12,32 @@ namespace TanksRebirth.Droid;
 /// Compiled .xnb content is left in the APK; MonoGame's ContentManager reads it from there directly.
 /// </summary>
 internal static class AssetExtractor {
-    public static void ExtractIfNeeded(Context context, string gameDir, string saveDir, Action<string>? progress = null) {
-        var assets = context.Assets!;
-
+    private static string Stamp(Context context) {
         // re-extract whenever the APK changes (install or update)
 #pragma warning disable CA1422
         var info = context.PackageManager!.GetPackageInfo(context.PackageName!, 0)!;
 #pragma warning restore CA1422
-        var stamp = info.LastUpdateTime.ToString();
+        return info.LastUpdateTime.ToString();
+    }
+
+    /// <summary>True when the files from this exact APK are already unpacked.</summary>
+    public static bool IsUpToDate(Context context, string gameDir) {
+        try {
+            var marker = Path.Combine(gameDir, ".extracted");
+            return File.Exists(marker) && File.ReadAllText(marker) == Stamp(context);
+        }
+        catch {
+            return false;
+        }
+    }
+
+    public static void ExtractIfNeeded(Context context, string gameDir, string saveDir, Action<string>? progress = null) {
+        var assets = context.Assets!;
+
+        var stamp = Stamp(context);
         var marker = Path.Combine(gameDir, ".extracted");
 
-        if (!(File.Exists(marker) && File.ReadAllText(marker) == stamp)) {
+        if (!IsUpToDate(context, gameDir)) {
             if (Directory.Exists(gameDir))
                 Directory.Delete(gameDir, true);
             Directory.CreateDirectory(gameDir);
