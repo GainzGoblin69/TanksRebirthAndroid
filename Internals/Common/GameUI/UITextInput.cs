@@ -50,7 +50,9 @@ namespace TanksRebirth.Internals.Common.GameUI
                 if (MouseHovering) {
                     if (currentActiveBox != Id) {
                         ActiveHandle = true;
+#if !ANDROID // Android has no text-input event; typing needs a hardware keyboard
                         TankGame.Instance.Window.TextInput += HandleText;
+#endif
                     }
                     if (Text == DefaultString)
                         Text = string.Empty;
@@ -84,7 +86,9 @@ namespace TanksRebirth.Internals.Common.GameUI
                     OnConfirmContents?.Invoke(this, new());
 
                 ActiveHandle = false;
+#if !ANDROID // Android has no text-input event; typing needs a hardware keyboard
                 TankGame.Instance.Window.TextInput -= HandleText;
+#endif
                 return;
             }
             if (TankGame.Instance.IsActive)
@@ -97,7 +101,9 @@ namespace TanksRebirth.Internals.Common.GameUI
                 else if (e.Key == Keys.Escape)
                 {
                     Text = string.Empty;
+#if !ANDROID // Android has no text-input event; typing needs a hardware keyboard
                     TankGame.Instance.Window.TextInput -= HandleText;
+#endif
                     ActiveHandle = false;
                     currentActiveBox = -1;
                     OnConfirmContents?.Invoke(this, new());
@@ -106,7 +112,9 @@ namespace TanksRebirth.Internals.Common.GameUI
                     Text += "   ";
                 else if (e.Key == Keys.Enter)
                 {
+#if !ANDROID // Android has no text-input event; typing needs a hardware keyboard
                     TankGame.Instance.Window.TextInput -= HandleText;
+#endif
                     ActiveHandle = false;
                     currentActiveBox = -1;
                     OnConfirmContents?.Invoke(this, new());

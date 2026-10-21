@@ -258,11 +258,15 @@ public sealed record ChatSystem {
         if (InputUtils.CanDetectClick())
         {
             if (trc && !ActiveHandle) { 
+#if !ANDROID // Android has no text-input event; typing needs a hardware keyboard
                 TankGame.Instance.Window.TextInput += HandleInput;
+#endif
                 ActiveHandle = true;
             }
             else if (!trc && ActiveHandle) {
+#if !ANDROID // Android has no text-input event; typing needs a hardware keyboard
                 TankGame.Instance.Window.TextInput -= HandleInput;
+#endif
                 ActiveHandle = false;
             }
         }
@@ -275,7 +279,9 @@ public sealed record ChatSystem {
                 TextCopy.ClipboardService.SetText(CurTyping);
             }
             if (ToggleChat.JustPressed) {
+#if !ANDROID // Android has no text-input event; typing needs a hardware keyboard
                 TankGame.Instance.Window.TextInput -= HandleInput;
+#endif
                 ActiveHandle = false;
             }
         }
@@ -326,7 +332,9 @@ public sealed record ChatSystem {
             }
             else if (e.Key == Keys.Escape) {
                 CurTyping = string.Empty;
+#if !ANDROID // Android has no text-input event; typing needs a hardware keyboard
                 TankGame.Instance.Window.TextInput -= HandleInput;
+#endif
                 ActiveHandle = false;
             }
             else if (e.Key == Keys.Tab)
@@ -334,7 +342,9 @@ public sealed record ChatSystem {
             else if (e.Key == Keys.Enter) {
 
                 if (CurTyping == string.Empty) {
+#if !ANDROID // Android has no text-input event; typing needs a hardware keyboard
                     TankGame.Instance.Window.TextInput -= HandleInput;
+#endif
                     ActiveHandle = false;
                     return;
                 }

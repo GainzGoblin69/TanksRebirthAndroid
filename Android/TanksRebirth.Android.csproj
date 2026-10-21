@@ -20,6 +20,8 @@
     <ApplicationVersion>1</ApplicationVersion>
     <ApplicationDisplayVersion>1.8.1</ApplicationDisplayVersion>
 
+    <!-- same C# version as the desktop build; C# 14 changed span overload resolution the game relies on -->
+    <LangVersion>12</LangVersion>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
