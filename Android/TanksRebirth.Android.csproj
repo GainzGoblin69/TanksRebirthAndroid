@@ -32,6 +32,7 @@
 
     <!-- The game leans on reflection (content IDs, JSON settings, mods), so don't let the trimmer strip anything. -->
     <PublishTrimmed>false</PublishTrimmed>
+    <RunAOTCompilation>false</RunAOTCompilation>
     <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
   </PropertyGroup>
 
