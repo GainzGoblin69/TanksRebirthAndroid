@@ -361,7 +361,8 @@ public static partial class MainMenuUI {
     }
     private static void ArrangeDifficultyButtons() {
 
-        const int maxRowsPerColumn = 12;
+        // phones use taller rows, so fewer per column keeps them clear of the Back button
+        int maxRowsPerColumn = Internals.Common.Framework.Input.TouchControls.Enabled ? 9 : 12;
         bool phone = Internals.Common.Framework.Input.TouchControls.Enabled;
         // phones: wider rows (room for the switch) and taller ones (easier to tap)
         Vector2 buttonSize = phone ? new Vector2(440, 58) : new Vector2(300, 40);

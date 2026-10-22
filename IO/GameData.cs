@@ -49,7 +49,7 @@ public class GameData : IFileSerializable {
 
     public void Setup() {
         for (int i = 0; i < TankID.Collection.Count; i++) {
-            TankKills.Add(i, 0);
+            TankKills[i] = 0; // (indexer: safe if Setup runs again in the same process)
         }
     }
     public void Serialize() {

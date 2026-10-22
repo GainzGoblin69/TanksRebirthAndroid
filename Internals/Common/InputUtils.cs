@@ -40,6 +40,8 @@ public static class InputUtils
             // controller: Start pauses; B goes back in menus
             bool padBack = CurrentGamePadSnapshot.IsButtonDown(Buttons.Start)
                 || (CurrentGamePadSnapshot.IsButtonDown(Buttons.B) && !Framework.Input.TouchControls.GameplayControlsActive);
+            if (CurrentGamePadSnapshot.IsButtonDown(Buttons.Back))
+                Framework.Input.TouchControls.NoteBackFromGamePad();
             if (Framework.Input.TouchControls.PauseJustPressed || CurrentGamePadSnapshot.IsButtonDown(Buttons.Back) || padBack)
                 keys.Add(Keys.Escape);
             CurrentKeySnapshot = new KeyboardState(keys.ToArray());

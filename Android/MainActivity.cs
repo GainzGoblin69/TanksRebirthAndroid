@@ -34,6 +34,8 @@ public class MainActivity : AndroidGameActivity {
     // than treat it as a failed launch.
     private static MainActivity? s_current;
     private static bool s_unpacking;
+    // The game keeps lots of static state and expects a fresh process per run, like on desktop.
+    private static bool s_gameCreated;
 
     private TankGame? _game;
     private SecondScreenPanel? _panel;
@@ -141,6 +143,17 @@ public class MainActivity : AndroidGameActivity {
         if (_game != null)
             return;
 
+        if (s_gameCreated) {
+            // Android kept the old process alive and reopened us; the game can't start twice in one process.
+            // Close this process completely; the next tap on the icon starts fresh.
+            Breadcrumb("stale process from an earlier run; restarting");
+            try { File.Delete(MarkerPath); } catch { }
+            FinishAndRemoveTask();
+            Android.OS.Process.KillProcess(Android.OS.Process.MyPid());
+            return;
+        }
+        s_gameCreated = true;
+
         try {
             // The game opens its files relative to the working directory, and keeps saves in TANKSREBIRTH_SAVE_DIR.
             Directory.SetCurrentDirectory(_gameDir);
@@ -201,8 +214,22 @@ public class MainActivity : AndroidGameActivity {
     protected override void OnDestroy() {
         try { _panel?.Dismiss(); } catch { }
         _panel = null;
+        bool closing = IsFinishing && _game != null;
         base.OnDestroy();
+        // When the app is closed for real, end the process so the next launch starts clean.
+        if (closing)
+            Android.OS.Process.KillProcess(Android.OS.Process.MyPid());
     }
+
+    // Back gesture/button: act like Escape in the game (back out of menus, pause/unpause) instead of closing the app.
+#pragma warning disable CS0672, CA1422
+    public override void OnBackPressed() {
+        if (_game != null)
+            TouchControls.RequestBack();
+        else
+            base.OnBackPressed();
+    }
+#pragma warning restore CS0672, CA1422
 
     protected override void OnPause() {
         _resumed = false;

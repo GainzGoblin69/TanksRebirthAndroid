@@ -234,6 +234,11 @@ public static class GameUI
                 HandleBackButton();
                 return;
             }
+            // phones: the back gesture / Escape steps back out of menu sub-screens (e.g. Difficulties)
+            if (Internals.Common.Framework.Input.TouchControls.Enabled && MainMenuUI.IsActive && BackButton.IsVisible) {
+                HandleBackButton();
+                return;
+            }
             else if (!MainMenuUI.IsActive) {
                 Paused = !Paused;
 

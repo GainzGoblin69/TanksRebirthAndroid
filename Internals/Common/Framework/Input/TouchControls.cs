@@ -42,6 +42,16 @@ public static class TouchControls {
     public static void RequestPause() => _pauseRequested = true;
     public static void RequestMine() => _mineRequested = true;
 
+    private static DateTime _lastBack = DateTime.MinValue;
+    /// <summary>Android back (from the activity). Ignored if MonoGame already reported this same press.</summary>
+    public static void RequestBack() {
+        if ((DateTime.UtcNow - _lastBack).TotalSeconds > 0.4)
+            _pauseRequested = true;
+        _lastBack = DateTime.UtcNow;
+    }
+    /// <summary>Called when MonoGame reports the back key as the controller Back button.</summary>
+    public static void NoteBackFromGamePad() => _lastBack = DateTime.UtcNow;
+
     /// <summary>Which side the joystick currently lives on.</summary>
     public static bool StickOnRight { get; private set; }
 
