@@ -299,10 +299,15 @@ public class GameHandler {
         CameraGlobals.SetMatrices();
     }
     public static void SetupGraphics() {
+        TankGame.ClientLog.Write("SetupGraphics: GameShaders.Initialize();", Internals.LogType.Debug);
         GameShaders.Initialize();
+        TankGame.ClientLog.Write("SetupGraphics: GameScene.InitializeRenderers();", Internals.LogType.Debug);
         GameScene.InitializeRenderers();
+        TankGame.ClientLog.Write("SetupGraphics: SceneManager.LoadGameScene();", Internals.LogType.Debug);
         SceneManager.LoadGameScene();
+        TankGame.ClientLog.Write("SetupGraphics: DebugManager.InitDebugUI();", Internals.LogType.Debug);
         DebugManager.InitDebugUI();
+        TankGame.ClientLog.Write("SetupGraphics: PlacementSquare.InitializeLevelEditorSquares();", Internals.LogType.Debug);
         PlacementSquare.InitializeLevelEditorSquares();
     }
 }

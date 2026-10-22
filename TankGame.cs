@@ -512,8 +512,11 @@ public class TankGame : Game {
         GameResources.EnsurePreloadedAssetsArePreloaded();
         ClientLog.Write("Setting up graphics and UI...", LogType.Info);
         GameHandler.SetupGraphics();
+        ClientLog.Write("LoadContent: GameUI.Initialize();", LogType.Debug);
         GameUI.Initialize();
+        ClientLog.Write("LoadContent: MainMenuUI.InitializeUI();", LogType.Debug);
         MainMenuUI.InitializeUI();
+        ClientLog.Write("LoadContent: MainMenuUI.InitializeBasics();", LogType.Debug);
         MainMenuUI.InitializeBasics();
 
         // this is achievements stuff
@@ -535,6 +538,7 @@ public class TankGame : Game {
         MainMenuUI.Open();
         ClientLog.Write("Main menu opened.", LogType.Info);
 
+        ClientLog.Write("LoadContent: ModLoader.LoadMods();", LogType.Debug);
         ModLoader.LoadMods();
 
         if (ModLoader.LoadingMods) {
@@ -569,8 +573,10 @@ public class TankGame : Game {
             //ChatSystem.SendMessage("Type /update to update the game and automatically restart.", Color.Red);
             SoundPlayer.SoundError();
         });
+        ClientLog.Write("LoadContent: PlaceSecrets();", LogType.Debug);
         PlaceSecrets();
 
+        ClientLog.Write("LoadContent: SceneManager.GameLight.Apply(false);", LogType.Debug);
         SceneManager.GameLight.Apply(false);
     }
     // FIXME: this method is a clusterfuck
