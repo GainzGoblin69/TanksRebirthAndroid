@@ -135,8 +135,13 @@ public class GameHandler {
         // phones: the main menu shows a still of the battlefield, so freeze the demo battle after a few frames
         // (a few updates are needed first to position the tanks)
         bool menuStill = Internals.Common.Framework.Input.TouchControls.Enabled && MainMenuUI.IsActive;
-        _menuStillFrames = menuStill ? _menuStillFrames + 1 : 0;
-        bool freezeEntities = menuStill && _menuStillFrames > 4;
+        // only count frames where the battle actually updated (not while the screen is still fading in), and
+        // only once there are tanks on the board
+        if (!menuStill)
+            _menuStillFrames = 0;
+        else if (!IntermissionSystem.IsAwaitingNewMission && AllTanks.Any(t => t is not null))
+            _menuStillFrames++;
+        bool freezeEntities = menuStill && _menuStillFrames > 10;
 
         if (!IntermissionSystem.IsAwaitingNewMission && !freezeEntities) {
             foreach (var pTank in AllPlayerTanks)
