@@ -184,7 +184,8 @@ public static class GameUI
     public static void SetSettingsUIVisibility(bool visible) {
         VolumeButton.IsVisible = visible;
         GraphicsButton.IsVisible = visible;
-        ControlsButton.IsVisible = visible;
+        // phones: no keyboard to rebind, so no Controls page
+        ControlsButton.IsVisible = visible && !Internals.Common.Framework.Input.TouchControls.Enabled;
         BackButton.IsVisible = visible;
     }
 
@@ -348,7 +349,7 @@ public static class GameUI
             VolumeUI.HideAll();
             VolumeButton.IsVisible = true;
             GraphicsButton.IsVisible = true;
-            ControlsButton.IsVisible = true;
+            ControlsButton.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled; // no Controls page on phones
         }
         else if (GraphicsUI.BatchVisible)
         {
@@ -356,7 +357,7 @@ public static class GameUI
             GraphicsUI.HideAll();
             VolumeButton.IsVisible = true;
             GraphicsButton.IsVisible = true;
-            ControlsButton.IsVisible = true;
+            ControlsButton.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled; // no Controls page on phones
 
             if (TankGame.Settings.WindowKind == WindowKind.Windowed) {
                 TankGame.Settings.ResWidth = GraphicsUI.CurrentRes.Key;
@@ -377,7 +378,7 @@ public static class GameUI
             ControlsUI.HideAll();
             VolumeButton.IsVisible = true;
             GraphicsButton.IsVisible = true;
-            ControlsButton.IsVisible = true;
+            ControlsButton.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled; // no Controls page on phones
         }
         else
         {

@@ -181,11 +181,11 @@ public static class GraphicsUI {
 
     public static void ShowAll() {
         PerPixelLightingButton.IsVisible = true;
-        VsyncButton.IsVisible = true;
+        VsyncButton.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled; // Android always syncs to the display
         FullScreenButton.IsVisible = true;
         ResolutionButton.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled;
         PerPixelLightingToggle.IsVisible = true;
-        VsyncToggle.IsVisible = true;
+        VsyncToggle.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled;
         FullScreenButton.IsVisible = true;
     }
 }

@@ -175,13 +175,46 @@ public static partial class MainMenuUI {
         if (inCampaignsMenu)
             SetCampaignDisplay();
     }
+    /// <summary>Phones: pick the starting mission with - / + buttons instead of the mouse wheel.</summary>
+    private static void DrawMissionPickerButtons() {
+        var sb = TankGame.SpriteRenderer;
+        var center = new Vector2(WindowUtils.WindowWidth / 3f, WindowUtils.WindowHeight * 0.66f);
+        var size = new Vector2(110, 90).ToResolution();
+        var minus = new Rectangle((int)(center.X - size.X * 2.4f), (int)(center.Y - size.Y / 2), (int)size.X, (int)size.Y);
+        var plus = new Rectangle((int)(center.X + size.X * 1.4f), (int)(center.Y - size.Y / 2), (int)size.X, (int)size.Y);
+
+        bool clicked = InputUtils.CanDetectClick();
+        if (clicked && minus.Contains(MouseUtils.MousePosition) && MissionCheckpoint > 0) {
+            MissionCheckpoint--;
+            SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
+        }
+        if (clicked && plus.Contains(MouseUtils.MousePosition)) {
+            MissionCheckpoint++;
+            SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
+        }
+
+        foreach (var (rect, label) in new[] { (minus, "-"), (plus, "+") }) {
+            DrawUtils.DrawNineSliced(sb, UIElement.UIPanelBackground, 12, rect, rect.Contains(MouseUtils.MousePosition) ? Color.CornflowerBlue : Color.WhiteSmoke, Vector2.Zero);
+            var m = FontGlobals.RebirthFont.MeasureString(label);
+            sb.DrawString(FontGlobals.RebirthFont, label, rect.Center.ToVector2(), Color.Black, new Vector2(1.6f).ToResolution(), 0f, m / 2f);
+        }
+
+        DrawUtils.DrawStringWithBorder(sb, FontGlobals.RebirthFont, $"Start at mission {MissionCheckpoint + 1}",
+            center, Color.White, Color.Black, new Vector2(0.9f).ToResolution(), 0f, Anchor.Center);
+        DrawUtils.DrawStringWithBorder(sb, FontGlobals.RebirthFont, "You will be alerted if that mission does not exist.",
+            center + new Vector2(0, size.Y * 0.9f), Color.White, Color.Black, new Vector2(0.55f).ToResolution(), 0f, Anchor.TopCenter);
+    }
+
     public static void DrawCampaignMenuExtras() {
         if (_oldwheel != InputUtils.DeltaScrollWheel)
             MissionCheckpoint += InputUtils.DeltaScrollWheel - _oldwheel;
         if (MissionCheckpoint < 0)
             MissionCheckpoint = 0;
 
-        DrawUtils.DrawStringWithBorder(TankGame.SpriteRenderer, FontGlobals.RebirthFont, $"You can scroll with your mouse to skip to a certain mission." +
+        if (Internals.Common.Framework.Input.TouchControls.Enabled) {
+            DrawMissionPickerButtons();
+        }
+        else DrawUtils.DrawStringWithBorder(TankGame.SpriteRenderer, FontGlobals.RebirthFont, $"You can scroll with your mouse to skip to a certain mission." +
             $"\nCurrently, you will skip to mission {MissionCheckpoint + 1}." +
             $"\nYou will be alerted if that mission does not exist.", new Vector2(WindowUtils.WindowWidth / 3, WindowUtils.WindowHeight * 0.6f),
             Color.White, Color.Black, new Vector2(0.75f).ToResolution(), 0f, Anchor.TopCenter);
