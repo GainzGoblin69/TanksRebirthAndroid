@@ -68,7 +68,12 @@ public static partial class MainMenuUI {
     private static void PText(SpriteBatch sb, string text, Vector2 pos, float scale, Color color, bool center = true) {
         var font = FontGlobals.RebirthFont;
         var m = font.MeasureString(text);
-        sb.DrawString(font, text, pos, color, new Vector2(scale * PhoneScale), 0f, center ? m / 2f : new Vector2(0, m.Y / 2f));
+        // a bit larger than the desktop text for phones, but always fitting inside the right-hand panel
+        float sc = scale * 1.35f * PhoneScale;
+        float maxW = RightPanel().Width * 0.92f;
+        if (m.X * sc > maxW)
+            sc = maxW / Math.Max(1f, m.X);
+        sb.DrawString(font, text, pos, color, new Vector2(sc), 0f, center ? m / 2f : new Vector2(0, m.Y / 2f));
     }
 
     /// <summary>The panel to the right of the button column.</summary>
