@@ -152,7 +152,7 @@ public static partial class MainMenuUI {
         return new Rectangle((int)(l.Margin + col * (l.TileW + l.Gap)), (int)(l.Top + row * (l.TileH + l.Gap) - _lsScroll), (int)l.TileW, (int)l.TileH);
     }
 
-    private static Rectangle LsBackRect => new((int)(28 * LsScale), (int)(28 * LsScale), (int)(190 * LsScale), (int)(76 * LsScale));
+    private static Rectangle LsBackRect => new((int)(28 * LsScale), (int)(18 * LsScale), (int)(230 * LsScale), (int)(92 * LsScale));
 
     // ------------------------------------------------------------------ update
 
@@ -400,8 +400,10 @@ public static partial class MainMenuUI {
         // header (drawn last so scrolled tiles slide under it)
         sb.Draw(px, new Rectangle(0, 0, WindowUtils.WindowWidth, (int)(layout.Top - 8 * s)), LsBackground);
         var back = LsBackRect;
-        DrawUtils.DrawNineSliced(sb, UIElement.UIPanelBackground, 12, back, Color.WhiteSmoke, Vector2.Zero);
-        DrawCentered(sb, font, "Back", back.Center.ToVector2(), Color.Black, 0.8f * s);
+        int lip = (int)(7 * s);
+        ToggleSwitch.DrawRoundedRect(sb, new Rectangle(back.X, back.Y + lip, back.Width, back.Height - lip), 26 * s, UITextButton.PhoneEdge);
+        ToggleSwitch.DrawRoundedRect(sb, new Rectangle(back.X, back.Y, back.Width, back.Height - lip), 26 * s, UITextButton.PhoneFill);
+        DrawCentered(sb, font, "Back", new Vector2(back.Center.X, back.Center.Y - lip / 2f), new Color(40, 30, 22), 0.95f * s);
 
         string title = mods ? $"Mission {_lsModMission + 1}: Challenges" : "Level Select";
         DrawCentered(sb, FontGlobals.RebirthFont, title, new Vector2(WindowUtils.WindowWidth / 2f, back.Center.Y), Color.White, 1.15f * s);

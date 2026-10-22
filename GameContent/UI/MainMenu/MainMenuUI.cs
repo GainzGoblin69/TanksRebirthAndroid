@@ -105,6 +105,7 @@ public static partial class MainMenuUI
         foreach (var e in _menuElements) {
             e.OnMouseOver = (uiElement) => SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
         }
+        ApplyPhoneLayout();
     }
     public static void Leave() {
         // call partially implemented methods
@@ -112,7 +113,10 @@ public static partial class MainMenuUI
         LeaveGP();
     }
     private static void UpdateModels() {
-        RebirthLogo.Position = new Vector3(0, 300.ToResolutionY(), 0);
+        // phones: the buttons are a column on the left, so the logo sits centered in the space to their right
+        RebirthLogo.Position = Phone
+            ? new Vector3((PhoneColumnRight + WindowUtils.WindowWidth) / 2f - WindowUtils.WindowWidth / 2f, 40.ToResolutionY(), 0)
+            : new Vector3(0, 300.ToResolutionY(), 0);
 
         // slowly return to normal if the mouse is not on-screen
         if (!MouseUtils.MouseOnScreen) {

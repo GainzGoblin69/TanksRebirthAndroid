@@ -49,6 +49,20 @@ public static class ToggleSwitch {
         sb.Draw(_pixel!, a, null, color, MathF.Atan2(d.Y, d.X), new Vector2(0, 0.5f), new Vector2(d.Length(), thickness), SpriteEffects.None, 0f);
     }
 
+    /// <summary>A filled rounded rectangle (use an opaque color: the pieces overlap).</summary>
+    public static void DrawRoundedRect(SpriteBatch sb, Rectangle r, float radius, Color color) {
+        EnsureTextures(sb.GraphicsDevice);
+        radius = MathF.Min(radius, MathF.Min(r.Width, r.Height) / 2f);
+        int ri = (int)radius;
+        sb.Draw(_pixel!, new Rectangle(r.X + ri, r.Y, r.Width - 2 * ri, r.Height), color);
+        sb.Draw(_pixel!, new Rectangle(r.X, r.Y + ri, ri, r.Height - 2 * ri), color);
+        sb.Draw(_pixel!, new Rectangle(r.Right - ri, r.Y + ri, ri, r.Height - 2 * ri), color);
+        DrawCircle(sb, new Vector2(r.X + radius, r.Y + radius), radius, color);
+        DrawCircle(sb, new Vector2(r.Right - radius, r.Y + radius), radius, color);
+        DrawCircle(sb, new Vector2(r.X + radius, r.Bottom - radius), radius, color);
+        DrawCircle(sb, new Vector2(r.Right - radius, r.Bottom - radius), radius, color);
+    }
+
     /// <summary>A check mark in a filled circle.</summary>
     public static void DrawCheckBadge(SpriteBatch sb, Vector2 center, float radius, Color fill) {
         DrawDisc(sb, center + new Vector2(0, radius * 0.08f), radius, Color.Black * 0.35f);

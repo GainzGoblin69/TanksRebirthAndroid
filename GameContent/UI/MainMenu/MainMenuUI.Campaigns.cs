@@ -75,15 +75,21 @@ public static partial class MainMenuUI {
         float uiStartX = totalWidth / 2f;
 
         int slot = 0;
-        Func<Vector2> nextSlot() {
+        // phones: one big left-hand column (campaigns, Level Select, Validate, Back)
+        CampaignColumnCount = totalCampaigns + 2;
+        (Func<Vector2>, Func<Vector2>) nextSlot() {
+            if (phone) {
+                int idx = slot++;
+                return (() => PhoneColumnSlot(idx, CampaignColumnCount).Location.ToVector2(), () => PhoneColumnSlot(idx, CampaignColumnCount).Size.ToVector2());
+            }
             var yOffControl = slot % MAX_CAMPAIGNS_PER_COLUMN;
             var xOffControl = slot / MAX_CAMPAIGNS_PER_COLUMN;
             slot++;
             float offsetY = yOffControl * (defaultDimensions.Y + padding);
             float offsetX = xOffControl * (defaultDimensions.X + padding);
-            return () => new Vector2(
+            return (() => new Vector2(
                 (WindowUtils.WindowWidth / 2f) - uiStartX.ToResolutionX() + offsetX.ToResolutionX(),
-                150f.ToResolutionY() + offsetY.ToResolutionY());
+                150f.ToResolutionY() + offsetY.ToResolutionY()), () => defaultDimensions.ToResolution());
         }
 
         for (int i = 0; i < campaignFiles.Length; i++) {
@@ -112,7 +118,8 @@ public static partial class MainMenuUI {
 
             if (phone)
                 elem.Tooltip = null;
-            elem.SetDimensions(nextSlot(), () => defaultDimensions.ToResolution());
+            var (ePos, eSize) = nextSlot();
+            elem.SetDimensions(ePos, eSize);
 
             elem.OnLeftClick += (el) => {
                 if (Client.IsConnected() && !Client.IsHost()) {
@@ -141,15 +148,21 @@ public static partial class MainMenuUI {
 
             if (isVanilla) {
                 var ls = new UITextButton("Level Select", FontGlobals.RebirthFont, Color.White, 0.8f) { IsVisible = true };
-                ls.SetDimensions(nextSlot(), () => defaultDimensions.ToResolution());
+                var (lPos, lSize) = nextSlot();
+                ls.SetDimensions(lPos, lSize);
                 ls.OnMouseOver = (_) => SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect);
                 ls.OnLeftClick += (_) => OpenLevelSelect();
                 campaignNames.Add(ls);
             }
         }
-        // phones: Freeplay is gone (it only opened an empty board)
-        if (phone)
+        // phones: Freeplay is gone (it only opened an empty board); Validate joins the column
+        if (phone) {
+            int vIdx = CampaignColumnCount - 2;
+            UpdateCampaignButton.Text = "Update Campaign";
+            UpdateCampaignButton.Tooltip = null;
+            UpdateCampaignButton.SetDimensions(() => PhoneColumnSlot(vIdx, CampaignColumnCount).Location.ToVector2(), () => PhoneColumnSlot(vIdx, CampaignColumnCount).Size.ToVector2());
             return;
+        }
         var extra = new UITextButton("Freeplay", FontGlobals.RebirthFont, Color.White, 0.8f) {
             IsVisible = true,
             Tooltip = "Play without a campaign!",
@@ -196,49 +209,75 @@ public static partial class MainMenuUI {
         if (inCampaignsMenu)
             SetCampaignDisplay();
     }
-    /// <summary>Phones: pick the starting mission with - / + buttons instead of the mouse wheel.</summary>
+    /// <summary>Phones: a card on the right to pick the starting mission (- / +), with its best times.</summary>
     private static void DrawMissionPickerButtons() {
         var sb = TankGame.SpriteRenderer;
-        var center = new Vector2(WindowUtils.WindowWidth / 2f, WindowUtils.WindowHeight * 0.66f);
-        var size = new Vector2(110, 90).ToResolution();
-        var minus = new Rectangle((int)(center.X - size.X * 2.4f), (int)(center.Y - size.Y / 2), (int)size.X, (int)size.Y);
-        var plus = new Rectangle((int)(center.X + size.X * 1.4f), (int)(center.Y - size.Y / 2), (int)size.X, (int)size.Y);
+        float s = WindowUtils.WindowHeight / 1080f;
+        var font = FontGlobals.RebirthFont;
+        // centered in the space to the right of the button column
+        float left = PhoneColumnRight + 40 * s;
+        var card = new Rectangle((int)left, (int)(170 * s), (int)Math.Min(WindowUtils.WindowWidth - left - 60 * s, 900 * s), (int)(620 * s));
+        card.X += (int)((WindowUtils.WindowWidth - 60 * s - card.Right) / 2);
+        var cx = card.Center.X;
 
-        bool clicked = InputUtils.CanDetectClick();
-        if (clicked && minus.Contains(MouseUtils.MousePosition) && MissionCheckpoint > 0) {
-            MissionCheckpoint--;
-            SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
-        }
+        float btnR = 72 * s;
+        var minusC = new Vector2(card.X + 60 * s + btnR, card.Y + 250 * s);
+        var plusC = new Vector2(card.Right - 60 * s - btnR, card.Y + 250 * s);
+        var mouse = MouseUtils.MousePosition;
+        bool OnBtn(Vector2 c) => Vector2.Distance(mouse, c) <= btnR * 1.15f;
+
         int unlocked = LevelProgress.HighestUnlocked(LevelSelectCampaign);
         int count = VanillaMissionCount();
         if (count > 0)
             unlocked = Math.Min(unlocked, count - 1);
         if (MissionCheckpoint > unlocked)
             MissionCheckpoint = unlocked;
-        if (clicked && plus.Contains(MouseUtils.MousePosition) && MissionCheckpoint < unlocked) {
+
+        bool clicked = InputUtils.CanDetectClick();
+        if (clicked && OnBtn(minusC) && MissionCheckpoint > 0) {
+            MissionCheckpoint--;
+            SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
+        }
+        if (clicked && OnBtn(plusC) && MissionCheckpoint < unlocked) {
             MissionCheckpoint++;
             SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
         }
 
-        foreach (var (rect, label, enabled) in new[] { (minus, "-", MissionCheckpoint > 0), (plus, "+", MissionCheckpoint < unlocked) }) {
-            var col = !enabled ? Color.Gray : rect.Contains(MouseUtils.MousePosition) ? Color.CornflowerBlue : Color.WhiteSmoke;
-            DrawUtils.DrawNineSliced(sb, UIElement.UIPanelBackground, 12, rect, col, Vector2.Zero);
-            var m = FontGlobals.RebirthFont.MeasureString(label);
-            sb.DrawString(FontGlobals.RebirthFont, label, rect.Center.ToVector2(), Color.Black, new Vector2(1.6f).ToResolution(), 0f, m / 2f);
+        sb.End();
+        sb.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.LinearClamp, null, null);
+
+        int lip = (int)(10 * s);
+        ToggleSwitch.DrawRoundedRect(sb, new Rectangle(card.X, card.Y + lip, card.Width, card.Height), 36 * s, UITextButton.PhoneEdge);
+        ToggleSwitch.DrawRoundedRect(sb, card, 36 * s, UITextButton.PhoneFill);
+        var ink = new Color(40, 30, 22);
+
+        void Text(string t, float y, float scale, Color c) {
+            var m = font.MeasureString(t);
+            sb.DrawString(font, t, new Vector2(cx, y), c, new Vector2(scale * s), 0f, m / 2f);
+        }
+        Text("Start at mission", card.Y + 80 * s, 1.0f, ink);
+        Text($"{MissionCheckpoint + 1}", minusC.Y, 2.6f, ink);
+
+        foreach (var (c, label, enabled) in new[] { (minusC, "-", MissionCheckpoint > 0), (plusC, "+", MissionCheckpoint < unlocked) }) {
+            var fill = !enabled ? new Color(200, 196, 188) : OnBtn(c) && InputUtils.CurrentMouseSnapshot.LeftButton == Microsoft.Xna.Framework.Input.ButtonState.Pressed ? new Color(70, 110, 200) : new Color(96, 140, 230);
+            ToggleSwitch.DrawDisc(sb, c + new Vector2(0, 6 * s), btnR, enabled ? new Color(50, 80, 150) : new Color(170, 165, 158));
+            ToggleSwitch.DrawDisc(sb, c, btnR, fill);
+            var m = font.MeasureString(label);
+            sb.DrawString(font, label, c, Color.White, new Vector2(2.2f * s), 0f, m / 2f);
         }
 
-        DrawUtils.DrawStringWithBorder(sb, FontGlobals.RebirthFont, $"Start at mission {MissionCheckpoint + 1}",
-            center, Color.White, Color.Black, new Vector2(0.9f).ToResolution(), 0f, Anchor.Center);
         var rec = LevelProgress.Get(LevelSelectCampaign, MissionCheckpoint);
-        var lines = new System.Collections.Generic.List<string> {
-            rec.BestSolo > 0 ? $"Fastest time: {LevelProgress.FormatTime(rec.BestSolo)}" : "Fastest time: --"
-        };
-        if (rec.CoopAttempted)
-            lines.Add(rec.BestCoop > 0 ? $"Co-op fastest: {LevelProgress.FormatTime(rec.BestCoop)}" : "Co-op fastest: --");
+        float y = card.Y + 410 * s;
+        Text(rec.BestSolo > 0 ? $"Fastest time: {LevelProgress.FormatTime(rec.BestSolo)}" : "Fastest time: --", y, 0.85f, ink);
+        if (rec.CoopAttempted) {
+            y += 56 * s;
+            Text(rec.BestCoop > 0 ? $"Co-op fastest: {LevelProgress.FormatTime(rec.BestCoop)}" : "Co-op fastest: --", y, 0.85f, ink);
+        }
         if (MissionCheckpoint == unlocked && (count == 0 || unlocked < count - 1))
-            lines.Add($"Clear mission {unlocked + 1} to unlock the next one");
-        DrawUtils.DrawStringWithBorder(sb, FontGlobals.RebirthFont, string.Join("\n", lines),
-            center + new Vector2(0, size.Y * 0.9f), Color.White, Color.Black, new Vector2(0.6f).ToResolution(), 0f, Anchor.TopCenter);
+            Text($"Clear mission {unlocked + 1} to unlock the next one", card.Bottom - 50 * s, 0.6f, new Color(120, 96, 70));
+
+        sb.End();
+        sb.Begin();
     }
 
     private static int _vanillaCount = -1;

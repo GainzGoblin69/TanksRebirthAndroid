@@ -491,7 +491,18 @@ public static class IntermissionSystem {
             1f, shadowDistScale: 1.5f, shadowAlpha: 0.5f, borderThickness: 2.5f, charSpacing: spacing);
 
         // draw campaign/mission data
-        if (CampaignGlobals.LoadedCampaign.CurrentMissionId == 0)
+        if (LevelProgress.Run is { } lsRun)
+            // level-select runs: say which challenge this is
+            DrawUtils.DrawStringWithBorderAndShadow(spriteBatch, FontGlobals.RebirthFontLarge,
+                new Vector2(WindowUtils.WindowWidth / 2, textOffsetDetails),
+                Vector2.One,
+                $"Level Select: {TankGame.GameLanguage.Mission} #{CampaignGlobals.LoadedCampaign.CurrentMissionId + 1}  -  " +
+                (lsRun.Modifier is { } lsMod ? $"Modifier: {lsMod.Name}" : "No modifier"),
+                BackgroundColor,
+                ColorForBorders,
+                TextAnimatorSmall.CurrentScale.ToResolution() * 1.15f,
+                1f, shadowDistScale: 1.5f, shadowAlpha: 0.5f, borderThickness: 1.5f);
+        else if (CampaignGlobals.LoadedCampaign.CurrentMissionId == 0)
             DrawUtils.DrawStringWithBorderAndShadow(spriteBatch, FontGlobals.RebirthFontLarge,
                 new Vector2(WindowUtils.WindowWidth / 2, textOffsetDetails),
                 Vector2.One,

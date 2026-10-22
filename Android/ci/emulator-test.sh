@@ -44,11 +44,14 @@ sleep 4
 # tap Play on the main menu (as a fraction of the screen size) and capture what comes next
 SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)
 W=${SIZE%x*}; H=${SIZE#*x}; [ $W -lt $H ] && { T=$W; W=$H; H=$T; }
-adb shell input tap $((W * 494 / 1000)) $((H * 527 / 1000))
+# phone menus: one button column on the left (x = 384/1080 of the height); main menu = 4 slots, play menu = 6
+CX=$((H * 384 / 1080))
+adb exec-out screencap -p > diag/run2-mainmenu.png
+adb shell input tap $CX $((H * 314 / 1000))
 sleep 6
 adb exec-out screencap -p > diag/run2-after-play.png
 # open Difficulties and flip the first two toggles (positions from the phone layout, as screen fractions)
-adb shell input tap $((W * 494 / 1000)) $((H * 531 / 1000)); sleep 4
+adb shell input tap $CX $((H * 455 / 1000)); sleep 4
 adb exec-out screencap -p > diag/run2-difficulties.png
 adb shell input tap $((W * 263 / 1000)) $((H * 147 / 1000)); sleep 3
 adb shell input tap $((W * 263 / 1000)) $((H * 214 / 1000)); sleep 3
@@ -56,15 +59,16 @@ adb exec-out screencap -p > diag/run2-difficulties-toggled.png
 # turn on Lantern Mode (3rd column, 6th row), go Back, then Single Player
 adb shell input tap $((W * 736 / 1000)) $((H * 480 / 1000)); sleep 2
 adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 3
-adb shell input tap $((W * 494 / 1000)) $((H * 437 / 1000)); sleep 5
+adb shell input tap $CX $((H * 173 / 1000)); sleep 5
 adb exec-out screencap -p > diag/run2-singleplayer.png
 
 # Level Select (the button under "Campaign"): let previews render, then start mission 1
-adb shell input tap $((W * 500 / 1000)) $((H * 213 / 1000)); sleep 15
+adb shell input tap $CX $((H * 455 / 1000)); sleep 15
 adb exec-out screencap -p > diag/run2-levelselect-15s.png
 sleep 60
 adb exec-out screencap -p > diag/run2-levelselect-75s.png
-adb shell input tap $((W * 100 / 1000)) $((H * 217 / 1000)); sleep 15
+adb shell input tap $((W * 100 / 1000)) $((H * 217 / 1000)); sleep 6
+adb exec-out screencap -p > diag/run2-levelrun-banner.png; sleep 9
 adb exec-out screencap -p > diag/run2-levelrun.png
 
 adb logcat -d -v threadtime > diag/logcat-full.txt
