@@ -85,6 +85,12 @@ public class MainActivity : AndroidGameActivity {
     private void BeginLaunch() {
         File.WriteAllText(MarkerPath, DateTime.Now.ToString("O"));
         File.WriteAllText(StartupPath, "");
+        // keep the last run's crash for reference, but don't show it as this run's error
+        try {
+            if (File.Exists(CrashPath))
+                File.Move(CrashPath, Path.Combine(_saveDir, "crash-previous.txt"), true);
+        }
+        catch { }
         Breadcrumb("launch started");
 
         // Usual case: files already unpacked, so start the game right here in OnCreate. MonoGame then gets the

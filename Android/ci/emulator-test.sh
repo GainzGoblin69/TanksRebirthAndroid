@@ -53,6 +53,11 @@ adb exec-out screencap -p > diag/run2-difficulties.png
 adb shell input tap $((W * 263 / 1000)) $((H * 147 / 1000)); sleep 3
 adb shell input tap $((W * 263 / 1000)) $((H * 214 / 1000)); sleep 3
 adb exec-out screencap -p > diag/run2-difficulties-toggled.png
+# turn on Lantern Mode (3rd column, 6th row), go Back, then Single Player
+adb shell input tap $((W * 736 / 1000)) $((H * 480 / 1000)); sleep 2
+adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 3
+adb shell input tap $((W * 494 / 1000)) $((H * 437 / 1000)); sleep 5
+adb exec-out screencap -p > diag/run2-singleplayer.png
 
 adb logcat -d -v threadtime > diag/logcat-full.txt
 grep -iE "mono-rt|Thread|at |TanksRebirth|DOTNET|mono|monodroid|AndroidRuntime|FATAL|Exception|libc|DEBUG|OpenGL|EGL|Adreno|MonoGame|$PKG" diag/logcat-full.txt > diag/logcat-filtered.txt

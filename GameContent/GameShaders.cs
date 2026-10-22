@@ -60,15 +60,21 @@ public class GameShaders
             var activeTanks = GameHandler.AllPlayerTanks.Where(x => x is not null && !x.IsDestroyed).ToArray();
 
             if (activeTanks.Length == 0 || MainMenuUI.IsActive) {
-                LanternShader.Parameters["oLanternCount"]?.SetValue(0);
+                LanternShader.Parameters["oLanternActive"]?.SetValue(0f);
                 return;
             }
 
-            var lanternPositions = new Vector2[activeTanks.Length];
-            var lanternPowers = new float[activeTanks.Length];
-            var lanternColors = new Vector3[activeTanks.Length];
+            // the shader has exactly 4 lantern slots; unused ones stay dark (zero color, tiny radius, off-screen)
+            const int LanternSlots = 4;
+            var lanternPositions = new Vector2[LanternSlots];
+            var lanternPowers = new float[LanternSlots];
+            var lanternColors = new Vector3[LanternSlots];
+            for (int i = 0; i < LanternSlots; i++) {
+                lanternPositions[i] = new Vector2(-10f);
+                lanternPowers[i] = 0.0001f;
+            }
 
-            for (int i = 0; i < activeTanks.Length; i++) {
+            for (int i = 0; i < System.Math.Min(activeTanks.Length, LanternSlots); i++) {
                 var tank = activeTanks[i];
 
                 var screenPos = MatrixUtils.ConvertWorldToScreen(
@@ -85,7 +91,7 @@ public class GameShaders
             }
 
             LanternShader.Parameters["oMaxDark"]?.SetValue(0.015f);
-            LanternShader.Parameters["oLanternCount"]?.SetValue(activeTanks.Length);
+            LanternShader.Parameters["oLanternActive"]?.SetValue(1f);
             LanternShader.Parameters["oLanternPositions"]?.SetValue(lanternPositions);
             LanternShader.Parameters["oLanternPowers"]?.SetValue(lanternPowers);
             LanternShader.Parameters["oLanternColors"]?.SetValue(lanternColors);

@@ -1,9 +1,11 @@
 ﻿float oTime;
 float oBend;
-int oLanternCount;
-float2 oLanternPositions[8];
-float oLanternPowers[8];
-float3 oLanternColors[8];
+// Up to 4 lanterns (one per player). Unused slots are filled with zero light by the game, so the loop below can
+// have a fixed length: mobile GPUs (OpenGL ES) reject loops bounded by a uniform and dynamic array indexing.
+float oLanternActive;
+float2 oLanternPositions[4];
+float oLanternPowers[4];
+float3 oLanternColors[4];
 float oMaxDark = 0.01;
 
 sampler TexSampler : register(s0);
@@ -52,12 +54,13 @@ float4 lantern_ps(float4 sampleColor : COLOR0, float2 coords : TEXCOORD0) : COLO
         color.rgb = lerp(color.rgb * oMaxDark, color.rgb, lightAmount); // 0.1 = darkness level
     }*/
     float4 color = tex2D(TexSampler, coords);
-    if (oLanternCount > 0)
+    if (oLanternActive > 0.5)
     {
         float3 totalLight = float3(0.0, 0.0, 0.0);
         
         // Each lantern contributes colored light independently
-        for (int i = 0; i < oLanternCount && i < 16; i++)
+        [unroll]
+        for (int i = 0; i < 4; i++)
         {
             float dist = distance(oLanternPositions[i], coords);
             
