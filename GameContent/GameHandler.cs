@@ -72,6 +72,7 @@ public class GameHandler {
         CosmeticsUI.Initialize();
         RebirthMouse.Initialize();
     }
+    private static int _menuStillFrames;
     internal static void UpdateAll(GameTime gameTime) {
         /*void doTestWithFont() {
             var str = 
@@ -131,7 +132,13 @@ public class GameHandler {
         foreach (var ping in IngamePing.AllIngamePings)
             ping?.Update();
 
-        if (!IntermissionSystem.IsAwaitingNewMission) {
+        // phones: the main menu shows a still of the battlefield, so freeze the demo battle after a few frames
+        // (a few updates are needed first to position the tanks)
+        bool menuStill = Internals.Common.Framework.Input.TouchControls.Enabled && MainMenuUI.IsActive;
+        _menuStillFrames = menuStill ? _menuStillFrames + 1 : 0;
+        bool freezeEntities = menuStill && _menuStillFrames > 4;
+
+        if (!IntermissionSystem.IsAwaitingNewMission && !freezeEntities) {
             foreach (var pTank in AllPlayerTanks)
                 pTank?.Update();
 

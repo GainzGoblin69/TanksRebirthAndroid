@@ -31,6 +31,13 @@ adb shell am force-stop $PKG
 sleep 3
 launch run2 60
 
+# tap Play on the main menu (as a fraction of the screen size) and capture what comes next
+SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)
+W=${SIZE%x*}; H=${SIZE#*x}; [ $W -lt $H ] && { T=$W; W=$H; H=$T; }
+adb shell input tap $((W * 494 / 1000)) $((H * 527 / 1000))
+sleep 6
+adb exec-out screencap -p > diag/run2-after-play.png
+
 adb logcat -d -v threadtime > diag/logcat-full.txt
 grep -iE "mono-rt|Thread|at |TanksRebirth|DOTNET|mono|monodroid|AndroidRuntime|FATAL|Exception|libc|DEBUG|OpenGL|EGL|Adreno|MonoGame|$PKG" diag/logcat-full.txt > diag/logcat-filtered.txt
 adb shell "ls -laR '$EXT'" > diag/files.txt 2>&1

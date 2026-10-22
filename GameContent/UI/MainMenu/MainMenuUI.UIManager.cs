@@ -223,6 +223,10 @@ public static partial class MainMenuUI
             TankGame.SpriteRenderer.DrawString(FontGlobals.RebirthFont, $"STEAM LAUNCH!\nLogged in as '{SteamworksUtils.MyUsername}'\n" +
                 $"You have {SteamworksUtils.FriendsCount} friends.", Vector2.One * 8, Color.White, Vector2.One.ToResolution(), 0f, Vector2.Zero);
 
+        // phones: keep the menu clean, just the logo and buttons over a still of the battlefield
+        if (Internals.Common.Framework.Input.TouchControls.Enabled)
+            return;
+
         spriteBatch.End();
 
         spriteBatch.Begin(effect: GameShaders.AnimatedRainbow);

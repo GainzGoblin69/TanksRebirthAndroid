@@ -17,8 +17,11 @@ namespace TanksRebirth.Internals.Common.Framework.Input;
 
 /// <summary>
 /// On-screen touch controls for phones and tablets.
-/// <para>While playing: a floating joystick on the left side of the screen drives the tank, and tapping anywhere
-/// on the right side aims the turret at that spot and fires. Small buttons lay mines and pause.</para>
+/// <para>While playing: a floating joystick drives the tank, and tapping the other side of the screen aims the
+/// turret at that spot and fires. The joystick lives on one side ("home"), left by default. With the joystick
+/// idle, a touch on the other side is a shot if it's a quick tap, but if it's held or dragged it becomes the
+/// joystick and the joystick's home moves to that side (the mine button moves to the opposite corner), so you
+/// can drive with your right thumb and shoot on the left.</para>
 /// <para>Everywhere else (menus, pause screen, results) the first finger simply acts as the mouse, so the
 /// existing mouse-driven UI keeps working.</para>
 /// </summary>
@@ -31,18 +34,30 @@ public static class TouchControls {
     public static bool MineJustPressed { get; private set; }
     public static bool PauseJustPressed { get; private set; }
 
-    /// <summary>Fraction of the screen width (from the left) where a new touch grabs the joystick.</summary>
+    /// <summary>Which side the joystick currently lives on.</summary>
+    public static bool StickOnRight { get; private set; }
+
+    /// <summary>Fraction of the screen width, measured from the joystick's side, where a touch grabs the joystick.</summary>
     public static float JoystickZone { get; set; } = 0.45f;
     public static float DeadZone { get; set; } = 0.2f;
+    /// <summary>How long a touch on the shooting side must be held (seconds) before it becomes the joystick.</summary>
+    public static float HoldToMoveTime { get; set; } = 0.2f;
 
     private static int _stickId = -1;
     private static Vector2 _stickOrigin;
     private static Vector2 _stickPos;
 
+    // a touch on the shooting side while the joystick is idle: a tap (shoot) or the start of a hold (move)?
+    private static int _pendingId = -1;
+    private static Vector2 _pendingStart;
+    private static Vector2 _pendingPos;
+    private static DateTime _pendingSince;
+
     private static int _pointerId = -1;
     private static Vector2 _pointerPos;
     private static bool _pointerDown;
     private static bool _pointerRetap;
+    private static bool _tapPressThisFrame;
 
     private static readonly HashSet<int> _buttonTouches = [];
     private static readonly HashSet<int> _seen = [];
@@ -52,11 +67,20 @@ public static class TouchControls {
 
     private static float UiScale => Math.Max(WindowUtils.WindowHeight, 1) / 1080f;
     private static float StickRadius => 170f * UiScale;
-    private static Vector2 RestingStickCenter => new(StickRadius * 1.6f, WindowUtils.WindowHeight - StickRadius * 1.6f);
+    private static Vector2 RestingStickCenter => new(
+        StickOnRight ? WindowUtils.WindowWidth - StickRadius * 1.6f : StickRadius * 1.6f,
+        WindowUtils.WindowHeight - StickRadius * 1.6f);
     private static float ButtonRadius => 85f * UiScale;
-    private static Vector2 MineButtonCenter => new(WindowUtils.WindowWidth - ButtonRadius * 1.5f, WindowUtils.WindowHeight - ButtonRadius * 1.5f);
+    // the mine button sits in the bottom corner opposite the joystick
+    private static Vector2 MineButtonCenter => new(
+        StickOnRight ? ButtonRadius * 1.5f : WindowUtils.WindowWidth - ButtonRadius * 1.5f,
+        WindowUtils.WindowHeight - ButtonRadius * 1.5f);
     private static Vector2 PauseButtonCenter => new(ButtonRadius * 0.9f, ButtonRadius * 0.9f);
     private static float PauseButtonRadius => ButtonRadius * 0.65f;
+
+    private static bool InStickZone(Vector2 pos) => StickOnRight
+        ? pos.X > WindowUtils.WindowWidth * (1f - JoystickZone)
+        : pos.X < WindowUtils.WindowWidth * JoystickZone;
 
     /// <summary>True while a mission is being played (or is between missions) and no menu is covering the field.</summary>
     public static bool GameplayControlsActive =>
@@ -67,14 +91,26 @@ public static class TouchControls {
         && !ChatSystem.ActiveHandle
         && !TankGame.IsCrashInfoVisible;
 
+    private static void GrabStick(int id, Vector2 origin, Vector2 pos) {
+        _stickId = id;
+        // keep the whole base on screen so the knob can travel in every direction
+        _stickOrigin = new Vector2(
+            MathHelper.Clamp(origin.X, StickRadius, WindowUtils.WindowWidth - StickRadius),
+            MathHelper.Clamp(origin.Y, StickRadius, WindowUtils.WindowHeight - StickRadius));
+        _stickPos = pos;
+    }
+
     public static void Update() {
         MineJustPressed = false;
         PauseJustPressed = false;
         _pointerRetap = false;
+        _tapPressThisFrame = false;
 
         bool gameplay = GameplayControlsActive;
-        if (!gameplay)
+        if (!gameplay) {
             _stickId = -1;
+            _pendingId = -1;
+        }
 
         _seen.Clear();
         var touches = TouchPanel.GetState();
@@ -96,14 +132,18 @@ public static class TouchControls {
                     _buttonTouches.Add(touch.Id);
                     continue;
                 }
-                if (gameplay && _stickId == -1 && pos.X < WindowUtils.WindowWidth * JoystickZone) {
-                    _stickId = touch.Id;
-                    // keep the whole base on screen so the knob can travel in every direction
-                    _stickOrigin = new Vector2(
-                        MathHelper.Clamp(pos.X, StickRadius, WindowUtils.WindowWidth - StickRadius),
-                        MathHelper.Clamp(pos.Y, StickRadius, WindowUtils.WindowHeight - StickRadius));
-                    _stickPos = pos;
-                    continue;
+                if (gameplay && _stickId == -1) {
+                    if (InStickZone(pos)) {
+                        GrabStick(touch.Id, pos, pos);
+                        continue;
+                    }
+                    if (_pendingId == -1) {
+                        // joystick idle, touch on the shooting side: wait to see if it's a tap or a hold
+                        _pendingId = touch.Id;
+                        _pendingStart = _pendingPos = pos;
+                        _pendingSince = DateTime.UtcNow;
+                        continue;
+                    }
                 }
                 if (_pointerId == -1) {
                     _pointerId = touch.Id;
@@ -117,7 +157,17 @@ public static class TouchControls {
                     _pointerRetap = true;
                 }
             }
-            else if (!isEnding) {
+            else if (isEnding) {
+                if (touch.Id == _pendingId) {
+                    // lifted quickly: it was a tap, so shoot there
+                    _pendingId = -1;
+                    if (_pointerId == -1) {
+                        _pointerPos = _pendingStart;
+                        _tapPressThisFrame = true;
+                    }
+                }
+            }
+            else {
                 if (touch.Id == _stickId) {
                     _stickPos = pos;
                     // let the base follow the finger when dragged past the edge, so direction changes stay quick
@@ -125,9 +175,24 @@ public static class TouchControls {
                     if (off.Length() > StickRadius)
                         _stickOrigin = _stickPos - Vector2.Normalize(off) * StickRadius;
                 }
+                else if (touch.Id == _pendingId) {
+                    _pendingPos = pos;
+                }
                 else if (touch.Id == _pointerId) {
                     _pointerPos = pos;
                 }
+            }
+        }
+
+        // a pending touch that is held or dragged becomes the joystick, and the joystick moves to that side
+        if (_pendingId != -1) {
+            if (!_seen.Contains(_pendingId))
+                _pendingId = -1;
+            else if (_stickId == -1 && ((DateTime.UtcNow - _pendingSince).TotalSeconds >= HoldToMoveTime
+                     || Vector2.Distance(_pendingPos, _pendingStart) > StickRadius * 0.25f)) {
+                StickOnRight = _pendingStart.X > WindowUtils.WindowWidth / 2f;
+                GrabStick(_pendingId, _pendingStart, _pendingPos);
+                _pendingId = -1;
             }
         }
 
@@ -138,7 +203,7 @@ public static class TouchControls {
             _pointerId = -1;
         _buttonTouches.RemoveWhere(id => !_seen.Contains(id));
 
-        _pointerDown = _pointerId != -1 && !_pointerRetap;
+        _pointerDown = (_pointerId != -1 && !_pointerRetap) || _tapPressThisFrame;
 
         if (_stickId != -1) {
             var v = (_stickPos - _stickOrigin) / StickRadius;

@@ -846,7 +846,9 @@ public class TankGame : Game {
         // this method begins the spritebatch, since it's supposed to have its own
         IntermissionSystem.Draw(SpriteRenderer);
 
-        ChatSystem.DrawMessages();
+        // chat needs a keyboard, so phones skip its on-screen box and alerts
+        if (!TouchControls.Enabled)
+            ChatSystem.DrawMessages();
 
         SpriteRenderer.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, rasterizerState: RenderGlobals.DefaultRasterizer);
 
@@ -889,11 +891,14 @@ public class TankGame : Game {
     }
 
     public static void DrawGameElements() {
-        var shader = Difficulties.Types["LanternMode"] && !MainMenuUI.IsActive ? GameShaders.LanternShader : (MainMenuUI.IsActive ? GameShaders.GaussianBlurShader : null);
+        var shader = Difficulties.Types["LanternMode"] && !MainMenuUI.IsActive ? GameShaders.LanternShader : (MainMenuUI.IsActive && !TouchControls.Enabled ? GameShaders.GaussianBlurShader : null);
         if (!GameScene.ShouldRenderAll) shader = null;
 
         SpriteRenderer.Begin(effect: shader);
         SpriteRenderer.Draw(GameFrameBuffer, Vector2.Zero, null, Color.White, 0f, Vector2.Zero, Vector2.One, default, 0f);
+        // phones: darken the still battlefield behind the menu a little so the logo and buttons stand out
+        if (TouchControls.Enabled && MainMenuUI.IsActive && TextureGlobals.Pixels.TryGetValue(Color.White, out var px))
+            SpriteRenderer.Draw(px, WindowUtils.ScreenRect, Color.Black * 0.3f);
         SpriteRenderer.End();
     } 
     public static void DrawCursor() {
