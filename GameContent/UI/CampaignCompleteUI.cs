@@ -356,7 +356,10 @@ public static class CampaignCompleteUI {
             }
         }
         #endregion
-        txt = ForceSkip ? "Press 'Enter' to exit." : "Press 'Enter' to skip.";
+        if (Internals.Common.Framework.Input.TouchControls.Enabled)
+            txt = ForceSkip ? "Tap to exit." : "Tap to skip.";
+        else
+            txt = ForceSkip ? "Press 'Enter' to exit." : "Press 'Enter' to skip.";
         DrawUtils.DrawStringWithShadow(TankGame.SpriteRenderer, FontGlobals.RebirthFont, new Vector2(WindowUtils.WindowWidth / 2, WindowUtils.WindowHeight - 8), Vector2.One, txt, Color.Black, Vector2.One.ToResolution(), 1f, Anchor.BottomCenter, 0.4f);
 
         txt = "Campaign Results";

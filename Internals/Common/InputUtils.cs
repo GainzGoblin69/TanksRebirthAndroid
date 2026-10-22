@@ -44,6 +44,15 @@ public static class InputUtils
                 Framework.Input.TouchControls.NoteBackFromGamePad();
             if (Framework.Input.TouchControls.PauseJustPressed || CurrentGamePadSnapshot.IsButtonDown(Buttons.Back) || padBack)
                 keys.Add(Keys.Escape);
+            // results screen (after a campaign or game over) continues with Enter: a tap, A/Start, or back do it too
+            if (GameContent.UI.CampaignCompleteUI.IsViewingResults) {
+                bool tapped = CurrentMouseSnapshot.LeftButton == ButtonState.Pressed && OldMouseSnapshot.LeftButton == ButtonState.Released;
+                bool padOk = CurrentGamePadSnapshot.IsButtonDown(Buttons.A) || CurrentGamePadSnapshot.IsButtonDown(Buttons.Start);
+                if (tapped || padOk || keys.Contains(Keys.Escape)) {
+                    keys.Remove(Keys.Escape);
+                    keys.Add(Keys.Enter);
+                }
+            }
             CurrentKeySnapshot = new KeyboardState(keys.ToArray());
             return;
         }
