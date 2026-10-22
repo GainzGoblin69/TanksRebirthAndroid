@@ -34,6 +34,14 @@ public static class TouchControls {
     public static bool MineJustPressed { get; private set; }
     public static bool PauseJustPressed { get; private set; }
 
+    /// <summary>True when a second-screen control panel (e.g. the AYN Thor's lower screen) is showing; the
+    /// on-screen pause button then lives there instead of on the game screen.</summary>
+    public static bool SecondScreenActive { get; set; }
+    private static bool _pauseRequested, _mineRequested;
+    /// <summary>Called by the second-screen panel's buttons (on the UI thread, same as the game loop).</summary>
+    public static void RequestPause() => _pauseRequested = true;
+    public static void RequestMine() => _mineRequested = true;
+
     /// <summary>Which side the joystick currently lives on.</summary>
     public static bool StickOnRight { get; private set; }
 
@@ -111,8 +119,9 @@ public static class TouchControls {
     }
 
     public static void Update() {
-        MineJustPressed = false;
-        PauseJustPressed = false;
+        MineJustPressed = _mineRequested && GameplayControlsActive;
+        PauseJustPressed = _pauseRequested;
+        _mineRequested = _pauseRequested = false;
         _pointerRetap = false;
         _tapPressThisFrame = false;
 
@@ -134,7 +143,7 @@ public static class TouchControls {
                 _seen.Add(touch.Id);
 
             if (touch.State == TouchLocationState.Pressed) {
-                if (gameplay && Vector2.Distance(pos, PauseButtonCenter) <= PauseButtonRadius * 1.3f) {
+                if (gameplay && !SecondScreenActive && Vector2.Distance(pos, PauseButtonCenter) <= PauseButtonRadius * 1.3f) {
                     PauseJustPressed = true;
                     _buttonTouches.Add(touch.Id);
                     continue;
@@ -307,10 +316,12 @@ public static class TouchControls {
         DrawCircle(sb, _ring!, MineButtonCenter, ButtonRadius, Color.White * 0.5f);
         DrawLabel(sb, "MINE", MineButtonCenter, 0.55f);
 
-        // pause button (two bars)
-        DrawCircle(sb, _disc!, PauseButtonCenter, PauseButtonRadius, Color.Black * 0.3f);
-        DrawCircle(sb, _ring!, PauseButtonCenter, PauseButtonRadius, Color.White * 0.5f);
-        if (TextureGlobals.Pixels.TryGetValue(Color.White, out var pixel)) {
+        // pause button (two bars); lives on the second screen when there is one
+        if (!SecondScreenActive)
+            DrawCircle(sb, _disc!, PauseButtonCenter, PauseButtonRadius, Color.Black * 0.3f);
+        if (!SecondScreenActive)
+            DrawCircle(sb, _ring!, PauseButtonCenter, PauseButtonRadius, Color.White * 0.5f);
+        if (!SecondScreenActive && TextureGlobals.Pixels.TryGetValue(Color.White, out var pixel)) {
             var barSize = new Vector2(PauseButtonRadius * 0.22f, PauseButtonRadius * 0.8f);
             var gap = PauseButtonRadius * 0.18f;
             sb.Draw(pixel, new Rectangle((int)(PauseButtonCenter.X - gap - barSize.X), (int)(PauseButtonCenter.Y - barSize.Y / 2), (int)barSize.X, (int)barSize.Y), Color.White * 0.8f);

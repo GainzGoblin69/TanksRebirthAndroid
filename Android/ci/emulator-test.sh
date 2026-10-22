@@ -29,7 +29,13 @@ adb logcat -d -v threadtime > diag/logcat-run1.txt
 adb shell 'cat /data/anr/* 2>/dev/null' > diag/anr-traces.txt
 adb shell am force-stop $PKG
 sleep 3
+# simulate a second screen (like the AYN Thor's lower display) for the second launch
+adb shell settings put global overlay_display_devices "1240x1080/240"
+sleep 4
 launch run2 60
+for id in $(adb shell dumpsys SurfaceFlinger --display-id | grep -oE 'Display [0-9]+' | awk '{print $2}'); do
+  adb exec-out screencap -d $id -p > "diag/display-$id.png"
+done
 
 # tap Play on the main menu (as a fraction of the screen size) and capture what comes next
 SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)

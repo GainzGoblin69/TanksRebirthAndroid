@@ -36,6 +36,7 @@ public class MainActivity : AndroidGameActivity {
     private static bool s_unpacking;
 
     private TankGame? _game;
+    private SecondScreenPanel? _panel;
     private TextView? _status;
     private TextView? _overlay;
     private Handler? _handler;
@@ -179,6 +180,10 @@ public class MainActivity : AndroidGameActivity {
             // screen forever). Deliver that event now.
             if (_resumed)
                 DeliverMissedResume();
+
+            // devices with a second display (e.g. the AYN Thor) get pause/mine buttons and stats there
+            _panel ??= SecondScreenPanel.TryShow(this);
+            Breadcrumb(_panel != null ? "second-screen panel shown" : "no second screen");
         }
         catch (Exception e) {
             LogCrash("starting the game", e);
@@ -191,6 +196,12 @@ public class MainActivity : AndroidGameActivity {
     protected override void OnResume() {
         base.OnResume();
         _resumed = true;
+    }
+
+    protected override void OnDestroy() {
+        try { _panel?.Dismiss(); } catch { }
+        _panel = null;
+        base.OnDestroy();
     }
 
     protected override void OnPause() {
