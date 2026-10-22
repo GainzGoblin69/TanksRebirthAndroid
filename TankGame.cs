@@ -542,6 +542,7 @@ public class TankGame : Game {
 
         MainMenuUI.Open();
         ClientLog.Write("Main menu opened.", LogType.Info);
+        LevelProgress.Initialize();
 
         ClientLog.Write("LoadContent: ModLoader.LoadMods();", LogType.Debug);
         ModLoader.LoadMods();
@@ -676,6 +677,7 @@ public class TankGame : Game {
             Task.Run(DiscordRichPresence.Update);
 
         LastGameTime = gameTime;
+        LevelProgress.Tick(gameTime.ElapsedGameTime.TotalSeconds);
 
         if (_wasActive && !IsActive)
             OnFocusLost?.Invoke(this, Window.Handle);

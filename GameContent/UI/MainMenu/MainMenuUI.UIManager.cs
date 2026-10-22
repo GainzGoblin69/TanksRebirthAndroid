@@ -43,7 +43,11 @@ public static partial class MainMenuUI
         Cosmetics,
         Difficulties,
         Settings,
-        StatsMenu
+        StatsMenu,
+        /// <summary>Phones: grid of every campaign mission.</summary>
+        LevelSelect,
+        /// <summary>Phones: one cleared mission, once per difficulty modifier.</summary>
+        LevelModifiers
     }
     private static UIState _menuState;
     public static UIState MenuState {

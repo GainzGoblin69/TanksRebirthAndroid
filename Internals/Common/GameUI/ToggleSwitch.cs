@@ -37,6 +37,30 @@ public static class ToggleSwitch {
         DrawCircle(sb, knobCenter, knobR, Color.White);
     }
 
+    /// <summary>A filled circle (straight alpha; use with BlendState.NonPremultiplied).</summary>
+    public static void DrawDisc(SpriteBatch sb, Vector2 center, float radius, Color color) {
+        EnsureTextures(sb.GraphicsDevice);
+        DrawCircle(sb, center, radius, color);
+    }
+
+    public static void DrawLine(SpriteBatch sb, Vector2 a, Vector2 b, float thickness, Color color) {
+        EnsureTextures(sb.GraphicsDevice);
+        var d = b - a;
+        sb.Draw(_pixel!, a, null, color, MathF.Atan2(d.Y, d.X), new Vector2(0, 0.5f), new Vector2(d.Length(), thickness), SpriteEffects.None, 0f);
+    }
+
+    /// <summary>A check mark in a filled circle.</summary>
+    public static void DrawCheckBadge(SpriteBatch sb, Vector2 center, float radius, Color fill) {
+        DrawDisc(sb, center + new Vector2(0, radius * 0.08f), radius, Color.Black * 0.35f);
+        DrawDisc(sb, center, radius, fill);
+        float t = radius * 0.24f;
+        var p1 = center + new Vector2(-0.48f, 0.02f) * radius;
+        var p2 = center + new Vector2(-0.12f, 0.38f) * radius;
+        var p3 = center + new Vector2(0.52f, -0.36f) * radius;
+        DrawLine(sb, p1, p2, t, Color.White);
+        DrawLine(sb, p2 - Vector2.Normalize(p3 - p2) * t * 0.4f, p3, t, Color.White);
+    }
+
     private static void DrawCircle(SpriteBatch sb, Vector2 center, float radius, Color color) {
         var scale = radius * 2f / _circle!.Width;
         sb.Draw(_circle, center, null, color, 0f, new Vector2(_circle.Width / 2f), scale, SpriteEffects.None, 0f);

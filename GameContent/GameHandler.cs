@@ -73,6 +73,10 @@ public class GameHandler {
         RebirthMouse.Initialize();
     }
     private static int _menuStillFrames;
+    /// <summary>Restart the phone menu's still-frame warm-up (e.g. after loading a different mission behind it).</summary>
+    public static void ResetMenuStill() => _menuStillFrames = 0;
+    /// <summary>True once the menu's battlefield has been positioned and frozen.</summary>
+    public static bool MenuStillReady => _menuStillFrames > 10;
     private static int _menuStillTankCount;
     internal static void UpdateAll(GameTime gameTime) {
         /*void doTestWithFont() {

@@ -19,6 +19,8 @@ public static class SoundPlayer
         byte[] soundData = File.ReadAllBytes(filePath);
         return SoundEffect.GetSampleDuration(soundData.Length, 44100, AudioChannels.Stereo);
     }
+    /// <summary>Silences sound effects (e.g. while level thumbnails are being rendered).</summary>
+    public static bool Muted { get; set; }
     private static float MusicVolume => TankGame.Settings.MusicVolume;
     private static float EffectsVolume => TankGame.Settings.EffectsVolume;
     private static float AmbientVolume => TankGame.Settings.AmbientVolume;
@@ -26,6 +28,8 @@ public static class SoundPlayer
     public static OggAudio PlaySoundInstance(string audioPath, SoundContext context, float volume = 1f, float maxVolume = 1f, float panOverride = 0f, float pitchOverride = 0f, bool rememberMe = false) {
         // because ogg is the only good audio format.
         audioPath = Path.Combine(audioPath.Contains("Content/") ? "" : TankGame.Instance.Content.RootDirectory, audioPath);
+        if (Muted)
+            volume = 0f;
 
         volume *= context switch {
             SoundContext.Music => MusicVolume,

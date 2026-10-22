@@ -83,6 +83,11 @@ public static class CampaignCompleteUI {
 
     /// <summary>Perform a multithreaded operation that will display tanks killed and their kill counts for the player.</summary>
     public static void PerformSequence(MissionEndContext context) {
+        // level-select runs go straight back to the level grid instead
+        if (LevelProgress.SuppressResults) {
+            LevelProgress.SuppressResults = false;
+            return;
+        }
         IsViewingResults = true;
 
         _curTier = 0;

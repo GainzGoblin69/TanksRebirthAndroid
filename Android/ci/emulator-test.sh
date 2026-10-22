@@ -59,6 +59,14 @@ adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 3
 adb shell input tap $((W * 494 / 1000)) $((H * 437 / 1000)); sleep 5
 adb exec-out screencap -p > diag/run2-singleplayer.png
 
+# Level Select (the button under "Campaign"): let previews render, then start mission 1
+adb shell input tap $((W * 500 / 1000)) $((H * 213 / 1000)); sleep 15
+adb exec-out screencap -p > diag/run2-levelselect-15s.png
+sleep 60
+adb exec-out screencap -p > diag/run2-levelselect-75s.png
+adb shell input tap $((W * 100 / 1000)) $((H * 217 / 1000)); sleep 15
+adb exec-out screencap -p > diag/run2-levelrun.png
+
 adb logcat -d -v threadtime > diag/logcat-full.txt
 grep -iE "mono-rt|Thread|at |TanksRebirth|DOTNET|mono|monodroid|AndroidRuntime|FATAL|Exception|libc|DEBUG|OpenGL|EGL|Adreno|MonoGame|$PKG" diag/logcat-full.txt > diag/logcat-filtered.txt
 adb shell "ls -laR '$EXT'" > diag/files.txt 2>&1

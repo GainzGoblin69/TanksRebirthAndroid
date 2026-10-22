@@ -159,6 +159,7 @@ public static partial class MainMenuUI
 
         void completePreparation(Campaign campaign) {
             CampaignGlobals.LoadedCampaign = campaign;
+            LevelProgress.CurrentCampaignKey = name;
 
             CampaignGlobals.LoadedCampaign.LoadMission(MissionCheckpoint); // loading the mission specified
 
@@ -233,6 +234,12 @@ public static partial class MainMenuUI
         UpdateDifficulties();
         UpdateMusic();
         UpdateMP();
+        LevelSelectPreUpdate();
+
+        if (InLevelSelect) {
+            UpdateLevelSelect();
+            return; // the board behind is used to render level previews, so leave it alone
+        }
 
         if (RuntimeData.RunTime % 60f < RuntimeData.DeltaTime) {
             UpdateGameplay();
@@ -264,6 +271,8 @@ public static partial class MainMenuUI
                 DrawCampaignsUI();
             else if (MenuState == UIState.Cosmetics)
                 RenderCosmeticsUI();
+            else if (InLevelSelect)
+                DrawLevelSelect(spriteBatch);
         }
 
         // why does this need to be here?????????? doesn't work in Update()

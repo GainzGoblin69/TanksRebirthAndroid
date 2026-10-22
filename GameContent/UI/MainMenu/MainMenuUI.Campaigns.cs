@@ -56,12 +56,16 @@ public static partial class MainMenuUI {
         Directory.CreateDirectory(path);
         // add a new UIElement for each campaign folder
 
-        var campaignFiles = Directory.GetFiles(path).Where(file => file.EndsWith(".campaign")).ToArray();
+        bool phone = Internals.Common.Framework.Input.TouchControls.Enabled;
+        // phones: the Vanilla campaign comes first (shown as "Campaign"), with Level Select right under it
+        var campaignFiles = Directory.GetFiles(path).Where(file => file.EndsWith(".campaign"))
+            .OrderBy(f => phone && Path.GetFileNameWithoutExtension(f) == LevelSelectCampaign ? 0 : 1).ToArray();
+        bool hasVanilla = phone && campaignFiles.Any(f => Path.GetFileNameWithoutExtension(f) == LevelSelectCampaign);
 
         var defaultDimensions = new Vector2(300, 40);
         float padding = 20f;
 
-        int totalCampaigns = campaignFiles.Length;
+        int totalCampaigns = campaignFiles.Length + (hasVanilla ? 1 : 0);
         int numColumns = (int)Math.Ceiling(totalCampaigns / (float)MAX_CAMPAIGNS_PER_COLUMN);
 
         // totalWidth and uiStartX must be calculated in logical units
@@ -70,14 +74,22 @@ public static partial class MainMenuUI {
         // scale the start position AFTER calculating centering
         float uiStartX = totalWidth / 2f;
 
-        for (int i = 0; i < campaignFiles.Length; i++) {
-            var yOffControl = i % MAX_CAMPAIGNS_PER_COLUMN;
-            var xOffControl = i / MAX_CAMPAIGNS_PER_COLUMN;
-
+        int slot = 0;
+        Func<Vector2> nextSlot() {
+            var yOffControl = slot % MAX_CAMPAIGNS_PER_COLUMN;
+            var xOffControl = slot / MAX_CAMPAIGNS_PER_COLUMN;
+            slot++;
             float offsetY = yOffControl * (defaultDimensions.Y + padding);
             float offsetX = xOffControl * (defaultDimensions.X + padding);
+            return () => new Vector2(
+                (WindowUtils.WindowWidth / 2f) - uiStartX.ToResolutionX() + offsetX.ToResolutionX(),
+                150f.ToResolutionY() + offsetY.ToResolutionY());
+        }
 
+        for (int i = 0; i < campaignFiles.Length; i++) {
             var name = campaignFiles[i];
+            var fileName = Path.GetFileNameWithoutExtension(name);
+            bool isVanilla = phone && fileName == LevelSelectCampaign;
 
             int numTanks = 0;
             var campaign = Campaign.Load(name);
@@ -85,7 +97,7 @@ public static partial class MainMenuUI {
             foreach (var mission in missions)
                 numTanks += mission.Tanks.Count(x => !x.IsPlayer);
 
-            var elem = new UITextButton(Path.GetFileNameWithoutExtension(name), FontGlobals.RebirthFont, Color.White, 0.8f) {
+            var elem = new UITextButton(isVanilla ? "Campaign" : fileName, FontGlobals.RebirthFont, Color.White, 0.8f) {
                 IsVisible = true,
                 Tooltip = missions.Length + " missions" +
                 $"\n{numTanks} tanks total" +
@@ -98,14 +110,9 @@ public static partial class MainMenuUI {
                 $"\n\nMiddle click to DELETE ME."
             };
 
-            elem.SetDimensions(() =>
-                new Vector2(
-                    // center X and offset by scaled X
-                    (WindowUtils.WindowWidth / 2f) - uiStartX.ToResolutionX() + offsetX.ToResolutionX(),
-                    150f.ToResolutionY() + offsetY.ToResolutionY()
-                ),
-                () => defaultDimensions.ToResolution()
-            );
+            if (phone)
+                elem.Tooltip = null;
+            elem.SetDimensions(nextSlot(), () => defaultDimensions.ToResolution());
 
             elem.OnLeftClick += (el) => {
                 if (Client.IsConnected() && !Client.IsHost()) {
@@ -114,13 +121,16 @@ public static partial class MainMenuUI {
                     return;
                 }
 
-                var noExt = Path.GetFileNameWithoutExtension(name);
+                var noExt = fileName;
+                // phones: missions not cleared yet are locked (start no further than one past the furthest clear)
+                if (phone)
+                    MissionCheckpoint = Math.Min(MissionCheckpoint, LevelProgress.HighestUnlocked(noExt));
                 PrepareGameplay(noExt, !Client.IsConnected() || Server.CurrentClientCount == 1, false);
                 OnCampaignSelected?.Invoke(CampaignGlobals.LoadedCampaign);
             };
 
             elem.OnMiddleClick += (el) => {
-                var path = Path.Combine(TankGame.SaveDirectory, "Campaigns", elem.Text);
+                var path = Path.Combine(TankGame.SaveDirectory, "Campaigns", fileName);
                 File.Delete(path + ".campaign");
                 SetCampaignDisplay();
             };
@@ -128,7 +138,18 @@ public static partial class MainMenuUI {
             elem.OnMouseOver = (_) => SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect);
 
             campaignNames.Add(elem);
+
+            if (isVanilla) {
+                var ls = new UITextButton("Level Select", FontGlobals.RebirthFont, Color.White, 0.8f) { IsVisible = true };
+                ls.SetDimensions(nextSlot(), () => defaultDimensions.ToResolution());
+                ls.OnMouseOver = (_) => SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect);
+                ls.OnLeftClick += (_) => OpenLevelSelect();
+                campaignNames.Add(ls);
+            }
         }
+        // phones: Freeplay is gone (it only opened an empty board)
+        if (phone)
+            return;
         var extra = new UITextButton("Freeplay", FontGlobals.RebirthFont, Color.White, 0.8f) {
             IsVisible = true,
             Tooltip = "Play without a campaign!",
@@ -178,7 +199,7 @@ public static partial class MainMenuUI {
     /// <summary>Phones: pick the starting mission with - / + buttons instead of the mouse wheel.</summary>
     private static void DrawMissionPickerButtons() {
         var sb = TankGame.SpriteRenderer;
-        var center = new Vector2(WindowUtils.WindowWidth / 3f, WindowUtils.WindowHeight * 0.66f);
+        var center = new Vector2(WindowUtils.WindowWidth / 2f, WindowUtils.WindowHeight * 0.66f);
         var size = new Vector2(110, 90).ToResolution();
         var minus = new Rectangle((int)(center.X - size.X * 2.4f), (int)(center.Y - size.Y / 2), (int)size.X, (int)size.Y);
         var plus = new Rectangle((int)(center.X + size.X * 1.4f), (int)(center.Y - size.Y / 2), (int)size.X, (int)size.Y);
@@ -188,21 +209,49 @@ public static partial class MainMenuUI {
             MissionCheckpoint--;
             SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
         }
-        if (clicked && plus.Contains(MouseUtils.MousePosition)) {
+        int unlocked = LevelProgress.HighestUnlocked(LevelSelectCampaign);
+        int count = VanillaMissionCount();
+        if (count > 0)
+            unlocked = Math.Min(unlocked, count - 1);
+        if (MissionCheckpoint > unlocked)
+            MissionCheckpoint = unlocked;
+        if (clicked && plus.Contains(MouseUtils.MousePosition) && MissionCheckpoint < unlocked) {
             MissionCheckpoint++;
             SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
         }
 
-        foreach (var (rect, label) in new[] { (minus, "-"), (plus, "+") }) {
-            DrawUtils.DrawNineSliced(sb, UIElement.UIPanelBackground, 12, rect, rect.Contains(MouseUtils.MousePosition) ? Color.CornflowerBlue : Color.WhiteSmoke, Vector2.Zero);
+        foreach (var (rect, label, enabled) in new[] { (minus, "-", MissionCheckpoint > 0), (plus, "+", MissionCheckpoint < unlocked) }) {
+            var col = !enabled ? Color.Gray : rect.Contains(MouseUtils.MousePosition) ? Color.CornflowerBlue : Color.WhiteSmoke;
+            DrawUtils.DrawNineSliced(sb, UIElement.UIPanelBackground, 12, rect, col, Vector2.Zero);
             var m = FontGlobals.RebirthFont.MeasureString(label);
             sb.DrawString(FontGlobals.RebirthFont, label, rect.Center.ToVector2(), Color.Black, new Vector2(1.6f).ToResolution(), 0f, m / 2f);
         }
 
         DrawUtils.DrawStringWithBorder(sb, FontGlobals.RebirthFont, $"Start at mission {MissionCheckpoint + 1}",
             center, Color.White, Color.Black, new Vector2(0.9f).ToResolution(), 0f, Anchor.Center);
-        DrawUtils.DrawStringWithBorder(sb, FontGlobals.RebirthFont, "You will be alerted if that mission does not exist.",
-            center + new Vector2(0, size.Y * 0.9f), Color.White, Color.Black, new Vector2(0.55f).ToResolution(), 0f, Anchor.TopCenter);
+        var rec = LevelProgress.Get(LevelSelectCampaign, MissionCheckpoint);
+        var lines = new System.Collections.Generic.List<string> {
+            rec.BestSolo > 0 ? $"Fastest time: {LevelProgress.FormatTime(rec.BestSolo)}" : "Fastest time: --"
+        };
+        if (rec.CoopAttempted)
+            lines.Add(rec.BestCoop > 0 ? $"Co-op fastest: {LevelProgress.FormatTime(rec.BestCoop)}" : "Co-op fastest: --");
+        if (MissionCheckpoint == unlocked && (count == 0 || unlocked < count - 1))
+            lines.Add($"Clear mission {unlocked + 1} to unlock the next one");
+        DrawUtils.DrawStringWithBorder(sb, FontGlobals.RebirthFont, string.Join("\n", lines),
+            center + new Vector2(0, size.Y * 0.9f), Color.White, Color.Black, new Vector2(0.6f).ToResolution(), 0f, Anchor.TopCenter);
+    }
+
+    private static int _vanillaCount = -1;
+    private static int VanillaMissionCount() {
+        if (_vanillaCount >= 0)
+            return _vanillaCount;
+        if (_lsCampaign is not null)
+            return _vanillaCount = _lsCampaign.CachedMissions.Length;
+        var p = Path.Combine(TankGame.SaveDirectory, "Campaigns", LevelSelectCampaign + ".campaign");
+        if (!File.Exists(p))
+            return 0; // not downloaded yet; check again next time
+        try { return _vanillaCount = Campaign.Load(p).CachedMissions.Length; }
+        catch { return _vanillaCount = 0; }
     }
 
     public static void DrawCampaignMenuExtras() {
@@ -212,7 +261,9 @@ public static partial class MainMenuUI {
             MissionCheckpoint = 0;
 
         if (Internals.Common.Framework.Input.TouchControls.Enabled) {
+            // phones: the picker shows the best times; no speedrun list
             DrawMissionPickerButtons();
+            return;
         }
         else DrawUtils.DrawStringWithBorder(TankGame.SpriteRenderer, FontGlobals.RebirthFont, $"You can scroll with your mouse to skip to a certain mission." +
             $"\nCurrently, you will skip to mission {MissionCheckpoint + 1}." +
