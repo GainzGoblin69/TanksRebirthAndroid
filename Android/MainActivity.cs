@@ -41,6 +41,7 @@ public class MainActivity : AndroidGameActivity {
     private SecondScreenPanel? _panel;
     private TextView? _status;
     private TextView? _overlay;
+    private bool _overlayDismissed;
     private Handler? _handler;
     private int _frames;
     private DateTime? _firstFrameAt;
@@ -227,6 +228,17 @@ public class MainActivity : AndroidGameActivity {
             Android.OS.Process.KillProcess(Android.OS.Process.MyPid());
     }
 
+    // A two-finger tap hides the yellow status overlay for the rest of this session.
+    public override bool DispatchTouchEvent(MotionEvent? ev) {
+        if (ev != null && ev.ActionMasked == MotionEventActions.PointerDown && ev.PointerCount == 2
+            && _overlay is { Visibility: ViewStates.Visible }) {
+            _overlayDismissed = true;
+            _overlay.Visibility = ViewStates.Gone;
+            TankGame.PostDrawEverything -= CountFrame;
+        }
+        return base.DispatchTouchEvent(ev);
+    }
+
     // Back gesture/button: act like Escape in the game (back out of menus, pause/unpause) instead of closing the app.
 #pragma warning disable CS0672, CA1422
     public override void OnBackPressed() {
@@ -265,7 +277,7 @@ public class MainActivity : AndroidGameActivity {
     private void CountFrame(GameTime _) => _frames++;
 
     private void UpdateOverlay() {
-        if (_overlay is null)
+        if (_overlay is null || _overlayDismissed)
             return;
 
         bool crashed = File.Exists(CrashPath);
