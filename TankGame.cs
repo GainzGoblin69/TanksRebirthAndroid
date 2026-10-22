@@ -672,6 +672,7 @@ public class TankGame : Game {
         }
 
         NetPlay.PollEvents();
+        TanksRebirth.Net.Online.OnlineSession.Update(); // online games: work that has to run on the game thread
 
         if (RuntimeData.RunTime % 60 < RuntimeData.DeltaTime && !OperatingSystem.IsAndroid())
             Task.Run(DiscordRichPresence.Update);

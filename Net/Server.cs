@@ -70,6 +70,7 @@ public class Server
 
         TankGame.ClientLog.Write($"Server started. (Name = \"{name}\" | Port = \"{port}\" | Address = \"{address}\" | Password = \"{password}\")", Internals.LogType.Debug);
 
+        NetManager.ReuseAddress = true; // online hosting binds the port it just asked a STUN server about
         NetManager.Start(port);
         NetManager.DisconnectTimeout = 10000;
         NetManager.UpdateTime = 15;

@@ -60,8 +60,12 @@ public static partial class MainMenuUI
         MPJoin,
         /// <summary>Phones: type the host's address.</summary>
         MPKeypad,
-        /// <summary>Phones: Wi-Fi lobby (host or joined).</summary>
-        MPLobby
+        /// <summary>Phones: Wi-Fi or online lobby (host or joined).</summary>
+        MPLobby,
+        /// <summary>Phones: online, host or join with a code.</summary>
+        MPOnline,
+        /// <summary>Phones: joining an online game (status while connecting).</summary>
+        MPOnlineJoining
     }
     private static UIState _menuState;
     public static UIState MenuState {

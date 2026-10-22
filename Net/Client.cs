@@ -44,13 +44,14 @@ public class Client {
         IsOperatedByPlayer = isOperatedByPlayer;
     }
 
-    public static void CreateClient(string username) {
+    public static void CreateClient(string username, int port = 0) {
         ClientListener = new();
         ClientManager = new(ClientListener) {
             NatPunchEnabled = true,
-            UpdateTime = 15
+            UpdateTime = 15,
+            ReuseAddress = port != 0
         };
-        ClientManager.Start();
+        ClientManager.Start(port);
         NetPlay.MapClientNetworking();
 
         Client c = new(0, username);

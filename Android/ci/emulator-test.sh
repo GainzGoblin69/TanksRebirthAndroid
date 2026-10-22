@@ -58,6 +58,9 @@ tapy 666
 # Multiplayer -> Same Device (screenshot) -> Back; Host on Wi-Fi (lobby screenshot) -> Leave; Back
 tapy 384 3
 adb exec-out screencap -p > diag/run2-mp.png
+tapy 666 3
+adb exec-out screencap -p > diag/run2-mp-online.png
+tapy 666 3
 tapy 244 3
 adb exec-out screencap -p > diag/run2-mp-local.png
 tapy 666
