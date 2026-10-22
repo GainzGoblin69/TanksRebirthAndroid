@@ -39,14 +39,22 @@ public class OggMusic : IAudio {
         BackingAudio.Instance.Volume = 0;
     }
 
-    public void Play()
-        => BackingAudio.Instance.Play();
+    // Android caps simultaneous sounds at 32: if they're all in use, skip rather than crash.
+    public void Play() {
+        try { BackingAudio.Instance.Play(); }
+        catch (InstancePlayLimitException) { }
+    }
 
     public void Pause()
         => BackingAudio?.Instance.Pause();
 
-    public void Resume()
-        => BackingAudio?.Instance.Resume();
+    // Only resume what was actually paused; resuming a stopped track would start it playing.
+    public void Resume() {
+        if (BackingAudio?.Instance.State != SoundState.Paused)
+            return;
+        try { BackingAudio.Instance.Resume(); }
+        catch (InstancePlayLimitException) { }
+    }
 
     public void SetVolume(float volume)
         => Volume = volume;

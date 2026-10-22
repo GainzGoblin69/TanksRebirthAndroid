@@ -56,7 +56,7 @@ public static class SoundPlayer
 
             if (sound.Sound.IsPlaying())
                 sound.Sound.Instance.Stop();
-            sound.Sound.Instance.Play();
+            try { sound.Sound.Instance.Play(); } catch (InstancePlayLimitException) { } // Android: 32-sound cap
             sound.Sound.Instance.Volume = volume;
 
             Sounds[Sounds.FindIndex(p => p.Name == soundDef.Name)] = soundDef;

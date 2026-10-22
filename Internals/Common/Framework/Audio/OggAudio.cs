@@ -51,7 +51,9 @@ public class OggAudio : IDisposable, IAudio {
 
     public void Play() {
         ThrowIfDisposed();
-        Instance.Play();
+        // Android caps simultaneous sounds at 32: if they're all in use, skip this one rather than crash.
+        try { Instance.Play(); }
+        catch (InstancePlayLimitException) { }
     }
 
     public void Pause() {

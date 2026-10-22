@@ -150,6 +150,10 @@ public static class TankMusicSystem
 
     public static bool IsLoaded;
     public static void PlayAll() {
+        if (OperatingSystem.IsAndroid()) {
+            PlayMissionTracksOnly();
+            return;
+        }
         //if (MusicMidi.State == Microsoft.Xna.Framework.Audio.SoundState.Stopped)
         //MusicMidi.Play(MusicSoundFont, true);
 
@@ -158,6 +162,40 @@ public static class TankMusicSystem
 
         foreach (var song in Audio)
             song.Value?.Play();
+
+        if (GameScene.Theme == MapTheme.Christmas)
+            SnowLoop?.Play();
+    }
+
+    /// <summary>
+    /// Android can only play 32 sounds at once (sound effects included), but there are 45 music layers.
+    /// Only one layer is ever audible: the strongest remaining tank type's. So start just the layers for the
+    /// tank types in this mission, strongest first. They all start together, so they stay in sync like on PC.
+    /// </summary>
+    private static void PlayMissionTracksOnly() {
+        const int MaxTracks = 20; // leaves room for sound effects
+        var tiers = GameHandler.AllAITanks
+            .Where(t => t is not null && !t.IsDestroyed)
+            .Select(t => t.AiTankType)
+            .Distinct()
+            .OrderByDescending(t => t);
+
+        int started = 0;
+        foreach (var tier in tiers) {
+            var key = TankID.Collection.GetKey(tier)?.ToLower();
+            if (string.IsNullOrEmpty(key))
+                continue;
+            foreach (var song in Audio) {
+                if (song.Value is null || !song.Key.StartsWith(key))
+                    continue;
+                var suffix = song.Key[key.Length..];
+                if (suffix.Length > 0 && !suffix.All(char.IsDigit))
+                    continue;
+                if (started++ >= MaxTracks)
+                    break;
+                song.Value.Play();
+            }
+        }
 
         if (GameScene.Theme == MapTheme.Christmas)
             SnowLoop?.Play();
