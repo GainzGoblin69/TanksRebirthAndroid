@@ -93,8 +93,11 @@ public static class CameraGlobals {
         bool isMainMenu = MainMenuUI.IsActive;
         bool isPOV = Difficulties.Types["POV"] && !isMainMenu;
 
+        // phones: the main menu sits over a still of the battlefield in the normal top-down gameplay view
+        bool phoneMenuStill = isMainMenu && Internals.Common.Framework.Input.TouchControls.Enabled;
+
         if (!isFreecam) {
-            if (!isMainMenu) {
+            if (!isMainMenu || phoneMenuStill) {
                 if (!Difficulties.Types["POV"] || LevelEditorUI.IsActive) {
                     UpdateOverhead();
 
