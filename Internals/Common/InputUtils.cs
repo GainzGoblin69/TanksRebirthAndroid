@@ -28,7 +28,10 @@ public static class InputUtils
 
         if (Framework.Input.TouchControls.Enabled) {
             Framework.Input.TouchControls.Update();
-            Framework.Input.TouchControls.UpdateGamepad(CurrentGamePadSnapshot);
+            GameContent.Systems.LocalCoop.Update();
+            // same-device co-op: during play each controller belongs to a player, so it doesn't drive the pointer
+            if (!GameContent.Systems.LocalCoop.Active || !Framework.Input.TouchControls.GameplayControlsActive)
+                Framework.Input.TouchControls.UpdateGamepad(CurrentGamePadSnapshot);
 
             // touches drive the "mouse" so the existing mouse-based UI and aiming keep working
             CurrentMouseSnapshot = Framework.Input.TouchControls.GetMouseState(OldMouseSnapshot);

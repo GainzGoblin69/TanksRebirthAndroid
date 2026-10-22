@@ -67,6 +67,8 @@ public sealed class PacketID {
     public const int SendAirplane = 30;
 
     public const int HostDisconnect = 31;
+    /// <summary>Phones: the host started a Level Select run (mission, modifier, which grid to return to).</summary>
+    public const int LevelRun = 32;
 
     public static int AddPacketId(string name) => Collection.ForcefullyInsert(name);
 

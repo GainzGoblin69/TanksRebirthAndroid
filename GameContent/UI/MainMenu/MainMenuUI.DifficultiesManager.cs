@@ -79,7 +79,7 @@ public static partial class MainMenuUI {
         BulletBlocking.IsVisible = visible;
         FFA.IsVisible = visible;
         LanternMode.IsVisible = visible;
-        DisguiseMode.IsVisible = visible;
+        DisguiseMode.IsVisible = visible && !Internals.Common.Framework.Input.TouchControls.Enabled; // removed on phones
     }
 
     public static void UpdateDifficulties() {
@@ -325,6 +325,12 @@ public static partial class MainMenuUI {
         AllDifficultyButtons.AddRange(new UITextButton[] { TanksAreCalculators, PieFactory, UltraMines, BulletHell, AllInvisible, AllStationary, Armored, AllHoming, BumpUp, Monochrome,
         InfiniteLives, MasterMode, TacticalPlanes, MachineGuns, RandomizedTanks, ThunderMode, POVMode, AiCompanion, Shotguns, Predictions,
         RandomizedPlayer, BulletBlocking, FFA, LanternMode, DisguiseMode });
+        // phones: Disguise is removed (only changes how enemies look)
+        if (Internals.Common.Framework.Input.TouchControls.Enabled) {
+            AllDifficultyButtons.Remove(DisguiseMode);
+            Difficulties.Types["Disguise"] = false;
+            Difficulties.DisguiseValue = TankID.None;
+        }
 
         // make all buttons not-interactable for non-host clients.
 

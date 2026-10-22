@@ -1,3 +1,5 @@
+using TanksRebirth.Net;
+using TanksRebirth.GameContent.Systems;
 using FontStashSharp;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -47,7 +49,19 @@ public static partial class MainMenuUI
         /// <summary>Phones: grid of every campaign mission.</summary>
         LevelSelect,
         /// <summary>Phones: one cleared mission, once per difficulty modifier.</summary>
-        LevelModifiers
+        LevelModifiers,
+        /// <summary>Phones: pick your tank's color.</summary>
+        TankColors,
+        /// <summary>Phones: multiplayer, choose Same Device / Wi-Fi.</summary>
+        MPMode,
+        /// <summary>Phones: same-device co-op setup.</summary>
+        MPLocal,
+        /// <summary>Phones: list of Wi-Fi games to join.</summary>
+        MPJoin,
+        /// <summary>Phones: type the host's address.</summary>
+        MPKeypad,
+        /// <summary>Phones: Wi-Fi lobby (host or joined).</summary>
+        MPLobby
     }
     private static UIState _menuState;
     public static UIState MenuState {
@@ -131,6 +145,7 @@ public static partial class MainMenuUI
         PlayButton_SinglePlayer.SetDimensions(() => new Vector2(700, 450).ToResolution(), () => new Vector2(500, 50).ToResolution());
 
         PlayButton_SinglePlayer.OnLeftClick = (uiElement) => {
+            LocalCoop.Stop(); // single player: one tank
             SetCampaignDisplay();
             MenuState = UIState.Campaigns;
         };
@@ -187,7 +202,8 @@ public static partial class MainMenuUI
     internal static void SetPrimaryMenuButtonsVisibility(bool visible) {
         GameUI.OptionsButton.IsVisible = visible;
         GameUI.QuitButton.IsVisible = visible;
-        GameUI.BackButton.Size.Y = 50;
+        if (!Phone) // phones size it from the button column every frame; this would squash it
+            GameUI.BackButton.Size.Y = 50;
 
         PlayButton.IsVisible = visible;
 
@@ -256,6 +272,9 @@ public static partial class MainMenuUI
         SetPrimaryMenuButtonsVisibility(MenuState == UIState.PrimaryMenu);
         SetDifficultiesButtonsVisibility(MenuState == UIState.Difficulties);
 
+        // phones: Difficulties lives on the Single Player (campaign) screen and the Wi-Fi host's lobby
+        if (Phone)
+            DifficultiesButton.IsVisible = MenuState == UIState.Campaigns || (MenuState == UIState.MPLobby && Client.IsHost());
     }
     public static void OpenUI() {
         if (!Speedrun.AreSpeedrunsFetched) {

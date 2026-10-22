@@ -111,12 +111,17 @@ public class PlayerTank : Tank {
                 Lives[i] = num;
     }
     public void SwapTankTexture(Texture2D texture) => _tankTexture = texture;
+    private int _colorIndex = -1;
     public PlayerTank(int playerType, bool isPlayerModel = true, int copyTier = -1) {
         Model = isPlayerModel ? ModelGlobals.TankPlayer.Asset : ModelGlobals.TankEnemy.Asset;
 
         Texture2D texAsset;
 
-        if (copyTier == -1)
+        // the tank color picked in the Tank Color screen (if any) replaces the standard player texture
+        int colorIndex = copyTier == -1 && isPlayerModel ? PlayerColors.ColorIndexFor(playerType) : -1;
+        if (colorIndex >= 0)
+            texAsset = PlayerColors.MakeTexture(TankGame.Instance.GraphicsDevice, PlayerColors.Palette[colorIndex]);
+        else if (copyTier == -1)
             texAsset = Assets[$"plrtank_" + PlayerID.Collection.GetKey(playerType)!.ToLower()];
         else {
             texAsset = Assets[$"tank_" + TankID.Collection.GetKey(copyTier)!.ToLower()];
@@ -124,7 +129,8 @@ public class PlayerTank : Tank {
             Properties = AIManager.GetAITankProperties(copyTier);
         }
 
-        _tankTexture = texAsset.Duplicate(TankGame.Instance.GraphicsDevice);
+        _tankTexture = colorIndex >= 0 ? texAsset : texAsset.Duplicate(TankGame.Instance.GraphicsDevice);
+        _colorIndex = colorIndex;
 
         _isPlayerModel = isPlayerModel;
         PlayerType = playerType;
@@ -179,6 +185,8 @@ public class PlayerTank : Tank {
             PlayerID.Yellow => Color.Yellow,
             _ => throw new Exception($"The player type with number \"{PlayerType}\" is not mapped to a color!"),
         };
+        if (_colorIndex >= 0)
+            properties.DestructionColor = PlayerColors.Palette[_colorIndex].Main;
 
         base.ApplyDefaults(ref properties);
     }
@@ -222,6 +230,17 @@ public class PlayerTank : Tank {
             return;
         }
 
+        bool localCoop = LocalCoop.ControlsPlayer(PlayerId);
+        if (localCoop) {
+            // same-device co-op: each player has their own input (touch, or their own controller)
+            if (!Properties.Stationary && CurShootStun <= 0 && CurMineStun <= 0)
+                ControlHandle_LocalCoop();
+            if (!GameUI.Paused && (LocalCoop.ShootPressed(PlayerId) || (LocalCoop.UsesTouch(PlayerId) && InputUtils.CanDetectClick())))
+                Shoot(false);
+            oldPosition = Position;
+            return;
+        }
+
         if (!Properties.Stationary) {
             if (NetPlay.IsClientMatched(PlayerId)) {
                 if (CurShootStun <= 0 && CurMineStun <= 0) {
@@ -246,6 +265,11 @@ public class PlayerTank : Tank {
         oldPosition = Position;
     }
     void ProcessPlayerMouse() {
+        if (LocalCoop.ControlsPlayer(PlayerId) && !MainMenuUI.IsActive && !LevelEditorUI.IsActive) {
+            var aimWorld = MatrixUtils.GetWorldPosition(LocalCoop.AimScreen(PlayerId), -11f);
+            TurretRotation = -(new Vector2(aimWorld.X, aimWorld.Z) - Position).ToRotation() + MathHelper.PiOver2;
+            return;
+        }
         if (NetPlay.IsClientMatched(PlayerId)) {
             if (!Difficulties.Types["POV"] || TouchControls.Enabled || LevelEditorUI.IsActive || MainMenuUI.IsActive) {
                 Vector3 mouseWorldPos = MatrixUtils.GetWorldPosition(MouseUtils.MousePosition, -11f);
@@ -364,6 +388,11 @@ public class PlayerTank : Tank {
     }
     /// <summary>Movement from the on-screen joystick. Mirrors the keyboard scheme, but with an analog direction.
     /// Aiming and firing come through the synthesized mouse (tap on the right side of the screen).</summary>
+    private void ControlHandle_LocalCoop() {
+        if (LocalCoop.MinePressed(PlayerId))
+            LayMine();
+        SteerWith(LocalCoop.Move(PlayerId));
+    }
     private void ControlHandle_Touch() {
         if (TouchControls.MineJustPressed || PlaceMine.JustPressed)
             LayMine();
@@ -387,6 +416,12 @@ public class PlayerTank : Tank {
             if (padMove.Length() > 0.2f)
                 move = padMove;
         }
+        SteerWith(move);
+    }
+    /// <summary>Analog steering shared by the touch joystick and controllers (smooth, no spinning in place).</summary>
+    private void SteerWith(Vector2 move) {
+        IsTurning = false;
+        ChassisRotation %= MathHelper.Tau;
         if (move != Vector2.Zero) {
             playerControl_isBindPressed = true;
             DesiredDirection = Vector2.Normalize(move);
@@ -449,7 +484,9 @@ public class PlayerTank : Tank {
         Velocity = Vector2.UnitY.Rotate(ChassisRotation) * Speed;
     }
     public override void Destroy(ITankHurtContext context, bool netSend) {
-        if (Client.IsConnected()) {
+        if (LocalCoop.ControlsPlayer(PlayerId))
+            Lives[PlayerId]--; // same-device co-op: each player has their own lives
+        else if (Client.IsConnected()) {
             // maybe make a camera transition to said tank.
 
             //if (context.Source is not null)

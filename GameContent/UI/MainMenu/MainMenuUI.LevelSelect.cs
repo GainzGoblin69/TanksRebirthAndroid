@@ -1,3 +1,4 @@
+using TanksRebirth.Net;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -98,6 +99,10 @@ public static partial class MainMenuUI {
         _lsLaunching = false;
         _lsModMission = run.Mission;
         GameUI.BackButton.IsVisible = false;
+        if (Client.IsConnected() && !Client.IsHost()) {
+            MenuState = UIState.MPLobby; // the host picks the levels
+            return;
+        }
         MenuState = run.FromModifierGrid ? UIState.LevelModifiers : UIState.LevelSelect;
     }
 
@@ -120,6 +125,14 @@ public static partial class MainMenuUI {
         CancelBake();
         LevelProgress.BeginRun(new(LevelSelectCampaign, mission, modifier, fromModifierGrid));
         MissionCheckpoint = mission;
+        if (Client.IsConnected() && Server.CurrentClientCount > 1) {
+            // Wi-Fi: everyone runs the same mission and modifier; the campaign start then goes through the usual checks
+            plrsConfirmed = 0;
+            Client.SendLevelRun(mission, modifier?.Key ?? string.Empty, fromModifierGrid);
+            PrepareGameplay(LevelSelectCampaign, false, false);
+            _lsLaunching = true;
+            return;
+        }
         if (!PrepareGameplay(LevelSelectCampaign, true, false)) {
             LevelProgress.AbortRun();
             return;

@@ -300,7 +300,7 @@ public static class TouchControls {
     public static Vector2 PointerPosition => _pointerPos;
 
     public static void Draw(SpriteBatch sb) {
-        if (!Enabled || !GameplayControlsActive || GamepadMode)
+        if (!Enabled || !GameplayControlsActive || GamepadMode || LocalCoop.HidesTouch)
             return;
 
         EnsureTextures(sb.GraphicsDevice);

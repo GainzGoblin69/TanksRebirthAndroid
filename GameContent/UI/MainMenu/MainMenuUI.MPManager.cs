@@ -27,6 +27,9 @@ public static partial class MainMenuUI {
     public static bool ShouldServerButtonsBeVisible {
         get => _ssbbv;
         set {
+            // phones have their own multiplayer screens; the desktop inputs stay hidden
+            if (TanksRebirth.Internals.Common.Framework.Input.TouchControls.Enabled)
+                value = false;
             _ssbbv = value;
             ConnectToServerButton.IsVisible = value;
             CreateServerButton.IsVisible = value;
@@ -52,6 +55,8 @@ public static partial class MainMenuUI {
     public static UITextInput ServerNameInput;
     public static UITextButton DisconnectButton;
     internal static void SetMPButtonsVisibility(bool visible) {
+        if (TanksRebirth.Internals.Common.Framework.Input.TouchControls.Enabled)
+            visible = false;
         if (ShouldServerButtonsBeVisible) {
             ConnectToServerButton.IsVisible = visible;
             CreateServerButton.IsVisible = visible;

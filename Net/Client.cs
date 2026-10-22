@@ -423,6 +423,15 @@ public class Client {
         message.Put(Difficulties.DisguiseValue);
         NetClient.Send(message, DeliveryMethod.Sequenced);
     }
+    public static void SendLevelRun(int mission, string modifierKey, bool fromModifierGrid) {
+        if (!IsConnected()) return;
+        NetDataWriter message = new();
+        message.Put(PacketID.LevelRun);
+        message.Put(mission);
+        message.Put(modifierKey);
+        message.Put(fromModifierGrid);
+        NetClient.Send(message, DeliveryMethod.ReliableOrdered);
+    }
     public static void SendMapPing(Vector3 location, int pingId, int playerId) {
         NetDataWriter message = new();
 

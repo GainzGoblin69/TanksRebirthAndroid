@@ -22,6 +22,11 @@ public class GameConfig
     public bool Vsync { get; set; } = true;
     /// <summary>Always draw the aim dots between your tank and the cursor (otherwise only when the cursor is far away).</summary>
     public bool AlwaysShowAimDots { get; set; } = true;
+    /// <summary>Tank color picked on this device for player 1 / player 2 (index into PlayerColors.Palette; -1 = that player's standard color).</summary>
+    public int TankColorP1 { get; set; } = -1;
+    public int TankColorP2 { get; set; } = -1;
+    /// <summary>Name shown to others in Wi-Fi games.</summary>
+    public string LanName { get; set; } = "";
     public WindowKind WindowKind { get; set; } = WindowKind.Windowed;
     public bool MSAA { get; set; } = false;
     public bool FadeFootprints { get; set; } = false;

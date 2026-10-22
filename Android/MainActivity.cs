@@ -39,6 +39,7 @@ public class MainActivity : AndroidGameActivity {
 
     private TankGame? _game;
     private SecondScreenPanel? _panel;
+    private static Android.Net.Wifi.WifiManager.MulticastLock? s_multicastLock;
     private TextView? _status;
     private TextView? _overlay;
     private bool _overlayDismissed;
@@ -167,6 +168,18 @@ public class MainActivity : AndroidGameActivity {
             System.Environment.SetEnvironmentVariable("TANKSREBIRTH_SAVE_DIR", _saveDir);
 
             TouchControls.Enabled = true;
+            // Wi-Fi games: a default player name, and let the game hear "who's hosting?" broadcasts
+            // (many phones drop broadcast packets unless an app holds a multicast lock)
+            TanksRebirth.Net.LanSession.DeviceName = string.IsNullOrWhiteSpace(Build.Model) ? "Phone" : Build.Model!;
+            try {
+                var wifi = (Android.Net.Wifi.WifiManager?)ApplicationContext!.GetSystemService(WifiService);
+                s_multicastLock ??= wifi?.CreateMulticastLock("tanksrebirth-lan");
+                s_multicastLock?.SetReferenceCounted(false);
+                s_multicastLock?.Acquire();
+            }
+            catch (Exception e) {
+                Breadcrumb("multicast lock unavailable: " + e.Message);
+            }
 
             Breadcrumb("creating game");
             _game = new TankGame();

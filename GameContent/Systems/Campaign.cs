@@ -175,7 +175,9 @@ public class Campaign
                     tank.IsDestroyed = false;
                     tank.Team = template.Team;
 
-                    if (tank.PlayerId <= Server.CurrentClientCount) {
+                    // same-device co-op keeps players 1 and 2 (offline otherwise keeps only player 1)
+                    int lastPlayer = Client.IsConnected() ? Server.CurrentClientCount : (LocalCoop.Active ? LocalCoop.PlayerCount - 1 : 0);
+                    if (tank.PlayerId <= lastPlayer) {
                         if (!LevelEditorUI.IsActive) {
                             if (NetPlay.IsClientMatched(tank.PlayerId)) {
                                 PlayerTank.MyTeam = tank.Team;
@@ -185,7 +187,7 @@ public class Campaign
                     }
                     else if (!LevelEditorUI.IsActive)
                         tank.Remove(true);
-                    if (Client.IsConnected()) {
+                    if (Client.IsConnected() || LocalCoop.Active) {
                         if (PlayerTank.Lives[tank.PlayerId] <= 0)
                             tank.Remove(true);
                     }

@@ -42,7 +42,6 @@ public static class LevelProgress {
         new("AiCompanion", "AI Companion"),
         new("FFA", "Free-for-all"),
         new("Monochrome", "Monochrome"),
-        new("Disguise", "Disguise"),
         new("RandomPlayer", "Randomized Player"),
         new("POV", "POV Mode"),
         new("ThunderMode", "Thunder Mode"),
@@ -141,7 +140,7 @@ public static class LevelProgress {
         return t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss\.ff") : t.ToString(@"m\:ss\.ff");
     }
 
-    private static bool IsCoop => Client.IsConnected() && Server.CurrentClientCount > 1;
+    private static bool IsCoop => (Client.IsConnected() && Server.CurrentClientCount > 1) || LocalCoop.Active;
 
     private static void OnMissionStart() {
         _timedMission = CampaignGlobals.LoadedCampaign.CurrentMissionId;
@@ -225,7 +224,6 @@ public static class LevelProgress {
             Difficulties.Types[m.Key] = true;
             switch (m.Key) {
                 case "Monochrome": Difficulties.MonochromeValue = TankID.Violet; break;
-                case "Disguise": Difficulties.DisguiseValue = TankID.Brown; break;
                 case "RandomizedTanks":
                     Difficulties.RandomTanksLower = TankID.Brown;
                     Difficulties.RandomTanksUpper = TankID.Black;

@@ -58,21 +58,27 @@ public static partial class MainMenuUI {
 
         // play menu
         PhonePlace(PlayButton_SinglePlayer, () => new Vector2(700, 450).ToResolution(), () => new Vector2(500, 50).ToResolution(),
-            () => InMenuState(UIState.PlayList, 0, 6));
+            () => InMenuState(UIState.PlayList, 0, 5));
         PhonePlace(PlayButton_Multiplayer, () => new Vector2(700, 750).ToResolution(), () => new Vector2(500, 50).ToResolution(),
-            () => InMenuState(UIState.PlayList, 1, 6));
-        PhonePlace(DifficultiesButton, () => new Vector2(700, 550).ToResolution(), () => new Vector2(500, 50).ToResolution(),
-            () => InMenuState(UIState.PlayList, 2, 6));
+            () => InMenuState(UIState.PlayList, 1, 5));
         PhonePlace(CosmeticsMenuButton, () => new Vector2(50, 50).ToResolution(), () => new Vector2(300, 50).ToResolution(),
-            () => InMenuState(UIState.PlayList, 3, 6));
+            () => InMenuState(UIState.PlayList, 2, 5));
         PhonePlace(PlayButton_LevelEditor, () => new Vector2(700, 650).ToResolution(), () => new Vector2(500, 50).ToResolution(),
-            () => InMenuState(UIState.PlayList, 4, 6));
+            () => InMenuState(UIState.PlayList, 3, 5));
+        // Difficulties: on the Single Player (campaign) screen and in the Wi-Fi host's lobby
+        PhonePlace(DifficultiesButton, () => new Vector2(700, 550).ToResolution(), () => new Vector2(500, 50).ToResolution(),
+            () => InMenuState(UIState.Campaigns, CampaignColumnCount - 3, CampaignColumnCount) ?? InMenuState(UIState.MPLobby, 1, 4));
 
         // Back is shared by every screen: only the play menu and the Campaigns screen use the column
         PhonePlace(GameUI.BackButton, () => new Vector2(700, 850).ToResolution(), () => new Vector2(500, 150).ToResolution(),
-            () => InMenuState(UIState.PlayList, 5, 6) ?? InMenuState(UIState.Campaigns, CampaignColumnCount - 1, CampaignColumnCount));
+            () => InMenuState(UIState.PlayList, 4, 5) ?? InMenuState(UIState.Campaigns, CampaignColumnCount - 1, CampaignColumnCount));
 
         if (Phone) {
+            // phones: Cosmetics is the tank color picker; Multiplayer has its own screens; Difficulties remembers where it was opened
+            CosmeticsMenuButton.Text = "Tank Color";
+            CosmeticsMenuButton.OnLeftClick = (_) => PhoneOpenTankColors();
+            PlayButton_Multiplayer.OnLeftClick = (_) => PhonePlayMultiplayer();
+            DifficultiesButton.OnLeftClick = (_) => PhoneOpenDifficulties();
             // the hover tooltips stick around after a tap on a touch screen
             foreach (var b in new UIElement[] { PlayButton, PlayButton_SinglePlayer, PlayButton_Multiplayer, DifficultiesButton, CosmeticsMenuButton, PlayButton_LevelEditor, StatsMenu })
                 b.Tooltip = null;

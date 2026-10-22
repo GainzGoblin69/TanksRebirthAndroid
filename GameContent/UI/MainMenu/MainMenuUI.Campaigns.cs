@@ -76,7 +76,7 @@ public static partial class MainMenuUI {
 
         int slot = 0;
         // phones: one big left-hand column (campaigns, Level Select, Validate, Back)
-        CampaignColumnCount = totalCampaigns + 2;
+        CampaignColumnCount = totalCampaigns + 3; // + Difficulties, Update Campaign, Back
         (Func<Vector2>, Func<Vector2>) nextSlot() {
             if (phone) {
                 int idx = slot++;

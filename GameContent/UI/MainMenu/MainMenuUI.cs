@@ -164,10 +164,12 @@ public static partial class MainMenuUI
         void completePreparation(Campaign campaign) {
             CampaignGlobals.LoadedCampaign = campaign;
             LevelProgress.CurrentCampaignKey = name;
+            // Level Select runs are one life (per player)
+            bool levelRun = LevelProgress.Run is not null;
 
             CampaignGlobals.LoadedCampaign.LoadMission(MissionCheckpoint); // loading the mission specified
 
-            PlayerTank.StartingLives = campaign.MetaData.StartingLives;
+            PlayerTank.StartingLives = levelRun ? 1 : campaign.MetaData.StartingLives;
             IntermissionSystem.BannerColor = campaign.MetaData.MissionStripColor;
             IntermissionSystem.BackgroundColor = campaign.MetaData.BackgroundColor;
         }
@@ -240,7 +242,10 @@ public static partial class MainMenuUI
         UpdateMP();
         LevelSelectPreUpdate();
 
-        if (InLevelSelect) {
+        if (IsPhoneScreen) {
+            UpdatePhoneScreens();
+        }
+        else if (InLevelSelect) {
             UpdateLevelSelect();
             return; // the board behind is used to render level previews, so leave it alone
         }
@@ -253,6 +258,11 @@ public static partial class MainMenuUI
         OpenUI();
         OpenAudio();
         OpenGP();
+        // phones: come back to where multiplayer was set up
+        if (Phone && Client.IsConnected())
+            MenuState = UIState.MPLobby;
+        else if (Phone && LocalCoop.Active)
+            EnterCampaigns();
         // there used to be stuff that manually removed entities. i hope we didn't need that
         OnMenuOpen?.Invoke();
     }
@@ -277,6 +287,8 @@ public static partial class MainMenuUI
                 RenderCosmeticsUI();
             else if (InLevelSelect)
                 DrawLevelSelect(spriteBatch);
+            else if (IsPhoneScreen)
+                DrawPhoneScreens(spriteBatch);
         }
 
         // why does this need to be here?????????? doesn't work in Update()

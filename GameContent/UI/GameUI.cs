@@ -102,7 +102,8 @@ public static class GameUI
 
             MainMenuUI.MenuState = MainMenuUI.UIState.Settings;
 
-            BackButton.Size.Y = 150;
+            if (!Internals.Common.Framework.Input.TouchControls.Enabled)
+                BackButton.Size.Y = 150;
 
             if (MainMenuUI.IsActive)
             {
@@ -306,6 +307,9 @@ public static class GameUI
     private static void HandleBackButton()
     {
         if (!_initialized)
+            return;
+        // phones: Difficulties / Campaigns go back to where they were opened from (e.g. a multiplayer lobby)
+        if (MainMenuUI.PhoneHandleBack())
             return;
         if (MainMenuUI.MenuState == MainMenuUI.UIState.Cosmetics)
             MainMenuUI.MenuState = MainMenuUI.UIState.PlayList;

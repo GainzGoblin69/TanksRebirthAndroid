@@ -444,6 +444,15 @@ public class NetPlay {
 
                 PlayerTank.KillCounts[clientid] = kills;
                 break;
+            case PacketID.LevelRun: {
+                var lrMission = reader.GetInt();
+                var lrMod = reader.GetString();
+                var lrFromGrid = reader.GetBool();
+                var mod = LevelProgress.Modifiers.FirstOrDefault(m => m.Key == lrMod);
+                LevelProgress.BeginRun(new(MainMenuUI.LevelSelectCampaign, lrMission, mod, lrFromGrid));
+                MainMenuUI.MissionCheckpoint = lrMission;
+                break;
+            }
             case PacketID.SyncDifficulties:
                 for (int i = 0; i < Difficulties.Types.Count; i++) {
                     Difficulties.Types[Difficulties.Types.Keys.ElementAt(i)] = reader.GetBool();
@@ -777,6 +786,12 @@ public class NetPlay {
                 message.Put(clientid);
                 message.Put(kills);
 
+                Server.NetManager.SendToAll(message, deliveryMethod, peer);
+                break;
+            case PacketID.LevelRun:
+                message.Put(reader.GetInt());
+                message.Put(reader.GetString());
+                message.Put(reader.GetBool());
                 Server.NetManager.SendToAll(message, deliveryMethod, peer);
                 break;
             case PacketID.SyncDifficulties:

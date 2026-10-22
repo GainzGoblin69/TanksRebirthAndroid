@@ -661,7 +661,7 @@ public class TankGame : Game {
             }
 
             // the cursor shows on desktop, and on phones while a controller is in use (it's the aim point)
-            RebirthMouse.ShouldRender = (!TouchControls.Enabled || TouchControls.GamepadMode) && (!Difficulties.Types["POV"] || GameUI.Paused || MainMenuUI.IsActive || LevelEditorUI.IsActive);
+            RebirthMouse.ShouldRender = (!TouchControls.Enabled || TouchControls.GamepadMode) && !(LocalCoop.Active && TouchControls.GameplayControlsActive) && (!Difficulties.Types["POV"] || GameUI.Paused || MainMenuUI.IsActive || LevelEditorUI.IsActive);
 
             UIElement.UpdateElements();
             GameUI.UpdateButtons();
@@ -913,6 +913,7 @@ public class TankGame : Game {
         SpriteRenderer.Begin(blendState: BlendState.AlphaBlend, effect: GameShaders.MouseShader, rasterizerState: RenderGlobals.DefaultRasterizer);
         RebirthMouse.DrawMouse();
         SpriteRenderer.End();
+        LocalCoop.DrawAim(SpriteRenderer); // same-device co-op: each controller player's aim
     }
 
     static Particle _ziggy;
