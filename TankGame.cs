@@ -482,6 +482,11 @@ public class TankGame : Game {
         PlayerTank.controlLeft.ForceReassign(Settings.LeftKeybind);
         PlayerTank.controlRight.ForceReassign(Settings.RightKeybind);
         PlayerTank.controlMine.ForceReassign(Settings.MineKeybind);
+        if (TouchControls.Enabled) {
+            // handheld/controller layout: bumpers instead of RT / A
+            PlayerTank.FireBullet.ForceReassign(Buttons.RightShoulder);
+            PlayerTank.PlaceMine.ForceReassign(Buttons.LeftShoulder);
+        }
         GameScene.Theme = Settings.GameTheme;
 
         /*if (!IsSouthernHemi ? LaunchTime.Month != 12 : LaunchTime.Month != 7)
@@ -654,7 +659,8 @@ public class TankGame : Game {
                 Graphics.ApplyChanges();
             }
 
-            RebirthMouse.ShouldRender = !TouchControls.Enabled && (!Difficulties.Types["POV"] || GameUI.Paused || MainMenuUI.IsActive || LevelEditorUI.IsActive);
+            // the cursor shows on desktop, and on phones while a controller is in use (it's the aim point)
+            RebirthMouse.ShouldRender = (!TouchControls.Enabled || TouchControls.GamepadMode) && (!Difficulties.Types["POV"] || GameUI.Paused || MainMenuUI.IsActive || LevelEditorUI.IsActive);
 
             UIElement.UpdateElements();
             GameUI.UpdateButtons();

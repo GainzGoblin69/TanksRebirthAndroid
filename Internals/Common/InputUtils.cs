@@ -28,6 +28,7 @@ public static class InputUtils
 
         if (Framework.Input.TouchControls.Enabled) {
             Framework.Input.TouchControls.Update();
+            Framework.Input.TouchControls.UpdateGamepad(CurrentGamePadSnapshot);
 
             // touches drive the "mouse" so the existing mouse-based UI and aiming keep working
             CurrentMouseSnapshot = Framework.Input.TouchControls.GetMouseState(OldMouseSnapshot);
@@ -36,7 +37,10 @@ public static class InputUtils
 
             // Android's back button and the on-screen pause button both act as Escape (pause / go back)
             var keys = Keyboard.GetState().GetPressedKeys().ToList();
-            if (Framework.Input.TouchControls.PauseJustPressed || CurrentGamePadSnapshot.IsButtonDown(Buttons.Back))
+            // controller: Start pauses; B goes back in menus
+            bool padBack = CurrentGamePadSnapshot.IsButtonDown(Buttons.Start)
+                || (CurrentGamePadSnapshot.IsButtonDown(Buttons.B) && !Framework.Input.TouchControls.GameplayControlsActive);
+            if (Framework.Input.TouchControls.PauseJustPressed || CurrentGamePadSnapshot.IsButtonDown(Buttons.Back) || padBack)
                 keys.Add(Keys.Escape);
             CurrentKeySnapshot = new KeyboardState(keys.ToArray());
             return;

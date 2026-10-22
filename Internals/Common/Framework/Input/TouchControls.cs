@@ -62,6 +62,16 @@ public static class TouchControls {
     private static readonly HashSet<int> _buttonTouches = [];
     private static readonly HashSet<int> _seen = [];
 
+    // ---- controller (e.g. AYN Thor, Bluetooth pads) ----
+    /// <summary>True after the controller was last used (touch controls hide); a screen touch turns it off.</summary>
+    public static bool GamepadMode { get; private set; }
+    /// <summary>On-screen speed of the aim cursor at full right-stick tilt, in screen heights per second.</summary>
+    public static float CursorSpeed { get; set; } = 1.4f;
+    private static Vector2 _padCursor = new(-1);
+    private static readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
+    private static double _lastTime;
+    private static bool _padClick;
+
     private static Texture2D? _disc;
     private static Texture2D? _ring;
 
@@ -71,10 +81,10 @@ public static class TouchControls {
         StickOnRight ? WindowUtils.WindowWidth - StickRadius * 1.6f : StickRadius * 1.6f,
         WindowUtils.WindowHeight - StickRadius * 1.6f);
     private static float ButtonRadius => 85f * UiScale;
-    // the mine button sits in the bottom corner opposite the joystick
+    // the mine button sits along the top edge, on the side opposite the joystick (clear of the HUD)
     private static Vector2 MineButtonCenter => new(
-        StickOnRight ? ButtonRadius * 1.5f : WindowUtils.WindowWidth - ButtonRadius * 1.5f,
-        WindowUtils.WindowHeight - ButtonRadius * 1.5f);
+        StickOnRight ? WindowUtils.WindowWidth * 0.19f : WindowUtils.WindowWidth * 0.83f,
+        ButtonRadius * 1.05f);
     private static Vector2 PauseButtonCenter => new(ButtonRadius * 0.9f, ButtonRadius * 0.9f);
     private static float PauseButtonRadius => ButtonRadius * 0.65f;
 
@@ -114,6 +124,8 @@ public static class TouchControls {
 
         _seen.Clear();
         var touches = TouchPanel.GetState();
+        if (touches.Count > 0)
+            GamepadMode = false;
 
         foreach (var touch in touches) {
             var pos = touch.Position;
@@ -215,16 +227,61 @@ public static class TouchControls {
             MoveVector = Vector2.Zero;
     }
 
+    /// <summary>
+    /// Controller input: the right stick (or either stick in menus) moves an on-screen cursor the turret aims at.
+    /// In menus, A (or RB) clicks at the cursor. Shooting and mines in missions go through PlayerTank's
+    /// FireBullet/PlaceMine binds (RB/LB on Android).
+    /// </summary>
+    public static void UpdateGamepad(GamePadState pad) {
+        var now = _clock.Elapsed.TotalSeconds;
+        var dt = (float)Math.Clamp(now - _lastTime, 0, 0.1);
+        _lastTime = now;
+        _padClick = false;
+
+        if (!pad.IsConnected)
+            return;
+        if (IsPadActive(pad))
+            GamepadMode = true;
+        if (!GamepadMode)
+            return;
+
+        int w = WindowUtils.WindowWidth, h = WindowUtils.WindowHeight;
+        if (_padCursor.X < 0)
+            _padCursor = new Vector2(w / 2f, h / 2f);
+
+        bool gameplay = GameplayControlsActive;
+        var stick = pad.ThumbSticks.Right;
+        if (!gameplay && stick.Length() < 0.2f)
+            stick = pad.ThumbSticks.Left; // menus: either stick moves the cursor
+        if (stick.Length() > 0.15f)
+            _padCursor += new Vector2(stick.X, -stick.Y) * CursorSpeed * h * dt;
+        _padCursor = Vector2.Clamp(_padCursor, Vector2.Zero, new Vector2(w - 1, h - 1));
+
+        _pointerPos = _padCursor;
+        _padClick = !gameplay && (pad.IsButtonDown(Buttons.A) || pad.IsButtonDown(Buttons.RightShoulder));
+    }
+
+    /// <summary>Whether the controller should count as "in use" this frame.</summary>
+    private static bool IsPadActive(GamePadState s) =>
+        s.Buttons.A == ButtonState.Pressed || s.Buttons.B == ButtonState.Pressed
+        || s.Buttons.X == ButtonState.Pressed || s.Buttons.Y == ButtonState.Pressed
+        || s.Buttons.Start == ButtonState.Pressed
+        || s.Buttons.LeftShoulder == ButtonState.Pressed || s.Buttons.RightShoulder == ButtonState.Pressed
+        || s.DPad.Up == ButtonState.Pressed || s.DPad.Down == ButtonState.Pressed
+        || s.DPad.Left == ButtonState.Pressed || s.DPad.Right == ButtonState.Pressed
+        || s.ThumbSticks.Left.Length() > 0.25f || s.ThumbSticks.Right.Length() > 0.25f
+        || s.Triggers.Left > 0.3f || s.Triggers.Right > 0.3f;
+
     /// <summary>A mouse state built from the "pointer" finger: its position, and the left button held while it touches.</summary>
     public static MouseState GetMouseState(MouseState previous) =>
         new((int)_pointerPos.X, (int)_pointerPos.Y, previous.ScrollWheelValue,
-            _pointerDown ? ButtonState.Pressed : ButtonState.Released,
+            _pointerDown || _padClick ? ButtonState.Pressed : ButtonState.Released,
             ButtonState.Released, ButtonState.Released, ButtonState.Released, ButtonState.Released);
 
     public static Vector2 PointerPosition => _pointerPos;
 
     public static void Draw(SpriteBatch sb) {
-        if (!Enabled || !GameplayControlsActive)
+        if (!Enabled || !GameplayControlsActive || GamepadMode)
             return;
 
         EnsureTextures(sb.GraphicsDevice);
