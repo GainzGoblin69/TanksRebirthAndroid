@@ -37,6 +37,10 @@ for id in $(adb shell dumpsys SurfaceFlinger --display-id | grep -oE 'Display [0
   adb exec-out screencap -d $id -p > "diag/display-$id.png"
 done
 
+# remove the simulated second display (its overlay window would swallow the taps below)
+adb shell settings put global overlay_display_devices '""'
+sleep 4
+
 # tap Play on the main menu (as a fraction of the screen size) and capture what comes next
 SIZE=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)
 W=${SIZE%x*}; H=${SIZE#*x}; [ $W -lt $H ] && { T=$W; W=$H; H=$T; }
