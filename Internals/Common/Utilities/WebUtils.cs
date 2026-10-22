@@ -33,14 +33,16 @@ public static class WebUtils {
         }
     }
     public static byte[] DownloadWebFile(string url, out string fileName, out HttpStatusCode status) {
-        var data = Inner_DownloadWebFile(url).GetAwaiter().GetResult();
+        // Run on the thread pool: blocking on async code from a thread with a SynchronizationContext (Android's UI
+        // thread, where the game loop runs) deadlocks, because the awaits try to resume on the blocked thread.
+        var data = Task.Run(() => Inner_DownloadWebFile(url)).GetAwaiter().GetResult();
 
         fileName = data.Name;
         status = data.Status;
         return data.Data;
     }
     private static async Task<(byte[] Data, string Name, HttpStatusCode Status)> Inner_DownloadWebFile(string url) {
-        var response = await _client.GetAsync(url); // Get the whole response
+        var response = await _client.GetAsync(url).ConfigureAwait(false); // Get the whole response
 
         if (response.StatusCode != HttpStatusCode.OK) {
             return (null, null, response.StatusCode)!;
@@ -52,7 +54,7 @@ public static class WebUtils {
             
         // GameHandler.ClientLog.Write($"WebRequest sent to '{url}'", LogType.Debug); make a logger.. of course.
 
-        return (await response.Content.ReadAsByteArrayAsync(), fileName, response.StatusCode)!;
+        return (await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false), fileName, response.StatusCode)!;
     }
 
     public static async Task<bool> RemoteFileExistsAsync(string url) {
@@ -61,7 +63,7 @@ public static class WebUtils {
             RequestUri = new(url),
         };
         
-        var response = await _client.SendAsync(request);
+        var response = await _client.SendAsync(request).ConfigureAwait(false);
         
         return response.StatusCode is HttpStatusCode.OK;
     }
@@ -71,14 +73,14 @@ public static class WebUtils {
             RequestUri = new(url),
         };
 
-        var response = await _client.SendAsync(request);
+        var response = await _client.SendAsync(request).ConfigureAwait(false);
 
         return response.StatusCode is HttpStatusCode.OK;
     }
 
     public static bool RemoteFileExists(string url) {
         try {
-            return RemoteFileExistsAsync(url).GetAwaiter().GetResult();
+            return Task.Run(() => RemoteFileExistsAsync(url)).GetAwaiter().GetResult();
         } catch {
             return false;
         }
