@@ -73,6 +73,7 @@ public class GameHandler {
         RebirthMouse.Initialize();
     }
     private static int _menuStillFrames;
+    private static int _menuStillTankCount;
     internal static void UpdateAll(GameTime gameTime) {
         /*void doTestWithFont() {
             var str = 
@@ -137,9 +138,13 @@ public class GameHandler {
         bool menuStill = Internals.Common.Framework.Input.TouchControls.Enabled && MainMenuUI.IsActive;
         // only count frames where the battle actually updated (not while the screen is still fading in), and
         // only once there are tanks on the board
-        if (!menuStill)
+        // The demo mission loads a moment after the menu appears, so restart the count whenever the set of tanks
+        // on the board changes; new tanks need some updates to be positioned before they can be drawn.
+        int liveAi = menuStill ? AllAITanks.Count(t => t is not null && !t.IsDestroyed) : 0;
+        if (!menuStill || liveAi != _menuStillTankCount)
             _menuStillFrames = 0;
-        else if (!IntermissionSystem.IsAwaitingNewMission && AllTanks.Any(t => t is not null))
+        _menuStillTankCount = liveAi;
+        if (menuStill && liveAi > 0 && !IntermissionSystem.IsAwaitingNewMission)
             _menuStillFrames++;
         bool freezeEntities = menuStill && _menuStillFrames > 10;
 
