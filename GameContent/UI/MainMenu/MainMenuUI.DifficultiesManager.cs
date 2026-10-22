@@ -118,11 +118,15 @@ public static partial class MainMenuUI {
         LanternMode.Color = Difficulties.Types["LanternMode"] ? Color.Lime : Color.Red;
         DisguiseMode.Color = Difficulties.Types["Disguise"] ? Color.Lime : Color.Red;
 
+        if (Internals.Common.Framework.Input.TouchControls.Enabled)
+            foreach (var (button, _) in DifficultyKeys)
+                button.Color = Color.WhiteSmoke;
+
         if (IsActive && Client.IsConnected() && Client.IsHost())
             Client.SendDiffiulties();
     }
     public static void RenderDifficultiesMenu() {
-        if (MenuState == UIState.Difficulties) {
+        if (MenuState == UIState.Difficulties && !Internals.Common.Framework.Input.TouchControls.Enabled) {
             DrawUtils.DrawStringWithBorder(TankGame.SpriteRenderer, FontGlobals.RebirthFont,
                 "Ideas are welcome! Let us know in our DISCORD server!",
                 new Vector2(WindowUtils.WindowWidth / 2, WindowUtils.WindowHeight / 6), Color.White, Color.Black, new Vector2(1f), 0f, Anchor.Center, 0.8f);
@@ -323,19 +327,52 @@ public static partial class MainMenuUI {
         RandomizedPlayer, BulletBlocking, FFA, LanternMode, DisguiseMode });
 
         // make all buttons not-interactable for non-host clients.
+
+        if (Internals.Common.Framework.Input.TouchControls.Enabled)
+            ApplyPhoneToggleLook();
+    }
+
+    /// <summary>Which difficulty flag each button shows, for the on/off switches.</summary>
+    private static (UITextButton Button, string Key)[] DifficultyKeys => [
+        (TanksAreCalculators, "TanksAreCalculators"), (PieFactory, "PieFactory"), (UltraMines, "UltraMines"),
+        (BulletHell, "BulletHell"), (AllInvisible, "AllInvisible"), (AllStationary, "AllStationary"),
+        (Armored, "Armored"), (AllHoming, "AllHoming"), (BumpUp, "BumpUp"), (Monochrome, "Monochrome"),
+        (InfiniteLives, "InfiniteLives"), (MasterMode, "MasterModBuff"), (TacticalPlanes, "TacticalPlanes"),
+        (MachineGuns, "MachineGuns"), (RandomizedTanks, "RandomizedTanks"), (ThunderMode, "ThunderMode"),
+        (POVMode, "POV"), (AiCompanion, "AiCompanion"), (Shotguns, "Shotguns"), (Predictions, "Predictions"),
+        (RandomizedPlayer, "RandomPlayer"), (BulletBlocking, "BulletBlocking"), (FFA, "FFA"),
+        (LanternMode, "LanternMode"), (DisguiseMode, "Disguise"),
+    ];
+
+    /// <summary>
+    /// Phones: neutral rows with a standard on/off switch at the right end, instead of red/green buttons.
+    /// </summary>
+    private static void ApplyPhoneToggleLook() {
+        foreach (var (button, key) in DifficultyKeys) {
+            var k = key;
+            button.HoverColor = Color.White;
+            button.UniqueDraw = (elem, sb) => {
+                bool on = Difficulties.Types.TryGetValue(k, out var v) && v;
+                var sw = ToggleSwitch.RightOf(elem.Hitbox);
+                ((UITextButton)elem).TextOffset = new Vector2(-(sw.Width + elem.Hitbox.Right - sw.Right) / 2f, 0);
+                ToggleSwitch.Draw(sb, sw, on);
+            };
+        }
     }
     private static void ArrangeDifficultyButtons() {
 
         const int maxRowsPerColumn = 12;
-        Vector2 buttonSize = new Vector2(300, 40);
-        float padding = 20f;
+        bool phone = Internals.Common.Framework.Input.TouchControls.Enabled;
+        // phones: wider rows (room for the switch) and taller ones (easier to tap)
+        Vector2 buttonSize = phone ? new Vector2(440, 58) : new Vector2(300, 40);
+        float padding = phone ? 14f : 20f;
         int totalButtons = AllDifficultyButtons.Count;
         int columnCount = (int)Math.Ceiling(totalButtons / (float)maxRowsPerColumn);
 
         // Get total width of all columns combined (scaled after ToResolutionX)
         //float totalWidth = (buttonSize.X * columnCount + padding * (columnCount - 1)).ToResolutionX();
         float totalWidth = columnCount * buttonSize.X + (columnCount + 1) * padding;
-        float startX = totalWidth / 2f; //(WindowUtils.WindowWidth - totalWidth) / 2f;
+        float startX = phone ? (1920f - totalWidth) / 2f + padding : totalWidth / 2f; //(WindowUtils.WindowWidth - totalWidth) / 2f;
 
         for (int i = 0; i < totalButtons; i++) {
             var button = AllDifficultyButtons[i];
@@ -345,7 +382,7 @@ public static partial class MainMenuUI {
             float offsetX = (buttonSize.X + padding) * col;
             float offsetY = (buttonSize.Y + padding) * row;
 
-            Vector2 position = new Vector2(startX + offsetX, (WindowUtils.WindowHeight * 0.1f) + offsetY);
+            Vector2 position = new Vector2(startX + offsetX, (phone ? 130f : WindowUtils.WindowHeight * 0.1f) + offsetY);
             button.SetDimensions(() => position.ToResolution(), () => buttonSize.ToResolution());
             button.OnMouseOver = (a) => SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
         }

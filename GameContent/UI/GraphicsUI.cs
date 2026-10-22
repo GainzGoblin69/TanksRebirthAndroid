@@ -97,7 +97,20 @@ public static class GraphicsUI {
             Tooltip = TankGame.GameLanguage.WindowKindDesc
         };
         FullScreenButton.SetDimensions(() => new Vector2(700, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
-        FullScreenButton.OnLeftClick = (uiElement) => {
+        if (Internals.Common.Framework.Input.TouchControls.Enabled) {
+            // phones are always fullscreen at native resolution, so this slot becomes the aim dots setting
+            FullScreenButton.Text = "Always Show Aim Dots";
+            FullScreenButton.Tooltip = "Draw the dotted line from your tank to the aim cursor at any distance.";
+            FullScreenButton.HoverColor = Color.White;
+            FullScreenButton.Color = Color.WhiteSmoke;
+            FullScreenButton.OnLeftClick = (_) => TankGame.Settings.AlwaysShowAimDots = !TankGame.Settings.AlwaysShowAimDots;
+            FullScreenButton.UniqueDraw = (elem, sb) => {
+                var sw = ToggleSwitch.RightOf(elem.Hitbox, 0.45f);
+                ((UITextButton)elem).TextOffset = new Vector2(-(sw.Width + elem.Hitbox.Right - sw.Right) / 2f, 0);
+                ToggleSwitch.Draw(sb, sw, TankGame.Settings.AlwaysShowAimDots);
+            };
+        }
+        else FullScreenButton.OnLeftClick = (uiElement) => {
             if (TankGame.Settings.WindowKind == WindowKind.Fullscreen) {
                 TankGame.Instance.Graphics.PreferredBackBufferHeight -= 50;
             }
@@ -170,7 +183,7 @@ public static class GraphicsUI {
         PerPixelLightingButton.IsVisible = true;
         VsyncButton.IsVisible = true;
         FullScreenButton.IsVisible = true;
-        ResolutionButton.IsVisible = true;
+        ResolutionButton.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled;
         PerPixelLightingToggle.IsVisible = true;
         VsyncToggle.IsVisible = true;
         FullScreenButton.IsVisible = true;

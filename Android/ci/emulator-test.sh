@@ -43,6 +43,12 @@ W=${SIZE%x*}; H=${SIZE#*x}; [ $W -lt $H ] && { T=$W; W=$H; H=$T; }
 adb shell input tap $((W * 494 / 1000)) $((H * 527 / 1000))
 sleep 6
 adb exec-out screencap -p > diag/run2-after-play.png
+# open Difficulties and flip the first two toggles (positions from the phone layout, as screen fractions)
+adb shell input tap $((W * 494 / 1000)) $((H * 531 / 1000)); sleep 4
+adb exec-out screencap -p > diag/run2-difficulties.png
+adb shell input tap $((W * 263 / 1000)) $((H * 147 / 1000)); sleep 3
+adb shell input tap $((W * 263 / 1000)) $((H * 214 / 1000)); sleep 3
+adb exec-out screencap -p > diag/run2-difficulties-toggled.png
 
 adb logcat -d -v threadtime > diag/logcat-full.txt
 grep -iE "mono-rt|Thread|at |TanksRebirth|DOTNET|mono|monodroid|AndroidRuntime|FATAL|Exception|libc|DEBUG|OpenGL|EGL|Adreno|MonoGame|$PKG" diag/logcat-full.txt > diag/logcat-filtered.txt

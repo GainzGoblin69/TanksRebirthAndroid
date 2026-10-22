@@ -52,7 +52,7 @@ public static class RebirthMouse
                 var me = GameHandler.AllPlayerTanks[clientId];
                 var tankPos = MatrixUtils.ConvertWorldToScreen(new Vector3(0, 11, 0), me.World, CameraGlobals.GameView, CameraGlobals.GameProjection);
 
-                if (GameUtils.Distance_WiiTanksUnits(tankPos, MouseUtils.MousePosition) >= DistUntilPathTrace.ToResolutionX()) // any scale doesnt matter?
+                if (TankGame.Settings.AlwaysShowAimDots || GameUtils.Distance_WiiTanksUnits(tankPos, MouseUtils.MousePosition) >= DistUntilPathTrace.ToResolutionX()) // any scale doesnt matter?
                 {
                     var tex = GameResources.GetGameResource<Texture2D>("Assets/textures/misc/mouse_dot");
 

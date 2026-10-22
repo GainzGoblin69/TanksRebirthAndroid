@@ -20,6 +20,8 @@ public class GameConfig
     public int TankFootprintLimit { get; set; } = 10000;
     public bool PerPixelLighting { get; set; } = true;
     public bool Vsync { get; set; } = true;
+    /// <summary>Always draw the aim dots between your tank and the cursor (otherwise only when the cursor is far away).</summary>
+    public bool AlwaysShowAimDots { get; set; } = true;
     public WindowKind WindowKind { get; set; } = WindowKind.Windowed;
     public bool MSAA { get; set; } = false;
     public bool FadeFootprints { get; set; } = false;

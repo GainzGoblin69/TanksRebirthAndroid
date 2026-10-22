@@ -45,6 +45,11 @@ public class UITextButton : UIImage
         SpriteFontBase font = FontGlobals.RebirthFont;
         Vector2 drawOrigin = font.MeasureString(Text) / 2f;
         if (TextScale != null && DrawText)
-            spriteBatch.DrawString(font, Text, Hitbox.Center.ToVector2(), Color.Black, AutoResolutionHandle ? TextScale.Invoke().ToResolution() : TextScale.Invoke(), TextRotation, drawOrigin);
+            spriteBatch.DrawString(font, Text, Hitbox.Center.ToVector2() + TextOffset, Color.Black, AutoResolutionHandle ? TextScale.Invoke().ToResolution() : TextScale.Invoke(), TextRotation, drawOrigin);
+        // extra decoration on top of the button (e.g. an on/off switch)
+        UniqueDraw?.Invoke(this, spriteBatch);
     }
+
+    /// <summary>Shifts the label from the button's center, in pixels (e.g. to make room for a switch).</summary>
+    public Vector2 TextOffset { get; set; }
 }

@@ -163,7 +163,8 @@ public class PlayerTank : Tank {
         properties.TurningSpeed = 0.1f;
 
         // this changes depending on input (or should it?)
-        properties.MaximalTurn = MathHelper.ToRadians(InputUtils.CurrentGamePadSnapshot.IsConnected ? 10 : 46); // normally it's 10 degrees, but we want to make it easier for keyboard players.
+        // phones (touch joystick or a handheld's controller) use the keyboard's wider turn window, which feels smooth
+        properties.MaximalTurn = MathHelper.ToRadians(InputUtils.CurrentGamePadSnapshot.IsConnected && !TouchControls.Enabled ? 10 : 46); // normally it's 10 degrees, but we want to make it easier for keyboard players.
 
         Properties.ShootPitch = 0.1f * PlayerType;
 
@@ -224,10 +225,10 @@ public class PlayerTank : Tank {
         if (!Properties.Stationary) {
             if (NetPlay.IsClientMatched(PlayerId)) {
                 if (CurShootStun <= 0 && CurMineStun <= 0) {
-                    if (LastUsedController)
+                    if (TouchControls.Enabled)
+                        ControlHandle_Touch(); // touch joystick and controller sticks share the smooth steering
+                    else if (LastUsedController)
                         ControlHandle_ConsoleController();
-                    else if (TouchControls.Enabled)
-                        ControlHandle_Touch();
                     else
                         ControlHandle_Keybinding();
                 }
@@ -364,14 +365,28 @@ public class PlayerTank : Tank {
     /// <summary>Movement from the on-screen joystick. Mirrors the keyboard scheme, but with an analog direction.
     /// Aiming and firing come through the synthesized mouse (tap on the right side of the screen).</summary>
     private void ControlHandle_Touch() {
-        if (TouchControls.MineJustPressed)
+        if (TouchControls.MineJustPressed || PlaceMine.JustPressed)
             LayMine();
+        if (FireBullet.JustPressed)
+            Shoot(false);
 
         IsTurning = false;
 
         ChassisRotation %= MathHelper.Tau;
 
         var move = TouchControls.MoveVector;
+        // controller: left stick (or d-pad) steers the same way as the touch joystick
+        var pad = InputUtils.CurrentGamePadSnapshot;
+        if (pad.IsConnected) {
+            var ls = pad.ThumbSticks.Left;
+            var padMove = new Vector2(ls.X, -ls.Y);
+            if (pad.DPad.Left == ButtonState.Pressed) padMove.X = -1;
+            if (pad.DPad.Right == ButtonState.Pressed) padMove.X = 1;
+            if (pad.DPad.Up == ButtonState.Pressed) padMove.Y = -1;
+            if (pad.DPad.Down == ButtonState.Pressed) padMove.Y = 1;
+            if (padMove.Length() > 0.2f)
+                move = padMove;
+        }
         if (move != Vector2.Zero) {
             playerControl_isBindPressed = true;
             DesiredDirection = Vector2.Normalize(move);
