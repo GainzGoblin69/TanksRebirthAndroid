@@ -25,8 +25,16 @@ namespace TanksRebirth.Droid;
     ScreenOrientation = ScreenOrientation.SensorLandscape,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.Keyboard | ConfigChanges.KeyboardHidden
                          | ConfigChanges.ScreenSize | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize
-                         | ConfigChanges.UiMode | ConfigChanges.Navigation)]
+                         | ConfigChanges.UiMode | ConfigChanges.Navigation | ConfigChanges.Density
+                         | ConfigChanges.FontScale | ConfigChanges.Locale | ConfigChanges.LayoutDirection
+                         | ConfigChanges.Touchscreen | ConfigChanges.Mcc | ConfigChanges.Mnc | ConfigChanges.ColorMode)]
 public class MainActivity : AndroidGameActivity {
+    // Process-wide launch state. Android can replace this activity with a new instance (e.g. on a configuration
+    // change) while files are still unpacking on a background thread; the new instance must pick that up rather
+    // than treat it as a failed launch.
+    private static MainActivity? s_current;
+    private static bool s_unpacking;
+
     private TankGame? _game;
     private TextView? _status;
     private TextView? _overlay;
@@ -55,6 +63,13 @@ public class MainActivity : AndroidGameActivity {
         Directory.CreateDirectory(_saveDir);
 
         HookCrashLogging();
+        s_current = this;
+
+        if (s_unpacking) {
+            // a previous instance of this activity is still unpacking; it will start the game on this one
+            ShowStatus("Preparing game files…");
+            return;
+        }
 
         if (File.Exists(MarkerPath)) {
             ShowReport();
@@ -84,27 +99,41 @@ public class MainActivity : AndroidGameActivity {
         }
 
         // Shown while the game files are unpacked (a few seconds on first launch only).
+        ShowStatus("Preparing game files…");
+
+        s_unpacking = true;
+        var context = ApplicationContext!;
+        string gameDir = _gameDir, saveDir = _saveDir;
+        Task.Run(() => {
+            try {
+                AssetExtractor.ExtractIfNeeded(context, gameDir, saveDir,
+                    msg => OnCurrent(a => { if (a._status != null) a._status.Text = msg; }));
+                Breadcrumb("game files ready");
+                s_unpacking = false;
+                OnCurrent(a => a.StartGame()); // whichever activity instance is current by now
+            }
+            catch (Exception e) {
+                s_unpacking = false;
+                LogCrash("unpacking game files", e);
+                OnCurrent(a => a.ShowReport());
+            }
+        });
+    }
+
+    private static void OnCurrent(Action<MainActivity> action) {
+        var a = s_current;
+        a?.RunOnUiThread(() => action(a));
+    }
+
+    private void ShowStatus(string text) {
         _status = new TextView(this) {
-            Text = "Preparing game files…",
+            Text = text,
             Gravity = GravityFlags.Center,
             TextSize = 22,
         };
         _status.SetTextColor(Android.Graphics.Color.White);
         _status.SetBackgroundColor(Android.Graphics.Color.Black);
         SetContentView(_status);
-
-        Task.Run(() => {
-            try {
-                AssetExtractor.ExtractIfNeeded(this, _gameDir, _saveDir,
-                    msg => RunOnUiThread(() => { if (_status != null) _status.Text = msg; }));
-                Breadcrumb("game files ready");
-                RunOnUiThread(StartGame);
-            }
-            catch (Exception e) {
-                LogCrash("unpacking game files", e);
-                RunOnUiThread(ShowReport);
-            }
-        });
     }
 
     private void StartGame() {
