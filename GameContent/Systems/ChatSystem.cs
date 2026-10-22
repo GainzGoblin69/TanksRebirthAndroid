@@ -392,6 +392,9 @@ public sealed record ChatSystem {
 /// <summary>Represents a system used to store messages and their contents in use with the <see cref="ChatSystem"/>.</summary>
 public struct ChatMessage
 {
+    // Explicit static constructor: makes the static fields above/below initialize at first use (as on desktop).
+    // Without it, Android's Mono runtime may run them early, before the fonts/textures/settings they read exist.
+    static ChatMessage() { }
     /// <summary>The content of this <see cref="ChatMessage"/>.</summary>
     public string Content;
 

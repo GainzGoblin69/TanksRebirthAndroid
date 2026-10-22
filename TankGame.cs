@@ -172,6 +172,11 @@ public class TankGame : Game {
 
         FontGlobals.RebirthFontSystem = new();
 
+        // Load settings up front: some static initializers (e.g. TankFootprint) read them, and on Android the
+        // Mono runtime runs those initializers as soon as a method that uses the type is compiled, which for
+        // LoadContent happens before its first line runs.
+        LoadSettings();
+
         RuntimeData.GameVersion = typeof(TankGame).Assembly.GetName().Version!;
         RuntimeData.ShortVersion = StringUtils.RemoveTrailingZeros(RuntimeData.GameVersion);
 
@@ -358,6 +363,20 @@ public class TankGame : Game {
             sounds.ToArray()
             , default);
     }
+    private static void LoadSettings() {
+        if (!File.Exists(Path.Combine(SaveDirectory, "settings.json"))) {
+            Settings = new();
+            SettingsHandler = new(Settings, Path.Combine(SaveDirectory, "settings.json"));
+            JsonSerializerOptions opts = new() {
+                WriteIndented = true
+            };
+            SettingsHandler.Serialize(opts, true);
+        }
+        else {
+            SettingsHandler = new(Settings, Path.Combine(SaveDirectory, "settings.json"));
+            Settings = SettingsHandler.Deserialize();
+        }
+    }
     protected override void LoadContent() {
         ClientLog.Write("Preloading textures and sounds...", LogType.Info);
         PreloadContent();
@@ -428,18 +447,6 @@ public class TankGame : Game {
         FontGlobals.RebirthFont = FontGlobals.RebirthFontSystem.GetFont(35);
         FontGlobals.RebirthFontLarge = FontGlobals.RebirthFontSystem.GetFont(120);
 
-        if (!File.Exists(Path.Combine(SaveDirectory, "settings.json"))) {
-            Settings = new();
-            SettingsHandler = new(Settings, Path.Combine(SaveDirectory, "settings.json"));
-            JsonSerializerOptions opts = new() {
-                WriteIndented = true
-            };
-            SettingsHandler.Serialize(opts, true);
-        }
-        else {
-            SettingsHandler = new(Settings, Path.Combine(SaveDirectory, "settings.json"));
-            Settings = SettingsHandler.Deserialize();
-        }
         RuntimeData.LaunchTime = DateTime.Now;
         RuntimeData.IsSouthernHemi = RegionUtils.IsSouthernHemisphere(RegionInfo.CurrentRegion.EnglishName);
 

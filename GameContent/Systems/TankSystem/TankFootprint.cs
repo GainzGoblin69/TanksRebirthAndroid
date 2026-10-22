@@ -18,6 +18,9 @@ namespace TanksRebirth.GameContent.Systems.TankSystem;
 
 #pragma warning disable
 public class TankFootprint {
+    // Explicit static constructor: makes the static fields above/below initialize at first use (as on desktop).
+    // Without it, Android's Mono runtime may run them early, before the fonts/textures/settings they read exist.
+    static TankFootprint() { }
     public static bool ShouldTracksFade;
 
     public static TankFootprint[] AllFootprints = new TankFootprint[TankGame.Settings.TankFootprintLimit];

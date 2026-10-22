@@ -20,6 +20,9 @@ using TanksRebirth.Internals.UI;
 namespace TanksRebirth.GameContent.UI.MainMenu;
 
 public static partial class MainMenuUI {
+    // Explicit static constructor: makes the static fields above/below initialize at first use (as on desktop).
+    // Without it, Android's Mono runtime may run them early, before the fonts/textures/settings they read exist.
+    static MainMenuUI() { }
     static bool _playerHasVanillaCampaign;
 
     const int MAX_CAMPAIGNS_PER_COLUMN = 8;

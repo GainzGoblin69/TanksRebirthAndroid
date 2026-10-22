@@ -27,6 +27,9 @@ public enum ParticleImportance {
 }
 public class Particle
 {
+    // Explicit static constructor: makes the static fields above/below initialize at first use (as on desktop).
+    // Without it, Android's Mono runtime may run them early, before the fonts/textures/settings they read exist.
+    static Particle() { }
     /// <summary>Data you may want to assign to this particle, such as assigning an owner to a particle, etc.</summary>
     public object Tag;
 

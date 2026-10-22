@@ -12,6 +12,9 @@ using static StbVorbisSharp.StbVorbis;
 namespace TanksRebirth.GameContent.UI;
 
 public static class GraphicsUI {
+    // Explicit static constructor: makes the static fields above/below initialize at first use (as on desktop).
+    // Without it, Android's Mono runtime may run them early, before the fonts/textures/settings they read exist.
+    static GraphicsUI() { }
     public static UITextButton PerPixelLightingButton;
 
     public static UIImage PerPixelLightingToggle;

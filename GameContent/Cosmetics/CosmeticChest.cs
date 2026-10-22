@@ -16,6 +16,9 @@ namespace TanksRebirth.GameContent.Cosmetics;
 // Not inherently locked to cosmetics only, but exist to distinguish from tank crates.
 public struct CosmeticChest
 {
+    // Explicit static constructor: makes the static fields above/below initialize at first use (as on desktop).
+    // Without it, Android's Mono runtime may run them early, before the fonts/textures/settings they read exist.
+    static CosmeticChest() { }
     public static Prop2D Anger = new("Anger!", GameResources.GetGameResource<Texture2D>("Assets/models/cosmetics/anger_symbol"), new(8, 20, 8), PropLockOptions.None)
     {
         UniqueBehavior = (cos, tnk) =>
