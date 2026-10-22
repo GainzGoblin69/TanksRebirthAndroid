@@ -75,10 +75,9 @@ public class UITextButton : UIImage
             SpriteFontBase font = FontGlobals.RebirthFont;
             var size = font.MeasureString(Text);
             float availW = face.Width - 2f * MathF.Abs(TextOffset.X) - face.Height * 0.5f;
-            float scale = MathF.Min(face.Height * 0.42f / MathF.Max(1f, size.Y), availW / MathF.Max(1f, size.X));
-            // never larger than the label would be at twice its desktop size
-            var desktop = AutoResolutionHandle ? TextScale.Invoke().ToResolution() : TextScale.Invoke();
-            scale = MathF.Min(scale, desktop.Y * 2.2f);
+            // same label size on every menu button (by height, capped so big buttons don't get huge text)
+            float byHeight = MathF.Min(face.Height * 0.40f, 46f * WindowUtils.WindowHeight / 1080f) / MathF.Max(1f, size.Y);
+            float scale = MathF.Min(byHeight, availW / MathF.Max(1f, size.X));
             spriteBatch.DrawString(font, Text, face.Center.ToVector2() + TextOffset, new Color(40, 30, 22), new Vector2(scale), TextRotation, size / 2f);
         }
         UniqueDraw?.Invoke(this, spriteBatch);

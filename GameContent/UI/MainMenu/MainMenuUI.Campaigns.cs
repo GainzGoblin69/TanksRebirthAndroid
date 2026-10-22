@@ -255,7 +255,7 @@ public static partial class MainMenuUI {
             var m = font.MeasureString(t);
             sb.DrawString(font, t, new Vector2(cx, y), c, new Vector2(scale * s), 0f, m / 2f);
         }
-        Text("Start at mission", card.Y + 80 * s, 1.0f, ink);
+        Text("Start at mission", card.Y + 80 * s, 1.25f, ink);
         Text($"{MissionCheckpoint + 1}", minusC.Y, 2.6f, ink);
 
         foreach (var (c, label, enabled) in new[] { (minusC, "-", MissionCheckpoint > 0), (plusC, "+", MissionCheckpoint < unlocked) }) {
@@ -268,13 +268,13 @@ public static partial class MainMenuUI {
 
         var rec = LevelProgress.Get(LevelSelectCampaign, MissionCheckpoint);
         float y = card.Y + 410 * s;
-        Text(rec.BestSolo > 0 ? $"Fastest time: {LevelProgress.FormatTime(rec.BestSolo)}" : "Fastest time: --", y, 0.85f, ink);
+        Text(rec.BestSolo > 0 ? $"Fastest time: {LevelProgress.FormatTime(rec.BestSolo)}" : "Fastest time: --", y, 1.05f, ink);
         if (rec.CoopAttempted) {
-            y += 56 * s;
-            Text(rec.BestCoop > 0 ? $"Co-op fastest: {LevelProgress.FormatTime(rec.BestCoop)}" : "Co-op fastest: --", y, 0.85f, ink);
+            y += 64 * s;
+            Text(rec.BestCoop > 0 ? $"Co-op fastest: {LevelProgress.FormatTime(rec.BestCoop)}" : "Co-op fastest: --", y, 1.05f, ink);
         }
         if (MissionCheckpoint == unlocked && (count == 0 || unlocked < count - 1))
-            Text($"Clear mission {unlocked + 1} to unlock the next one", card.Bottom - 50 * s, 0.6f, new Color(120, 96, 70));
+            Text($"Clear mission {unlocked + 1} to unlock the next one", card.Bottom - 50 * s, 0.8f, new Color(120, 96, 70));
 
         sb.End();
         sb.Begin();
