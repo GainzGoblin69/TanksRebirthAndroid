@@ -10,6 +10,8 @@ public sealed class ShellID
     public const int TrailedRocket = 3;
     public const int Supressed = 4;
     public const int Explosive = 5;
+    /// <summary>Gears of War missile upgrade: no bounces, breaks through destructible blocks, can't be shot down.</summary>
+    public const int Missile = 6;
 
     /* IDEAS:
      * Clustering shell: explodes into multiple smaller shells (after X amount of time or distance?)

@@ -316,6 +316,18 @@ public class PlayerTank : Tank {
     }
     public override void Shoot(bool fxOnly, bool netSend = true) {
         PlayerStatistics.ShellsShot++;
+        // Gears of War missile upgrade: this shot is a missile
+        if (MissileUpgrade.ShotsLeft(PlayerId) > 0) {
+            var (type, bounces) = (Properties.ShellType, Properties.RicochetCount);
+            var before = LastShotShell;
+            Properties.ShellType = ShellID.Missile;
+            Properties.RicochetCount = 0;
+            base.Shoot(false);
+            (Properties.ShellType, Properties.RicochetCount) = (type, bounces);
+            if (LastShotShell is not null && !ReferenceEquals(before, LastShotShell))
+                MissileUpgrade.UsedShot(PlayerId);
+            return;
+        }
         base.Shoot(false);
     }
     public override void LayMine() {

@@ -180,6 +180,15 @@ public class Shell : IAITankDanger {
                 _shellTexture = GameResources.GetGameResource<Texture2D>("Assets/textures/bullet/explosive_bullet");
                 Properties.IsDestructible = false;
                 break;
+            case ShellID.Missile:
+                _shellTexture = GameResources.GetGameResource<Texture2D>("Assets/textures/bullet/explosive_bullet");
+                Properties.Flaming = true;
+                Properties.IsDestructible = false; // enemy bullets can't stop it
+                RicochetsRemaining = 0;
+                TrailSound?.Instance?.Stop();
+                TrailSound = new OggAudio("Content/Assets/sounds/tnk_shoot_rocket_loop.ogg", 0.3f);
+                TrailSound.Instance.IsLooped = true;
+                break;
             default:
                 ModdedData?.OnCreate();
                 break;
@@ -228,7 +237,7 @@ public class Shell : IAITankDanger {
         Swap(type);
 
         if (playSpawnSound) {
-            if (Type <= ShellID.Explosive) {
+            if (Type <= ShellID.Missile) {
                 ShootSound = Type switch {
                     ShellID.Player => new OggAudio("Content/Assets/sounds/tnk_shoot_regular_1.ogg"),
                     ShellID.Standard => new OggAudio("Content/Assets/sounds/tnk_shoot_regular_2.ogg"),
@@ -236,6 +245,7 @@ public class Shell : IAITankDanger {
                     ShellID.TrailedRocket => new OggAudio("Content/Assets/sounds/tnk_shoot_ricochet_rocket.ogg"),
                     ShellID.Supressed => new OggAudio("Content/Assets/sounds/tnk_shoot_silencer.ogg"),
                     ShellID.Explosive => new OggAudio("Content/Assets/sounds/tnk_shoot_regular_2.ogg"),
+                    ShellID.Missile => new OggAudio("Content/Assets/sounds/tnk_shoot_rocket.ogg"),
                     _ => throw new NotImplementedException($"Sound for the shell type {Type} is not implemented, yet."),
                 };
             }
@@ -312,6 +322,14 @@ public class Shell : IAITankDanger {
         Collision.HandleCollisionSimple_ForBlocks(Hitbox, Velocity, ref dummy, out var dir, out var block,
             out bool corner, false, (c) => c.Properties.IsSolid);
 
+        if (Type == ShellID.Missile && block is not null && (dir != CollisionDirection.None || corner)) {
+            // missiles break through destructible blocks and keep going; anything else stops them
+            if (block.Properties.IsDestructible)
+                block.Destroy();
+            else
+                Destroy(DestructionContext.WithObstacle);
+        }
+        else {
         if (LifeTime <= 5 && (dir != CollisionDirection.None || corner))
             Destroy(DestructionContext.WithObstacle);
         if (corner)
@@ -334,6 +352,7 @@ public class Shell : IAITankDanger {
                     OnRicochetWithBlock?.Invoke(block, this);
                     break;
             }
+        }
         }
 
         LifeTime += RuntimeData.DeltaTime;

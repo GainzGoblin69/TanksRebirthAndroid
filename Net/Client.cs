@@ -424,6 +424,12 @@ public class Client {
         message.Put(Difficulties.DisguiseValue);
         NetClient.Send(message, DeliveryMethod.Sequenced);
     }
+    public static void SendReturnToMenu() {
+        if (!IsConnected()) return;
+        NetDataWriter message = new();
+        message.Put(PacketID.ReturnToMenu);
+        NetClient.Send(message, DeliveryMethod.ReliableOrdered);
+    }
     public static void SendLevelRun(int mission, string modifierKey, bool fromModifierGrid) {
         if (!IsConnected()) return;
         NetDataWriter message = new();

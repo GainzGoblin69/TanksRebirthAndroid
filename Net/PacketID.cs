@@ -69,6 +69,8 @@ public sealed class PacketID {
     public const int HostDisconnect = 31;
     /// <summary>Phones: the host started a Level Select run (mission, modifier, which grid to return to).</summary>
     public const int LevelRun = 32;
+    /// <summary>Phones: after a multiplayer game over the host chose Restart; everyone goes back to the menus.</summary>
+    public const int ReturnToMenu = 33;
 
     public static int AddPacketId(string name) => Collection.ForcefullyInsert(name);
 

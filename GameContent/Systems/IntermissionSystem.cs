@@ -176,7 +176,11 @@ public static class IntermissionSystem {
             _forceBonusDrawToHeight = true;
         } 
         else if (frameId == 1) {
-            PlayerTank.AddLives(1);
+            // Gears of War has no extra lives: the bonus is a missile upgrade instead
+            if (Difficulties.Types["GearsOfWar"])
+                MissileUpgrade.Grant();
+            else
+                PlayerTank.AddLives(1);
         }
         else if (frameId == 2) {
 
@@ -563,10 +567,12 @@ public static class IntermissionSystem {
         BonusTextGradient.Top = gradientModifiedTopColor;
         BonusTextGradient.Bottom = gradientModifiedBottomColor;
 
-        spriteBatch.DrawString(FontGlobals.RebirthFontLarge, TankGame.GameLanguage.BonusTank, 
+        var bonusText = Difficulties.Types["GearsOfWar"] ? "Missile Upgrade!" : TankGame.GameLanguage.BonusTank;
+        float bonusFit = Math.Min(1f, BonusBannerTextBuffer.Width * 0.9f / Math.Max(1f, FontGlobals.RebirthFontLarge.MeasureString(bonusText).X * _bannerScale * 0.5f * 1f.ToResolutionX()));
+        spriteBatch.DrawString(FontGlobals.RebirthFontLarge, bonusText, 
             new Vector2(BonusBannerTextBuffer.Width / 2, BonusBannerTextBuffer.Height / 2), 
-            Color.White, (Vector2.One * _bannerScale * 0.5f * BonusLifeAnimator.CurrentScale).ToResolution(), 
-            origin: Anchor.Center.GetAnchor(FontGlobals.RebirthFontLarge.MeasureString(TankGame.GameLanguage.BonusTank)));
+            Color.White, (Vector2.One * _bannerScale * 0.5f * bonusFit * BonusLifeAnimator.CurrentScale).ToResolution(), 
+            origin: Anchor.Center.GetAnchor(FontGlobals.RebirthFontLarge.MeasureString(bonusText)));
 
         spriteBatch.End();
 

@@ -121,6 +121,12 @@ public static class LocalCoop {
         return Just(s, Buttons.LeftShoulder) || Just(s, Buttons.A) || (s.Cur.Triggers.Left > 0.5f && s.Old.Triggers.Left <= 0.5f);
     }
 
+    /// <summary>Use a missile upgrade: Y on a controller, the MISSILE button for the touch player.</summary>
+    public static bool MissilePressed(int playerId) {
+        var s = _slots[playerId];
+        return s.Touch ? TouchControls.MissileJustPressed : Just(s, Buttons.Y);
+    }
+
     /// <summary>Where this player is aiming, in screen pixels.</summary>
     public static Vector2 AimScreen(int playerId) {
         var s = _slots[playerId];

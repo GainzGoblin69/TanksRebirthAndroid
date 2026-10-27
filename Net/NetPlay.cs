@@ -1,4 +1,5 @@
 ﻿using LiteNetLib;
+using TanksRebirth.GameContent.ID;
 using LiteNetLib.Utils;
 using Microsoft.Xna.Framework;
 using System;
@@ -325,6 +326,8 @@ public class NetPlay {
 
                 shooter.Shoot(false, false);
                 if (shooter.LastShotShell is not null) {
+                    if (shellType == ShellID.Missile)
+                        shooter.LastShotShell!.Swap(shellType); // missile looks/behaves differently
                     shooter!.LastShotShell!.Type = shellType;
                     shooter.LastShotShell.Position = shellPos;
                     shooter.LastShotShell.Velocity = shellVel;
@@ -443,6 +446,9 @@ public class NetPlay {
                 var kills = reader.GetInt();
 
                 PlayerTank.KillCounts[clientid] = kills;
+                break;
+            case PacketID.ReturnToMenu:
+                MPEndScreen.ReturnFromHost();
                 break;
             case PacketID.LevelRun: {
                 var lrMission = reader.GetInt();
@@ -786,6 +792,9 @@ public class NetPlay {
                 message.Put(clientid);
                 message.Put(kills);
 
+                Server.NetManager.SendToAll(message, deliveryMethod, peer);
+                break;
+            case PacketID.ReturnToMenu:
                 Server.NetManager.SendToAll(message, deliveryMethod, peer);
                 break;
             case PacketID.LevelRun:

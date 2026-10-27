@@ -32,6 +32,9 @@ public static class TouchControls {
     /// <summary>Joystick direction in screen space (-1..1 on each axis, +Y is down). Zero inside the dead zone.</summary>
     public static Vector2 MoveVector { get; private set; }
     public static bool MineJustPressed { get; private set; }
+    /// <summary>Missile upgrade button: (upgrades waiting, missile shots left) while there is one to show.</summary>
+    public static (int Charges, int Shots)? MissileButton { get; set; }
+    public static bool MissileJustPressed { get; private set; }
     /// <summary>Phone tilt (-1..1 each way, screen axes, +Y toward the bottom), from the Android launcher.</summary>
     public static Vector2 Tilt { get; set; }
     /// <summary>Whether a finger is on the screen right now.</summary>
@@ -107,6 +110,8 @@ public static class TouchControls {
     private static Vector2 MineButtonCenter => new(
         StickOnRight ? WindowUtils.WindowWidth * 0.19f : WindowUtils.WindowWidth * 0.83f,
         ButtonRadius * 1.05f);
+    // the missile upgrade button sits next to the mine button, toward the middle
+    private static Vector2 MissileButtonCenter => MineButtonCenter + new Vector2((StickOnRight ? 1 : -1) * ButtonRadius * 2.4f, 0);
     private static Vector2 PauseButtonCenter => new(ButtonRadius * 0.9f, ButtonRadius * 0.9f);
     private static float PauseButtonRadius => ButtonRadius * 0.65f;
 
@@ -121,7 +126,8 @@ public static class TouchControls {
         && !TanksRebirth.GameContent.UI.GameUI.Paused
         && !CampaignCompleteUI.IsViewingResults
         && !ChatSystem.ActiveHandle
-        && !TankGame.IsCrashInfoVisible;
+        && !TankGame.IsCrashInfoVisible
+        && !TanksRebirth.GameContent.UI.MPEndScreen.Active;
 
     private static void GrabStick(int id, Vector2 origin, Vector2 pos) {
         _stickId = id;
@@ -134,6 +140,7 @@ public static class TouchControls {
 
     public static void Update() {
         MineJustPressed = _mineRequested && GameplayControlsActive;
+        MissileJustPressed = false;
         PauseJustPressed = _pauseRequested;
         _mineRequested = _pauseRequested = false;
         _pointerRetap = false;
@@ -159,6 +166,11 @@ public static class TouchControls {
             if (touch.State == TouchLocationState.Pressed) {
                 if (gameplay && !SecondScreenActive && Vector2.Distance(pos, PauseButtonCenter) <= PauseButtonRadius * 1.3f) {
                     PauseJustPressed = true;
+                    _buttonTouches.Add(touch.Id);
+                    continue;
+                }
+                if (gameplay && MissileButton is { Charges: > 0 } && Vector2.Distance(pos, MissileButtonCenter) <= ButtonRadius * 1.1f) {
+                    MissileJustPressed = true;
                     _buttonTouches.Add(touch.Id);
                     continue;
                 }
@@ -329,6 +341,15 @@ public static class TouchControls {
         DrawCircle(sb, _disc!, MineButtonCenter, ButtonRadius, Color.Black * 0.3f);
         DrawCircle(sb, _ring!, MineButtonCenter, ButtonRadius, Color.White * 0.5f);
         DrawLabel(sb, "MINE", MineButtonCenter, 0.55f);
+
+        // missile upgrade (Gears of War): shows how many are waiting, or the missile shots left while one is on
+        if (MissileButton is { } mb) {
+            bool on = mb.Shots > 0;
+            DrawCircle(sb, _disc!, MissileButtonCenter, ButtonRadius, (on ? Color.OrangeRed : mb.Charges > 0 ? Color.DarkOrange : Color.Black) * (on ? 0.55f : 0.4f));
+            DrawCircle(sb, _ring!, MissileButtonCenter, ButtonRadius, Color.White * 0.6f);
+            DrawLabel(sb, "MISSILE", MissileButtonCenter - new Vector2(0, ButtonRadius * 0.18f), 0.45f);
+            DrawLabel(sb, on ? $"{mb.Shots} shots" : $"x{mb.Charges}", MissileButtonCenter + new Vector2(0, ButtonRadius * 0.28f), 0.45f);
+        }
 
         // pause button (two bars); lives on the second screen when there is one
         if (!SecondScreenActive)

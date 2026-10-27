@@ -182,6 +182,7 @@ public static partial class MainMenuUI
             LevelProgress.CurrentCampaignKey = name;
             // Level Select runs are one life (per player)
             bool levelRun = LevelProgress.Run is not null;
+            MissileUpgrade.Reset();
 
             CampaignGlobals.LoadedCampaign.LoadMission(MissionCheckpoint); // loading the mission specified
 

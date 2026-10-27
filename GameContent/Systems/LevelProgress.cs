@@ -165,12 +165,19 @@ public static class LevelProgress {
     }
 
     private static void OnMissionEnd(int delay, MissionEndContext context, bool result1up) {
-        if (!_timing)
-            return;
+        bool timed = _timing;
         _timing = false;
         bool won = context is MissionEndContext.Win or MissionEndContext.CampaignCompleteMajor or MissionEndContext.CampaignCompleteMinor;
 
-        if (won && _timedMission >= 0) {
+        // multiplayer: when everyone is out, the end screen asks the host what to do (nobody is left hanging)
+        bool mpOut = Client.IsConnected() && (context == MissionEndContext.GameOver || (Run is not null && !won));
+        if (mpOut) {
+            SuppressResults = true;
+            _returnCountdown = 0;
+            UI.MPEndScreen.Show();
+        }
+
+        if (timed && won && _timedMission >= 0) {
             var rec = Get(CurrentCampaignKey, _timedMission);
             rec.Completed = true;
             if (IsCoop) {
@@ -187,10 +194,18 @@ public static class LevelProgress {
         }
 
         // level-select runs go back to the grid after a moment, win or lose
-        if (Run is not null) {
+        if (Run is not null && !mpOut) {
             SuppressResults = true;
             _returnCountdown = won ? 3.0 : 2.5;
         }
+    }
+
+    /// <summary>End the level-select run now (back to the menu; the grid reopens). False if there's no run.</summary>
+    public static bool EndRunNow() {
+        if (Run is null)
+            return false;
+        FinishRun();
+        return true;
     }
 
     // ---- level-select runs ----
