@@ -257,12 +257,16 @@ public static partial class MainMenuUI {
         float s = PhoneScale;
         var cx = panel.Center.X;
         PText(sb, "Multiplayer", new Vector2(cx, panel.Y + 80 * s), 1.6f, Ink);
-        PText(sb, "Same Device", new Vector2(cx, panel.Y + 200 * s), 1.05f, Ink);
-        PText(sb, "Two players on this phone: touch + a controller, or two controllers.", new Vector2(cx, panel.Y + 255 * s), 0.8f, UITextButton.PhoneEdge);
-        PText(sb, "Wi-Fi", new Vector2(cx, panel.Y + 360 * s), 1.05f, Ink);
-        PText(sb, "Phones on the same Wi-Fi. One hosts, the others join from the list.", new Vector2(cx, panel.Y + 415 * s), 0.8f, UITextButton.PhoneEdge);
-        PText(sb, "Online", new Vector2(cx, panel.Y + 520 * s), 1.05f, Ink);
-        PText(sb, "Play with anyone over the internet. The host shares a 6-digit code.", new Vector2(cx, panel.Y + 575 * s), 0.8f, UITextButton.PhoneEdge);
+        var sub = UITextButton.PhoneEdge;
+        PText(sb, "Same Device", new Vector2(cx, panel.Y + 180 * s), 1.15f, Ink);
+        PText(sb, "Two players on this phone.", new Vector2(cx, panel.Y + 235 * s), 0.9f, sub);
+        PText(sb, "Touch + a controller, or two controllers.", new Vector2(cx, panel.Y + 280 * s), 0.9f, sub);
+        PText(sb, "Wi-Fi", new Vector2(cx, panel.Y + 365 * s), 1.15f, Ink);
+        PText(sb, "Phones on the same Wi-Fi network.", new Vector2(cx, panel.Y + 420 * s), 0.9f, sub);
+        PText(sb, "One hosts, the others join from a list.", new Vector2(cx, panel.Y + 465 * s), 0.9f, sub);
+        PText(sb, "Online", new Vector2(cx, panel.Y + 550 * s), 1.15f, Ink);
+        PText(sb, "Play with anyone over the internet.", new Vector2(cx, panel.Y + 605 * s), 0.9f, sub);
+        PText(sb, "The host shares a 6-digit code.", new Vector2(cx, panel.Y + 650 * s), 0.9f, sub);
 
         if (PButton(sb, PhoneColumnSlot(0, n), "Same Device"))
             GoToState(UIState.MPLocal);
@@ -300,10 +304,11 @@ public static partial class MainMenuUI {
         }
         else {
             PText(sb, "Host Online", new Vector2(cx, panel.Y + 200 * s), 1.05f, Ink);
-            PText(sb, "You get a 6-digit code. Send it to your friends.", new Vector2(cx, panel.Y + 255 * s), 0.8f, UITextButton.PhoneEdge);
+            PText(sb, "You get a 6-digit code to send to friends.", new Vector2(cx, panel.Y + 255 * s), 0.9f, UITextButton.PhoneEdge);
             PText(sb, "Join with Code", new Vector2(cx, panel.Y + 360 * s), 1.05f, Ink);
-            PText(sb, "Type the code from the host's screen.", new Vector2(cx, panel.Y + 415 * s), 0.8f, UITextButton.PhoneEdge);
-            PText(sb, "Campaign, Level Select and modifiers work the same as on Wi-Fi.", new Vector2(cx, panel.Bottom - 70 * s), 0.7f, UITextButton.PhoneEdge);
+            PText(sb, "Type the code from the host's screen.", new Vector2(cx, panel.Y + 415 * s), 0.9f, UITextButton.PhoneEdge);
+            PText(sb, "Campaign, Level Select and modifiers", new Vector2(cx, panel.Bottom - 110 * s), 0.8f, UITextButton.PhoneEdge);
+            PText(sb, "work the same as on Wi-Fi.", new Vector2(cx, panel.Bottom - 65 * s), 0.8f, UITextButton.PhoneEdge);
         }
         if (PButton(sb, PhoneColumnSlot(0, n), "Host Online", enabled: ready)) {
             Net.Online.OnlineSession.Host();
@@ -453,7 +458,14 @@ public static partial class MainMenuUI {
         DrawPanel(sb, panel);
         var cx = panel.Center.X;
         PText(sb, NetPlay.ServerName ?? "Wi-Fi game", new Vector2(cx, panel.Y + 70 * s), 1.2f, Ink);
-        if (Net.Online.OnlineSession.Active) {
+        bool showCode = Net.Online.OnlineSession.Active && host && Net.Online.OnlineSession.Code is not null;
+        if (showCode) {
+            // the code is what friends need: make it big
+            var c = Net.Online.OnlineSession.Code!;
+            PText(sb, $"Code  {c[..3]} {c[3..]}", new Vector2(cx, panel.Y + 150 * s), 1.7f, new Color(30, 110, 200));
+            PText(sb, "Friends: Multiplayer > Online > Join with Code", new Vector2(cx, panel.Y + 215 * s), 0.75f, UITextButton.PhoneEdge);
+        }
+        else if (Net.Online.OnlineSession.Active) {
             var os = Net.Online.OnlineSession.Code is { } code && host
                 ? $"Code: {code}   (friends: Multiplayer > Online > Join with Code)"
                 : host ? Net.Online.OnlineSession.Status
@@ -465,7 +477,7 @@ public static partial class MainMenuUI {
 
         int count = Math.Max(Server.CurrentClientCount, 0);
         for (int i = 0; i < 4; i++) {
-            var row = new Rectangle(panel.X + (int)(60 * s), panel.Y + (int)((190 + i * 90) * s), panel.Width - (int)(120 * s), (int)(74 * s));
+            var row = new Rectangle(panel.X + (int)(60 * s), panel.Y + (int)(((showCode ? 260 : 190) + i * (showCode ? 84 : 90)) * s), panel.Width - (int)(120 * s), (int)(70 * s));
             var c = Server.ConnectedClients is not null && i < Server.ConnectedClients.Length ? Server.ConnectedClients[i] : null;
             bool present = c is not null && i < count;
             var col = PlayerID.PlayerTankColors[i];
