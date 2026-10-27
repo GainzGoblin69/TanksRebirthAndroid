@@ -60,6 +60,10 @@ tapy 384 3
 adb exec-out screencap -p > diag/run2-mp.png
 tapy 666 3
 adb exec-out screencap -p > diag/run2-mp-online.png
+# Host Online: the lobby should show a 6-digit code from Firebase; then Leave and Back
+tapy 384 10
+adb exec-out screencap -p > diag/run2-online-lobby.png
+tapy 736 4
 tapy 666 3
 tapy 244 3
 adb exec-out screencap -p > diag/run2-mp-local.png

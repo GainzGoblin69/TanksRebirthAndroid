@@ -16,13 +16,13 @@ namespace TanksRebirth.Net.Online;
 /// networking already copes with that (it's built for UDP).
 /// </summary>
 public sealed class RelayPipe {
-    private const int SLOTS = 32;
+    private const int SLOTS = 64;
     private const int MAX_BATCH = 12_000;
     private readonly FirebaseRest _fb;
     private readonly string _sendPath, _recvPath;
     private readonly Action<byte[]> _onReceive;
     private readonly ConcurrentQueue<byte[]> _out = new();
-    private readonly SemaphoreSlim _inFlight = new(4);
+    private readonly SemaphoreSlim _inFlight = new(8);
     private readonly HashSet<long> _seen = [];
     private readonly Queue<long> _seenOrder = new();
     private long _seq;
