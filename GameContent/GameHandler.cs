@@ -112,6 +112,7 @@ public class GameHandler {
         // ExperienceBar.Value = TankGame.GameData.ExpLevel - MathF.Floor(TankGame.GameData.ExpLevel);
 
         VanillaAchievements.Repository.UpdateCompletions(TankGame.VanillaAchievementPopupHandler);
+        AchievementStore.Tick();
 
         if (RuntimeData.RunTime % 30 < RuntimeData.DeltaTime) {
             Client.SendLives();

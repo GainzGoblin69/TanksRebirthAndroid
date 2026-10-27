@@ -493,6 +493,7 @@ public class PlayerTank : Tank {
         bool keepLives = (Difficulties.Types["KidMode"] && PlayerId == PlayerID.Red) || Difficulties.Types["GearsOfWar"];
         if (Difficulties.Types["GearsOfWar"] && CampaignGlobals.InMission)
             ReviveSystem.PlayerDown(this);
+        AchievementStore.PlayerDestroyed(this, context);
         if (keepLives) { }
         else if (LocalCoop.ControlsPlayer(PlayerId))
             Lives[PlayerId]--; // same-device co-op: each player has their own lives

@@ -24,7 +24,8 @@ namespace TanksRebirth.GameContent.UI.MainMenu;
 /// </summary>
 public static partial class MainMenuUI {
     private static bool IsPhoneScreen => MenuState is UIState.TankColors or UIState.MPMode or UIState.MPLocal
-        or UIState.MPJoin or UIState.MPLobby or UIState.MPKeypad or UIState.MPOnline or UIState.MPOnlineJoining;
+        or UIState.MPJoin or UIState.MPLobby or UIState.MPKeypad or UIState.MPOnline or UIState.MPOnlineJoining
+        or UIState.StatsMenu;
 
     /// <summary>Where Back from the Difficulties screen goes.</summary>
     private static UIState _difficultiesReturn = UIState.Campaigns;
@@ -170,6 +171,9 @@ public static partial class MainMenuUI {
             case UIState.MPOnline:
                 GoToState(UIState.MPMode);
                 break;
+            case UIState.StatsMenu:
+                GoToState(UIState.PrimaryMenu);
+                break;
             case UIState.MPOnlineJoining:
                 Net.Online.OnlineSession.Leave();
                 GoToState(UIState.MPOnline);
@@ -248,6 +252,7 @@ public static partial class MainMenuUI {
             case UIState.MPKeypad: DrawKeypad(sb); break;
             case UIState.MPLobby: DrawLobby(sb); break;
             case UIState.MPOnline: DrawMPOnline(sb); break;
+            case UIState.StatsMenu: DrawStatsPhone(sb); break;
             case UIState.MPOnlineJoining: DrawMPOnlineJoining(sb); break;
         }
         sb.End();
@@ -521,6 +526,116 @@ public static partial class MainMenuUI {
                 PhoneScreenBack();
             PText(sb, "Waiting for the host to start...", new Vector2(cx, panel.Bottom - 60 * s), 0.75f, Ink);
         }
+    }
+
+    // ---- game stats and achievements
+    private static bool _statsAchTab;
+    private static int _achSelected;
+
+    private static void DrawStatsPhone(SpriteBatch sb) {
+        float s = PhoneScale;
+        int n = 3;
+        if (PButton(sb, PhoneColumnSlot(0, n), "Stats", selected: !_statsAchTab))
+            _statsAchTab = false;
+        if (PButton(sb, PhoneColumnSlot(1, n), "Achievements", selected: _statsAchTab))
+            _statsAchTab = true;
+        if (PButton(sb, PhoneColumnSlot(2, n), "Back")) {
+            PhoneScreenBack();
+            return;
+        }
+        var panel = RightPanel(70, 40);
+        DrawPanel(sb, panel);
+        if (_statsAchTab)
+            DrawAchievementsPanel(sb, panel);
+        else
+            DrawStatsPanel(sb, panel);
+    }
+
+    private static void DrawStatsPanel(SpriteBatch sb, Rectangle panel) {
+        float s = PhoneScale;
+        RequestStats();
+        var font = FontGlobals.RebirthFont;
+        PText(sb, "Game Stats", new Vector2(panel.Center.X, panel.Y + 55 * s), 1.3f, Ink);
+        float leftX = panel.X + 50 * s, rightX = panel.X + panel.Width * 0.58f;
+        float y = panel.Y + 130 * s, line = 54 * s;
+        foreach (var t in _info) {
+            PText(sb, t, new Vector2(leftX, y), 0.62f, Ink, center: false);
+            y += line;
+        }
+        y = panel.Y + 130 * s;
+        PText(sb, TankGame.GameLanguage.TankKillsPerType + ":", new Vector2(rightX, y), 0.7f, Ink, center: false);
+        y += line;
+        int shown = 0;
+        for (int i = 1; i < TankGame.SaveFile.TankKills.Count; i++) {
+            var elem = TankGame.SaveFile.TankKills.ElementAt(i);
+            if (elem.Value == 0)
+                continue;
+            var name = TankID.Collection.GetKey(elem.Key)!.SplitByCamel();
+            var col = Systems.AI.AITank.TankDestructionColors.TryGetValue(elem.Key, out var c) ? Color.Lerp(c, Color.Black, 0.35f) : Ink;
+            PText(sb, $"{name}: {elem.Value}", new Vector2(rightX, y), 0.62f, col, center: false);
+            y += line * 0.9f;
+            if (++shown >= 14) break;
+        }
+        if (shown == 0)
+            PText(sb, "None yet!", new Vector2(rightX, y), 0.62f, UITextButton.PhoneEdge, center: false);
+    }
+
+    private static void DrawAchievementsPanel(SpriteBatch sb, Rectangle panel) {
+        float s = PhoneScale;
+        var list = Achievements.VanillaAchievements.Repository.GetAchievements();
+        int unlocked = list.Count(a => a.IsComplete);
+        PText(sb, $"Achievements   {unlocked} / {list.Count} unlocked", new Vector2(panel.Center.X, panel.Y + 50 * s), 1.1f, Ink);
+
+        // grid: as big as fits above the details area
+        float gap = 14 * s, top = panel.Y + 100 * s, detailsH = 150 * s;
+        float availW = panel.Width - 60 * s, availH = panel.Height - (top - panel.Y) - detailsH;
+        float size = 110 * s;
+        int cols = 1, rows = 1;
+        for (; size > 30 * s; size -= 4 * s) {
+            cols = Math.Max(1, (int)((availW + gap) / (size + gap)));
+            rows = (list.Count + cols - 1) / cols;
+            if (rows * (size + gap) - gap <= availH)
+                break;
+        }
+        float gridW = cols * (size + gap) - gap;
+        float x0 = panel.Center.X - gridW / 2f;
+        _achSelected = Math.Clamp(_achSelected, 0, Math.Max(0, list.Count - 1));
+        for (int i = 0; i < list.Count; i++) {
+            var a = list[i];
+            var r = new Rectangle((int)(x0 + (i % cols) * (size + gap)), (int)(top + (i / cols) * (size + gap)), (int)size, (int)size);
+            if (i == _achSelected)
+                ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X - (int)(5 * s), r.Y - (int)(5 * s), r.Width + (int)(10 * s), r.Height + (int)(10 * s)), 14 * s, new Color(30, 110, 200));
+            ToggleSwitch.DrawRoundedRect(sb, r, 12 * s, a.IsComplete ? new Color(255, 236, 170) : new Color(200, 194, 184));
+            var tex = (a as Achievements.Achievement)?.Texture ?? Achievements.Achievement.MysteryTexture;
+            if (tex is not null) {
+                var inner = new Rectangle(r.X + (int)(6 * s), r.Y + (int)(6 * s), r.Width - (int)(12 * s), r.Height - (int)(12 * s));
+                sb.Draw(tex, inner, a.IsComplete ? Color.White : new Color(70, 70, 70, 200));
+            }
+            if (!a.IsComplete)
+                DrawLock(sb, new Vector2(r.Right - size * 0.22f, r.Bottom - size * 0.24f), size * 0.16f);
+            if (!_pmDown && _pmWasDown && r.Contains(_pmPress) && r.Contains(MouseUtils.MousePosition) && !_pmEnteredThisFrame) {
+                _achSelected = i;
+                SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
+            }
+        }
+        if (list.Count > 0) {
+            var sel = list[_achSelected];
+            var desc = (sel as Achievements.Achievement)?.Description ?? "";
+            float y = panel.Bottom - detailsH + 35 * s;
+            PText(sb, (sel.IsComplete ? "Unlocked:  " : "Locked:  ") + sel.Name, new Vector2(panel.Center.X, y), 0.95f,
+                sel.IsComplete ? new Color(30, 130, 60) : Ink);
+            PText(sb, desc, new Vector2(panel.Center.X, y + 55 * s), 0.7f, UITextButton.PhoneEdge);
+        }
+    }
+
+    /// <summary>A small padlock (body + shackle).</summary>
+    private static void DrawLock(SpriteBatch sb, Vector2 c, float r) {
+        var dark = new Color(60, 52, 44);
+        ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(c.X - r), (int)(c.Y - r * 0.2f), (int)(r * 2), (int)(r * 1.5f)), r * 0.3f, dark);
+        float t = Math.Max(2f, r * 0.28f);
+        ToggleSwitch.DrawLine(sb, new Vector2(c.X - r * 0.6f, c.Y - r * 0.1f), new Vector2(c.X - r * 0.6f, c.Y - r * 0.75f), t, dark);
+        ToggleSwitch.DrawLine(sb, new Vector2(c.X + r * 0.6f, c.Y - r * 0.1f), new Vector2(c.X + r * 0.6f, c.Y - r * 0.75f), t, dark);
+        ToggleSwitch.DrawLine(sb, new Vector2(c.X - r * 0.6f - t / 2, c.Y - r * 0.9f), new Vector2(c.X + r * 0.6f + t / 2, c.Y - r * 0.9f), t, dark);
     }
 
     // ---- tank color

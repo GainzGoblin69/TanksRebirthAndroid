@@ -27,6 +27,11 @@ public static partial class MainMenuUI {
         ];
     }
     public static void RenderStatsMenu() {
+        // phones: a Back button and an Achievements tab instead of "Press ESC to return"
+        if (Internals.Common.Framework.Input.TouchControls.Enabled) {
+            DrawPhoneScreens(TankGame.SpriteRenderer);
+            return;
+        }
         DrawStats(new Vector2(WindowUtils.WindowWidth * 0.3f, 200.ToResolutionY()), new Vector2(WindowUtils.WindowWidth * 0.7f, 40.ToResolutionY()), Anchor.TopCenter);
     }
     // probably GC collection here at like crazy amounts

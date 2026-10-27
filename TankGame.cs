@@ -232,6 +232,7 @@ public class TankGame : Game {
         IntermissionSystem.InitializeAllStartupLogic();
 
         VanillaAchievementPopupHandler = new(VanillaAchievements.Repository);
+        AchievementStore.Initialize(); // unlocked achievements are remembered between launches
 
         base.Initialize();
     }

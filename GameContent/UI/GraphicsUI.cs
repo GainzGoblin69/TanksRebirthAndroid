@@ -1,3 +1,4 @@
+using TanksRebirth.GameContent.Systems;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
@@ -98,12 +99,29 @@ public static class GraphicsUI {
         };
         FullScreenButton.SetDimensions(() => new Vector2(700, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
         if (Internals.Common.Framework.Input.TouchControls.Enabled) {
+            // phones always sync to the display, so the VSync slot becomes the debug readout setting
+            VsyncButton.Text = "Show Debug Info";
+            VsyncButton.Tooltip = "The yellow readout (frames drawn, game log) over the game.";
+            VsyncButton.HoverColor = Color.White;
+            VsyncButton.Color = Color.WhiteSmoke;
+            VsyncButton.OnLeftClick = (_) => {
+                TankGame.Settings.ShowStartupInfo = !TankGame.Settings.ShowStartupInfo;
+                PlayerColors.SaveSettings();
+            };
+            VsyncButton.UniqueDraw = (elem, sb) => {
+                var sw = ToggleSwitch.RightOf(elem.Hitbox, 0.45f);
+                ((UITextButton)elem).TextOffset = new Vector2(-(sw.Width + elem.Hitbox.Right - sw.Right) / 2f, 0);
+                ToggleSwitch.Draw(sb, sw, TankGame.Settings.ShowStartupInfo);
+            };
             // phones are always fullscreen at native resolution, so this slot becomes the aim dots setting
             FullScreenButton.Text = "Always Show Aim Dots";
             FullScreenButton.Tooltip = "Draw the dotted line from your tank to the aim cursor at any distance.";
             FullScreenButton.HoverColor = Color.White;
             FullScreenButton.Color = Color.WhiteSmoke;
-            FullScreenButton.OnLeftClick = (_) => TankGame.Settings.AlwaysShowAimDots = !TankGame.Settings.AlwaysShowAimDots;
+            FullScreenButton.OnLeftClick = (_) => {
+                TankGame.Settings.AlwaysShowAimDots = !TankGame.Settings.AlwaysShowAimDots;
+                PlayerColors.SaveSettings();
+            };
             FullScreenButton.UniqueDraw = (elem, sb) => {
                 var sw = ToggleSwitch.RightOf(elem.Hitbox, 0.45f);
                 ((UITextButton)elem).TextOffset = new Vector2(-(sw.Width + elem.Hitbox.Right - sw.Right) / 2f, 0);
@@ -181,7 +199,7 @@ public static class GraphicsUI {
 
     public static void ShowAll() {
         PerPixelLightingButton.IsVisible = true;
-        VsyncButton.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled; // Android always syncs to the display
+        VsyncButton.IsVisible = true; // phones: the debug readout switch
         FullScreenButton.IsVisible = true;
         ResolutionButton.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled;
         PerPixelLightingToggle.IsVisible = true;

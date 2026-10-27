@@ -43,6 +43,7 @@ public class MainActivity : AndroidGameActivity {
     private TextView? _status;
     private TextView? _overlay;
     private bool _overlayDismissed;
+    private readonly DateTime _launchedAt = DateTime.Now;
     private Handler? _handler;
     private int _frames;
     private DateTime? _firstFrameAt;
@@ -198,6 +199,7 @@ public class MainActivity : AndroidGameActivity {
             _overlay.SetTextColor(Android.Graphics.Color.Yellow);
             _overlay.SetBackgroundColor(Android.Graphics.Color.Argb(170, 0, 0, 0));
             _overlay.SetPadding(12, 8, 12, 8);
+            _overlay.Visibility = ViewStates.Gone; // off unless switched on in Options (or startup goes wrong)
             frame.AddView(_overlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
             SetContentView(frame);
             _status = null;
@@ -304,12 +306,16 @@ public class MainActivity : AndroidGameActivity {
             return;
 
         bool crashed = File.Exists(CrashPath);
-        // hide 8 seconds after the first frame, unless something went wrong
-        if (_firstFrameAt is { } t && (DateTime.Now - t).TotalSeconds > 8 && !crashed) {
+        // shown when turned on in Options (Graphics > Show Debug Info), or when something went wrong:
+        // a crash, or no picture yet 15 seconds after launch
+        bool wanted = TankGame.Settings?.ShowStartupInfo == true;
+        bool stuck = _firstFrameAt is null && (DateTime.Now - _launchedAt).TotalSeconds > 15;
+        if (!wanted && !crashed && !stuck) {
             _overlay.Visibility = ViewStates.Gone;
-            TankGame.PostDrawEverything -= CountFrame;
+            _handler?.PostDelayed(UpdateOverlay, 1000); // keep checking: the setting can be switched on later
             return;
         }
+        _overlay.Visibility = ViewStates.Visible;
 
         string newestLog = "(no game log yet)";
         try {

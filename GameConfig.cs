@@ -23,6 +23,8 @@ public class GameConfig
     /// <summary>Always draw the aim dots between your tank and the cursor (otherwise only when the cursor is far away).</summary>
     public bool AlwaysShowAimDots { get; set; } = true;
     /// <summary>Tank color picked on this device for player 1 / player 2 (index into PlayerColors.Palette; -1 = that player's standard color).</summary>
+    /// <summary>Phones: show the yellow startup/debug readout (frames, log tail) over the game.</summary>
+    public bool ShowStartupInfo { get; set; } = false;
     public int TankColorP1 { get; set; } = -1;
     public int TankColorP2 { get; set; } = -1;
     /// <summary>Name shown to others in Wi-Fi games.</summary>

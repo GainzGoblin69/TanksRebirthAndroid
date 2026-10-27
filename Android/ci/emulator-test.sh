@@ -53,6 +53,12 @@ tapy 455 4
 adb exec-out screencap -p > diag/run2-options.png
 adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 3
 adb exec-out screencap -p > diag/run2-options-back.png
+# Game Stats: stats tab, achievements tab, then Back
+tapy 595 4
+adb exec-out screencap -p > diag/run2-stats.png
+tapy 525 3
+adb exec-out screencap -p > diag/run2-achievements.png
+tapy 666 3
 # Play -> play menu (5 slots: Single Player, Multiplayer, Tank Color, Level Editor, Back)
 tapy 314 6
 adb exec-out screencap -p > diag/run2-after-play.png
