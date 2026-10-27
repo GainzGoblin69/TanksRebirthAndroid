@@ -5,7 +5,7 @@ using Android.Runtime;
 using Android.Views;
 using TanksRebirth.Internals.Common.Framework.Input;
 
-namespace TanksRebirth.Android;
+namespace TanksRebirth.Droid;
 
 /// <summary>
 /// Reads the phone's tilt (gravity sensor, or the accelerometer if there's none) and hands it to the game as a
