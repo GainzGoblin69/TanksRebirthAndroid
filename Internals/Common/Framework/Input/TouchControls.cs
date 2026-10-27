@@ -127,7 +127,8 @@ public static class TouchControls {
         && !CampaignCompleteUI.IsViewingResults
         && !ChatSystem.ActiveHandle
         && !TankGame.IsCrashInfoVisible
-        && !TanksRebirth.GameContent.UI.MPEndScreen.Active;
+        && !TanksRebirth.GameContent.UI.MPEndScreen.Active
+        && !TanksRebirth.GameContent.Systems.Troves.TroveRun.ShowingEnd;
 
     private static void GrabStick(int id, Vector2 origin, Vector2 pos) {
         _stickId = id;

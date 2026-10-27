@@ -230,7 +230,7 @@ public static class GameUI
     {
         Pause.OnPress = () =>
         {
-            if (CampaignCompleteUI.IsViewingResults || MPEndScreen.Active)
+            if (CampaignCompleteUI.IsViewingResults || MPEndScreen.Active || Systems.Troves.TroveRun.ShowingEnd)
                 return;
             if (InOptions) {
                 HandleBackButton();

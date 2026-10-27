@@ -71,6 +71,8 @@ public sealed class PacketID {
     public const int LevelRun = 32;
     /// <summary>Phones: after a multiplayer game over the host chose Restart; everyone goes back to the menus.</summary>
     public const int ReturnToMenu = 33;
+    /// <summary>Phones: Tank Troves event from the host (start, move rooms, retry, next floor, end).</summary>
+    public const int TroveEvent = 34;
 
     public static int AddPacketId(string name) => Collection.ForcefullyInsert(name);
 

@@ -65,7 +65,7 @@ public static partial class MainMenuUI {
         var defaultDimensions = new Vector2(300, 40);
         float padding = 20f;
 
-        int totalCampaigns = campaignFiles.Length + (hasVanilla ? 1 : 0);
+        int totalCampaigns = campaignFiles.Length + (hasVanilla ? 2 : 0); // + Level Select, Tank Troves
         int numColumns = (int)Math.Ceiling(totalCampaigns / (float)MAX_CAMPAIGNS_PER_COLUMN);
 
         // totalWidth and uiStartX must be calculated in logical units
@@ -153,6 +153,14 @@ public static partial class MainMenuUI {
                 ls.OnMouseOver = (_) => SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect);
                 ls.OnLeftClick += (_) => OpenLevelSelect();
                 campaignNames.Add(ls);
+
+                // Tank Troves: the dungeon-crawl mode
+                var tt = new UITextButton("Tank Troves", FontGlobals.RebirthFont, Color.White, 0.8f) { IsVisible = true };
+                var (tPos, tSize) = nextSlot();
+                tt.SetDimensions(tPos, tSize);
+                tt.OnMouseOver = (_) => SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect);
+                tt.OnLeftClick += (_) => Systems.Troves.TroveRun.StartFromMenu();
+                campaignNames.Add(tt);
             }
         }
         // phones: Freeplay is gone (it only opened an empty board); Validate joins the column

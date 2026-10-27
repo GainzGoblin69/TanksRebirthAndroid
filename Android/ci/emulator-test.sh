@@ -83,11 +83,11 @@ tapy 384 5
 adb exec-out screencap -p > diag/run2-mp-lobby.png
 tapy 736 4
 tapy 806 3
-# Single Player -> campaign screen (Campaign, Level Select, Difficulties, Update Campaign, Back)
+# Single Player -> campaign screen (Campaign, Level Select, Tank Troves, Difficulties, Update Campaign, Back)
 tapy 244 5
 adb exec-out screencap -p > diag/run2-singleplayer.png
 # Difficulties: flip the first two toggles and Lantern Mode, then Back to the campaign screen
-tapy 525 4
+tapy 595 4
 adb exec-out screencap -p > diag/run2-difficulties.png
 adb shell input tap $((W * 263 / 1000)) $((H * 147 / 1000)); sleep 3
 adb shell input tap $((W * 263 / 1000)) $((H * 214 / 1000)); sleep 3
@@ -98,15 +98,29 @@ adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 3
 adb exec-out screencap -p > diag/run2-singleplayer-back.png
 
 # Level Select (the button under "Campaign"): let previews render, then start mission 1
-adb shell input tap $CX $((H * 384 / 1000)); sleep 15
+adb shell input tap $CX $((H * 314 / 1000)); sleep 15
 adb exec-out screencap -p > diag/run2-levelselect-15s.png
 sleep 60
 adb exec-out screencap -p > diag/run2-levelselect-75s.png
 # back to the campaign screen and start the Campaign: Double Enemies should give mission 1 two enemy tanks
 adb shell input tap $((H * 143 / 1080)) $((H * 59 / 1000)); sleep 4
-tapy 244 8
+tapy 173 8
 adb exec-out screencap -p > diag/run2-levelrun-banner.png; sleep 9
 adb exec-out screencap -p > diag/run2-levelrun.png
+
+# Tank Troves: pause, Quit, then Play > Single Player > Tank Troves; the first room of floor 1
+adb shell input keyevent KEYCODE_BACK; sleep 2
+adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 5
+tapy 314 4
+tapy 244 5
+tapy 455 6
+adb exec-out screencap -p > diag/run2-troves-banner.png; sleep 12
+adb exec-out screencap -p > diag/run2-troves-room.png
+# hold the joystick up, then left, to drive into a door (if the start room has one there)
+adb shell input swipe $((W * 15 / 100)) $((H * 75 / 100)) $((W * 15 / 100)) $((H * 45 / 100)) 6000; sleep 2
+adb exec-out screencap -p > diag/run2-troves-up.png
+adb shell input swipe $((W * 20 / 100)) $((H * 70 / 100)) $((W * 5 / 100)) $((H * 70 / 100)) 6000; sleep 2
+adb exec-out screencap -p > diag/run2-troves-left.png
 
 adb logcat -d -v threadtime > diag/logcat-full.txt
 grep -iE "mono-rt|Thread|at |TanksRebirth|DOTNET|mono|monodroid|AndroidRuntime|FATAL|Exception|libc|DEBUG|OpenGL|EGL|Adreno|MonoGame|$PKG" diag/logcat-full.txt > diag/logcat-filtered.txt

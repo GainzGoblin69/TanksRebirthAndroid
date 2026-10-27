@@ -677,6 +677,7 @@ public class TankGame : Game {
         ReviveSystem.Update();
         MissileUpgrade.Update();
         MPEndScreen.Update();
+        GameContent.Systems.Troves.TroveRun.Update();
 
         if (RuntimeData.RunTime % 60 < RuntimeData.DeltaTime && !OperatingSystem.IsAndroid())
             Task.Run(DiscordRichPresence.Update);
@@ -920,6 +921,7 @@ public class TankGame : Game {
         SpriteRenderer.End();
         LocalCoop.DrawAim(SpriteRenderer); // same-device co-op: each controller player's aim
         ReviveSystem.Draw(SpriteRenderer); // Gears of War: revive rings
+        TroveHud.Draw(SpriteRenderer); // Tank Troves: doors, minimap, room fades, end screen
         MPEndScreen.Draw(SpriteRenderer); // multiplayer game over: Restart / Quit
     }
 

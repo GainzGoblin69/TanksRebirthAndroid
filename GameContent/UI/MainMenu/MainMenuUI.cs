@@ -233,6 +233,15 @@ public static partial class MainMenuUI
 
         return true;
     }
+    /// <summary>Start a game whose campaign was already set up in code (e.g. Tank Troves).</summary>
+    public static void LaunchCustomGame() {
+        SetPlayButtonsVisibility(false);
+        SetPrimaryMenuButtonsVisibility(false);
+        SetMPButtonsVisibility(false);
+        SetDifficultiesButtonsVisibility(false);
+        GameUI.BackButton.IsVisible = false;
+        TransitionToGame();
+    }
     public static void TransitionToGame() {
         foreach (var elem in campaignNames)
             elem?.Remove();

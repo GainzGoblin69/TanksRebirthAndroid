@@ -24,6 +24,9 @@ public static class IntermissionSystem {
     public static RenderTarget2D BannerBuffer;
     public static RenderTarget2D BonusBannerBuffer;
     public static RenderTarget2D BonusBannerTextBuffer;
+    /// <summary>The bonus banner's text: the extra life, or (Gears of War) the missile upgrade.</summary>
+    private static string BonusText => Difficulties.Types["GearsOfWar"] ? "Missile Upgrade!" : TankGame.GameLanguage.BonusTank;
+    private static float _bonusFit = 1f;
 
     public static Animator TextAnimatorLarge;
     public static Animator TextAnimatorSmall;
@@ -469,7 +472,9 @@ public static class IntermissionSystem {
 
         // draw large(r) text
         float spacing = 10;
-        string enemyTankDisplay = $"{TankGame.GameLanguage.EnemyTanks}: {mafs}";
+        string enemyTankDisplay = Troves.TroveRun.Active && Troves.TroveRun.Floor is { } tf
+            ? $"{tf.Rooms.Count} rooms" // Tank Troves: the floor, not one mission
+            : $"{TankGame.GameLanguage.EnemyTanks}: {mafs}";
         string missionName = CampaignGlobals.LoadedCampaign.LoadedMission.Name;
 
         float spacingEnemyTankDisplay = DrawUtils.GetTextXOffsetForSpacing(enemyTankDisplay, spacing) / TextAnimatorLarge.CurrentScale.X;
@@ -506,6 +511,15 @@ public static class IntermissionSystem {
                 BackgroundColor,
                 ColorForBorders,
                 TextAnimatorSmall.CurrentScale.ToResolution() * 1.15f,
+                1f, shadowDistScale: 1.5f, shadowAlpha: 0.5f, borderThickness: 1.5f);
+        else if (Troves.TroveRun.Active)
+            DrawUtils.DrawStringWithBorderAndShadow(spriteBatch, FontGlobals.RebirthFontLarge,
+                new Vector2(WindowUtils.WindowWidth / 2, textOffsetDetails),
+                Vector2.One,
+                $"Tank Troves - Floor {Troves.TroveRun.FloorNumber} of {Troves.TroveGen.FLOORS}",
+                BackgroundColor,
+                ColorForBorders,
+                TextAnimatorSmall.CurrentScale.ToResolution(),
                 1f, shadowDistScale: 1.5f, shadowAlpha: 0.5f, borderThickness: 1.5f);
         else if (CampaignGlobals.LoadedCampaign.CurrentMissionId == 0)
             DrawUtils.DrawStringWithBorderAndShadow(spriteBatch, FontGlobals.RebirthFontLarge,
@@ -567,8 +581,8 @@ public static class IntermissionSystem {
         BonusTextGradient.Top = gradientModifiedTopColor;
         BonusTextGradient.Bottom = gradientModifiedBottomColor;
 
-        var bonusText = Difficulties.Types["GearsOfWar"] ? "Missile Upgrade!" : TankGame.GameLanguage.BonusTank;
-        float bonusFit = Math.Min(1f, BonusBannerTextBuffer.Width * 0.9f / Math.Max(1f, FontGlobals.RebirthFontLarge.MeasureString(bonusText).X * _bannerScale * 0.5f * 1f.ToResolutionX()));
+        var bonusText = BonusText;
+        float bonusFit = _bonusFit = Math.Min(1f, BonusBannerTextBuffer.Width * 0.9f / Math.Max(1f, FontGlobals.RebirthFontLarge.MeasureString(bonusText).X * _bannerScale * 0.5f * 1f.ToResolutionX()));
         spriteBatch.DrawString(FontGlobals.RebirthFontLarge, bonusText, 
             new Vector2(BonusBannerTextBuffer.Width / 2, BonusBannerTextBuffer.Height / 2), 
             Color.White, (Vector2.One * _bannerScale * 0.5f * bonusFit * BonusLifeAnimator.CurrentScale).ToResolution(), 
@@ -645,10 +659,10 @@ public static class IntermissionSystem {
                 spriteBatch.Begin();
                 var textPos = new Vector2(WindowUtils.WindowWidth / 2, _renderY - 20.ToResolutionY());
                 DrawUtils.DrawStringShadowOnly(spriteBatch, FontGlobals.RebirthFontLarge, textPos, Vector2.One * _bannerScale,
-                    TankGame.GameLanguage.BonusTank, (Vector2.One * _bannerScale * 0.5f * BonusLifeAnimator.CurrentScale).ToResolution(), BonusBannerAlpha * Alpha, shadowAlpha: 0.5f);
-                DrawUtils.DrawStringBorderOnly(spriteBatch, FontGlobals.RebirthFontLarge, TankGame.GameLanguage.BonusTank, 
+                    BonusText, (Vector2.One * _bannerScale * 0.5f * _bonusFit * BonusLifeAnimator.CurrentScale).ToResolution(), BonusBannerAlpha * Alpha, shadowAlpha: 0.5f);
+                DrawUtils.DrawStringBorderOnly(spriteBatch, FontGlobals.RebirthFontLarge, BonusText, 
                     textPos,
-                    BonusBannerTextBorderColor * Alpha * BonusBannerAlpha, (Vector2.One * _bannerScale * 0.5f * BonusLifeAnimator.CurrentScale).ToResolution(), 0f, borderThickness: 1.5f);
+                    BonusBannerTextBorderColor * Alpha * BonusBannerAlpha, (Vector2.One * _bannerScale * 0.5f * _bonusFit * BonusLifeAnimator.CurrentScale).ToResolution(), 0f, borderThickness: 1.5f);
                 spriteBatch.End();
 
                 // draw the inner text with the gradient

@@ -318,12 +318,13 @@ public class PlayerTank : Tank {
         PlayerStatistics.ShellsShot++;
         // Gears of War missile upgrade: this shot is a missile
         if (MissileUpgrade.ShotsLeft(PlayerId) > 0) {
-            var (type, bounces) = (Properties.ShellType, Properties.RicochetCount);
+            var (type, bounces, speed) = (Properties.ShellType, Properties.RicochetCount, Properties.ShellSpeed);
             var before = LastShotShell;
             Properties.ShellType = ShellID.Missile;
             Properties.RicochetCount = 0;
+            Properties.ShellSpeed = speed * 1.8f; // missiles are fast
             base.Shoot(false);
-            (Properties.ShellType, Properties.RicochetCount) = (type, bounces);
+            (Properties.ShellType, Properties.RicochetCount, Properties.ShellSpeed) = (type, bounces, speed);
             if (LastShotShell is not null && !ReferenceEquals(before, LastShotShell))
                 MissileUpgrade.UsedShot(PlayerId);
             return;

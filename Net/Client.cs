@@ -424,6 +424,14 @@ public class Client {
         message.Put(Difficulties.DisguiseValue);
         NetClient.Send(message, DeliveryMethod.Sequenced);
     }
+    public static void SendTroveEvent(int ev, int a) {
+        if (!IsConnected()) return;
+        NetDataWriter message = new();
+        message.Put(PacketID.TroveEvent);
+        message.Put(ev);
+        message.Put(a);
+        NetClient.Send(message, DeliveryMethod.ReliableOrdered);
+    }
     public static void SendReturnToMenu() {
         if (!IsConnected()) return;
         NetDataWriter message = new();

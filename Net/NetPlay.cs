@@ -450,6 +450,12 @@ public class NetPlay {
             case PacketID.ReturnToMenu:
                 MPEndScreen.ReturnFromHost();
                 break;
+            case PacketID.TroveEvent: {
+                var tev = reader.GetInt();
+                var targ = reader.GetInt();
+                GameContent.Systems.Troves.TroveRun.OnEvent(tev, targ);
+                break;
+            }
             case PacketID.LevelRun: {
                 var lrMission = reader.GetInt();
                 var lrMod = reader.GetString();
@@ -795,6 +801,11 @@ public class NetPlay {
                 Server.NetManager.SendToAll(message, deliveryMethod, peer);
                 break;
             case PacketID.ReturnToMenu:
+                Server.NetManager.SendToAll(message, deliveryMethod, peer);
+                break;
+            case PacketID.TroveEvent:
+                message.Put(reader.GetInt());
+                message.Put(reader.GetInt());
                 Server.NetManager.SendToAll(message, deliveryMethod, peer);
                 break;
             case PacketID.LevelRun:
