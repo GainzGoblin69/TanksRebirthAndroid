@@ -169,7 +169,8 @@ public static partial class MainMenuUI
 
             CampaignGlobals.LoadedCampaign.LoadMission(MissionCheckpoint); // loading the mission specified
 
-            PlayerTank.StartingLives = levelRun ? 1 : campaign.MetaData.StartingLives;
+            // Level Select runs and Gears of War: one life each
+            PlayerTank.StartingLives = levelRun || Difficulties.Types["GearsOfWar"] ? 1 : campaign.MetaData.StartingLives;
             IntermissionSystem.BannerColor = campaign.MetaData.MissionStripColor;
             IntermissionSystem.BackgroundColor = campaign.MetaData.BackgroundColor;
         }

@@ -109,6 +109,79 @@ public class Campaign
 
     /// <summary>Sets up the <see cref="Mission"/> that is loaded.</summary>
     /// <param name="spawnNewSet">If true, will spawn all tanks as if it's the first time the player(s) has/have entered this mission.</param>
+    // Double Enemies: which twins are still alive (by tank template index), and for which mission
+    private bool[] _doubleAlive = [];
+    private TankTemplate[]? _doubleMission;
+
+    /// <summary>How many extra (twin) enemies the Double Enemies option adds to the current mission.</summary>
+    public int ExpectedDoubles() {
+        if (!Difficulties.Types["DoubleTanks"] || LoadedMission.Tanks is null)
+            return 0;
+        if (ReferenceEquals(_doubleMission, LoadedMission.Tanks) && _doubleAlive.Length == LoadedMission.Tanks.Length)
+            return _doubleAlive.Count(a => a);
+        int n = 0;
+        for (int i = 0; i < LoadedMission.Tanks.Length && i < TrackedSpawnPoints.Length; i++)
+            if (!LoadedMission.Tanks[i].IsPlayer && TrackedSpawnPoints[i].Alive)
+                n++;
+        return n;
+    }
+
+    private void SpawnDoubles(bool fresh) {
+        var tanks = LoadedMission.Tanks;
+        if (fresh || !ReferenceEquals(_doubleMission, tanks) || _doubleAlive.Length != tanks.Length) {
+            _doubleAlive = new bool[tanks.Length];
+            for (int i = 0; i < tanks.Length; i++)
+                _doubleAlive[i] = !tanks[i].IsPlayer;
+            _doubleMission = tanks;
+        }
+        float S = Block.SIDE_LENGTH;
+        var taken = tanks.Select(t => t.Position).ToList();
+        var blocks = LoadedMission.Blocks.Select(b => b.Position).ToList();
+        Vector2[] offsets = [new(S, 0), new(-S, 0), new(0, S), new(0, -S), new(S, S), new(-S, S), new(S, -S), new(-S, -S),
+            new(2 * S, 0), new(-2 * S, 0), new(0, 2 * S), new(0, -2 * S)];
+
+        for (int i = 0; i < tanks.Length; i++) {
+            var template = tanks[i];
+            if (template.IsPlayer || !_doubleAlive[i])
+                continue;
+            Vector2? spot = null;
+            foreach (var off in offsets) {
+                var p = template.Position + off;
+                if (p.X < TanksRebirth.Graphics.GameScene.TANKS_MIN_X + S / 2 || p.X > TanksRebirth.Graphics.GameScene.TANKS_MAX_X - S / 2 || p.Y < TanksRebirth.Graphics.GameScene.TANKS_MIN_Y + S / 2 || p.Y > TanksRebirth.Graphics.GameScene.TANKS_MAX_Y - S / 2)
+                    continue;
+                if (blocks.Any(b => Vector2.Distance(b, p) < S * 0.8f) || taken.Any(t => Vector2.Distance(t, p) < S * 0.8f))
+                    continue;
+                spot = p;
+                break;
+            }
+            if (spot is null)
+                continue; // no room next to this one
+            taken.Add(spot.Value);
+
+            float rot = template.Rotation;
+            while (rot < 0) rot += MathHelper.Tau;
+            while (rot > MathHelper.Tau) rot -= MathHelper.Tau;
+            var chassisRotation = MathF.Round(rot, 5);
+
+            var tank = template.GetAiTank();
+            tank.Position = spot.Value;
+            tank.ChassisRotation = chassisRotation;
+            tank.DesiredChassisRotation = chassisRotation;
+            tank.TurretRotation = MathF.Round(-rot, 5);
+            tank.IsDestroyed = false;
+            tank.Team = template.Team;
+            int idx = i;
+            if (CampaignGlobals.ShouldMissionsProgress)
+                tank.OnDestroy += () => _doubleAlive[idx] = false; // not spawned again on a retry
+            var placement = PlacementSquare.GetFromClosest(tank.Position3D);
+            if (placement is not null) {
+                placement.TankId = tank.WorldId;
+                placement.HasBlock = false;
+                tank.Position = placement.Position.FlattenZ();
+            }
+        }
+    }
+
     public void SetupLoadedMission(bool spawnNewSet) {
         // FIXME: source of level editor bug.
         PlacementSquare.ResetSquares();
@@ -217,6 +290,10 @@ public class Campaign
                 }
             }
         }
+
+        // Double Enemies: a twin of every enemy on a free spot right next to it (not in menus or the editor)
+        if (Difficulties.Types["DoubleTanks"] && !UI.MainMenu.MainMenuUI.IsActive && !LevelEditorUI.IsActive)
+            SpawnDoubles(spawnNewSet);
 
         for (int b = 0; b < LoadedMission.Blocks.Length; b++) {
             var template = LoadedMission.Blocks[b];

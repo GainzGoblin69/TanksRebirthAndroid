@@ -461,6 +461,7 @@ public static class IntermissionSystem {
         int mafs1 = CampaignGlobals.LoadedCampaign.TrackedSpawnPoints.Count(p => p.Item2);
         int mafs2 = CampaignGlobals.LoadedCampaign.LoadedMission.Tanks.Count(x => x.IsPlayer);
         int mafs = mafs1 - mafs2; // waddafak. why is my old code so horrid.
+        mafs += CampaignGlobals.LoadedCampaign.ExpectedDoubles(); // Double Enemies
 
         // draw large(r) text
         float spacing = 10;

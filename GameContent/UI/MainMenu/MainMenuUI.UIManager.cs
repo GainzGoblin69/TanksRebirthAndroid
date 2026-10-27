@@ -278,7 +278,7 @@ public static partial class MainMenuUI
 
         // phones: Difficulties lives on the Single Player (campaign) screen and the Wi-Fi host's lobby
         if (Phone)
-            DifficultiesButton.IsVisible = MenuState == UIState.Campaigns || (MenuState == UIState.MPLobby && Client.IsHost());
+            DifficultiesButton.IsVisible = MenuState == UIState.Campaigns; // the multiplayer screens draw their own
     }
     public static void OpenUI() {
         if (!Speedrun.AreSpeedrunsFetched) {

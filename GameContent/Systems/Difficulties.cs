@@ -44,7 +44,11 @@ public record Difficulties {
         ["BulletBlocking"] = false,
         ["FFA"] = false,
         ["LanternMode"] = false,
-        ["Disguise"] = false
+        ["Disguise"] = false,
+        // co-op helpers and extra challenge (added for phones)
+        ["KidMode"] = false,
+        ["GearsOfWar"] = false,
+        ["DoubleTanks"] = false
     };
     public static readonly Dictionary<int, int> VanillaToMasterModeConversions = new() {
         [TankID.Brown] = TankID.Bronze,

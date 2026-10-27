@@ -218,11 +218,18 @@ public static partial class MainMenuUI {
             LanSession.StopSearch();
             MenuState = UIState.MPLobby;
         }
+        // host: whenever someone joins, send them the current difficulty choices
+        if (MenuState == UIState.MPLobby && Client.IsConnected() && Client.IsHost() && Server.CurrentClientCount != _lastLobbyCount) {
+            _lastLobbyCount = Server.CurrentClientCount;
+            if (_lastLobbyCount > 1)
+                Client.SendDiffiulties();
+        }
         if (InputUtils.KeyJustPressed(Keys.Escape) && !_suppressEscape)
             PhoneScreenBack();
         _suppressEscape = false;
     }
     private static bool _suppressEscape;
+    private static int _lastLobbyCount;
 
     private static int _lobbyGrace;
 
@@ -342,7 +349,7 @@ public static partial class MainMenuUI {
 
     // ---- same device
     private static void DrawMPLocal(SpriteBatch sb) {
-        int n = 3;
+        int n = 4;
         var panel = RightPanel();
         DrawPanel(sb, panel);
         float s = PhoneScale;
@@ -361,7 +368,9 @@ public static partial class MainMenuUI {
             StartLocalCoop(LocalCoop.Scheme.TouchAndController);
         if (PButton(sb, PhoneColumnSlot(1, n), "Two Controllers", enabled: pads >= 2))
             StartLocalCoop(LocalCoop.Scheme.TwoControllers);
-        if (PButton(sb, PhoneColumnSlot(2, n), "Back"))
+        if (PButton(sb, PhoneColumnSlot(2, n), "Difficulties"))
+            PhoneOpenDifficulties();
+        if (PButton(sb, PhoneColumnSlot(3, n), "Back"))
             PhoneScreenBack();
     }
 
@@ -492,7 +501,8 @@ public static partial class MainMenuUI {
                 plrsConfirmed = 0;
                 EnterCampaigns();
             }
-            // slot 1: the Difficulties button (a UIElement, placed by the phone layout)
+            if (PButton(sb, PhoneColumnSlot(1, n), "Difficulties"))
+                PhoneOpenDifficulties();
             if (PButton(sb, PhoneColumnSlot(2, n), "Tank Color"))
                 GoToState(UIState.TankColors);
             if (PButton(sb, PhoneColumnSlot(3, n), "Leave"))
@@ -501,10 +511,13 @@ public static partial class MainMenuUI {
                 PText(sb, "Waiting for others to join...", new Vector2(cx, panel.Bottom - 60 * s), 0.65f, UITextButton.PhoneEdge);
         }
         else {
-            int n = 2;
-            if (PButton(sb, PhoneColumnSlot(0, n), "Tank Color"))
+            // joined players see the host's difficulty choices (only the host can change them)
+            int n = 3;
+            if (PButton(sb, PhoneColumnSlot(0, n), "Difficulties"))
+                PhoneOpenDifficulties();
+            if (PButton(sb, PhoneColumnSlot(1, n), "Tank Color"))
                 GoToState(UIState.TankColors);
-            if (PButton(sb, PhoneColumnSlot(1, n), "Leave"))
+            if (PButton(sb, PhoneColumnSlot(2, n), "Leave"))
                 PhoneScreenBack();
             PText(sb, "Waiting for the host to start...", new Vector2(cx, panel.Bottom - 60 * s), 0.75f, Ink);
         }

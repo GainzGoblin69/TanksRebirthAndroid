@@ -673,6 +673,7 @@ public class TankGame : Game {
 
         NetPlay.PollEvents();
         TanksRebirth.Net.Online.OnlineSession.Update(); // online games: work that has to run on the game thread
+        ReviveSystem.Update();
 
         if (RuntimeData.RunTime % 60 < RuntimeData.DeltaTime && !OperatingSystem.IsAndroid())
             Task.Run(DiscordRichPresence.Update);
@@ -915,6 +916,7 @@ public class TankGame : Game {
         RebirthMouse.DrawMouse();
         SpriteRenderer.End();
         LocalCoop.DrawAim(SpriteRenderer); // same-device co-op: each controller player's aim
+        ReviveSystem.Draw(SpriteRenderer); // Gears of War: revive rings
     }
 
     static Particle _ziggy;

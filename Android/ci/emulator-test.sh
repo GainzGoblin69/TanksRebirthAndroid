@@ -67,7 +67,7 @@ tapy 736 4
 tapy 666 3
 tapy 244 3
 adb exec-out screencap -p > diag/run2-mp-local.png
-tapy 666
+tapy 736
 tapy 384 5
 adb exec-out screencap -p > diag/run2-mp-lobby.png
 tapy 736 4
@@ -81,7 +81,8 @@ adb exec-out screencap -p > diag/run2-difficulties.png
 adb shell input tap $((W * 263 / 1000)) $((H * 147 / 1000)); sleep 3
 adb shell input tap $((W * 263 / 1000)) $((H * 214 / 1000)); sleep 3
 adb exec-out screencap -p > diag/run2-difficulties-toggled.png
-adb shell input tap $((W * 736 / 1000)) $((H * 480 / 1000)); sleep 2
+# turn on Double Enemies (3rd column, 7th row)
+adb shell input tap $((W * 736 / 1000)) $((H * 547 / 1000)); sleep 2
 adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 3
 adb exec-out screencap -p > diag/run2-singleplayer-back.png
 
@@ -90,7 +91,9 @@ adb shell input tap $CX $((H * 384 / 1000)); sleep 15
 adb exec-out screencap -p > diag/run2-levelselect-15s.png
 sleep 60
 adb exec-out screencap -p > diag/run2-levelselect-75s.png
-adb shell input tap $((W * 100 / 1000)) $((H * 217 / 1000)); sleep 6
+# back to the campaign screen and start the Campaign: Double Enemies should give mission 1 two enemy tanks
+adb shell input tap $((H * 143 / 1080)) $((H * 59 / 1000)); sleep 4
+tapy 244 8
 adb exec-out screencap -p > diag/run2-levelrun-banner.png; sleep 9
 adb exec-out screencap -p > diag/run2-levelrun.png
 

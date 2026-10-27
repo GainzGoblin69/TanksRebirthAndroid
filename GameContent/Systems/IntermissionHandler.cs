@@ -223,6 +223,10 @@ public static class IntermissionHandler {
                     }
                 }
 
+                // Gears of War: everyone down (nobody left to revive) ends the campaign
+                if (allPlayersDead && Difficulties.Types["GearsOfWar"])
+                    everyoneLostAllLives = true;
+
                 if (allPlayersDead) {
                     if (everyoneLostAllLives)
                         endContext = MissionEndContext.GameOver;

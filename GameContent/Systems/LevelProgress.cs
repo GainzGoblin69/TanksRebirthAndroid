@@ -213,8 +213,10 @@ public static class LevelProgress {
         // the run uses exactly its own modifier (or none); the player's own difficulty choices come back afterwards
         _savedTypes = new Dictionary<string, bool>(Difficulties.Types);
         _savedValues = (Difficulties.MonochromeValue, Difficulties.DisguiseValue, Difficulties.RandomTanksLower, Difficulties.RandomTanksUpper);
+        // co-op helpers (Kid Mode, Gears of War) stay as chosen; every other option is off for the run
         foreach (var key in Difficulties.Types.Keys.ToList())
-            Difficulties.Types[key] = false;
+            if (key is not ("KidMode" or "GearsOfWar"))
+                Difficulties.Types[key] = false;
         Difficulties.MonochromeValue = TankID.None;
         Difficulties.DisguiseValue = TankID.None;
         Difficulties.RandomTanksLower = TankID.None;

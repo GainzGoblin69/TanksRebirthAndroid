@@ -189,6 +189,10 @@ public class PlayerTank : Tank {
             properties.DestructionColor = PlayerColors.Palette[_colorIndex].Main;
 
         base.ApplyDefaults(ref properties);
+
+        // Kid Mode: player 2 can take two hits
+        if (Difficulties.Types["KidMode"] && PlayerId == PlayerID.Red)
+            properties.Armor = new(this, 1);
     }
     public override void Update() {
         /*if (Input.KeyJustPressed(Keys.P))
@@ -484,7 +488,13 @@ public class PlayerTank : Tank {
         Velocity = Vector2.UnitY.Rotate(ChassisRotation) * Speed;
     }
     public override void Destroy(ITankHurtContext context, bool netSend) {
-        if (LocalCoop.ControlsPlayer(PlayerId))
+        // Kid Mode: player 2 never runs out of lives. Gears of War: a fallen player is "down" (waiting to be
+        // revived) rather than losing a life; if everyone is down, it's game over.
+        bool keepLives = (Difficulties.Types["KidMode"] && PlayerId == PlayerID.Red) || Difficulties.Types["GearsOfWar"];
+        if (Difficulties.Types["GearsOfWar"] && CampaignGlobals.InMission)
+            ReviveSystem.PlayerDown(this);
+        if (keepLives) { }
+        else if (LocalCoop.ControlsPlayer(PlayerId))
             Lives[PlayerId]--; // same-device co-op: each player has their own lives
         else if (Client.IsConnected()) {
             // maybe make a camera transition to said tank.

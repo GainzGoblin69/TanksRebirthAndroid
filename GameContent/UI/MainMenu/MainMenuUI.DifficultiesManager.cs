@@ -50,6 +50,9 @@ public static partial class MainMenuUI {
     public static UITextButton LanternMode;
 
     public static UITextButton DisguiseMode;
+    public static UITextButton KidMode;
+    public static UITextButton GearsOfWar;
+    public static UITextButton DoubleTanks;
 
     public static List<UIElement> AllDifficultyButtons = [];
 
@@ -80,6 +83,9 @@ public static partial class MainMenuUI {
         FFA.IsVisible = visible;
         LanternMode.IsVisible = visible;
         DisguiseMode.IsVisible = visible && !Internals.Common.Framework.Input.TouchControls.Enabled; // removed on phones
+        KidMode.IsVisible = visible;
+        GearsOfWar.IsVisible = visible;
+        DoubleTanks.IsVisible = visible;
     }
 
     public static void UpdateDifficulties() {
@@ -322,9 +328,25 @@ public static partial class MainMenuUI {
             }
         };
 
+        KidMode = new("Kid Mode", font, Color.White) {
+            IsVisible = false,
+            Tooltip = "Player 2 has infinite lives and can take two hits.",
+            OnLeftClick = (elem) => Difficulties.Types["KidMode"] = !Difficulties.Types["KidMode"]
+        };
+        GearsOfWar = new("Gears of War", font, Color.White) {
+            IsVisible = false,
+            Tooltip = "One life each. Revive a teammate by standing where they fell for 5 seconds.",
+            OnLeftClick = (elem) => Difficulties.Types["GearsOfWar"] = !Difficulties.Types["GearsOfWar"]
+        };
+        DoubleTanks = new("Double Enemies", font, Color.White) {
+            IsVisible = false,
+            Tooltip = "Every enemy tank comes with a twin right next to it.",
+            OnLeftClick = (elem) => Difficulties.Types["DoubleTanks"] = !Difficulties.Types["DoubleTanks"]
+        };
+
         AllDifficultyButtons.AddRange(new UITextButton[] { TanksAreCalculators, PieFactory, UltraMines, BulletHell, AllInvisible, AllStationary, Armored, AllHoming, BumpUp, Monochrome,
         InfiniteLives, MasterMode, TacticalPlanes, MachineGuns, RandomizedTanks, ThunderMode, POVMode, AiCompanion, Shotguns, Predictions,
-        RandomizedPlayer, BulletBlocking, FFA, LanternMode, DisguiseMode });
+        RandomizedPlayer, BulletBlocking, FFA, LanternMode, DisguiseMode, DoubleTanks, KidMode, GearsOfWar });
         // phones: Disguise is removed (only changes how enemies look)
         if (Internals.Common.Framework.Input.TouchControls.Enabled) {
             AllDifficultyButtons.Remove(DisguiseMode);
@@ -348,6 +370,7 @@ public static partial class MainMenuUI {
         (POVMode, "POV"), (AiCompanion, "AiCompanion"), (Shotguns, "Shotguns"), (Predictions, "Predictions"),
         (RandomizedPlayer, "RandomPlayer"), (BulletBlocking, "BulletBlocking"), (FFA, "FFA"),
         (LanternMode, "LanternMode"), (DisguiseMode, "Disguise"),
+        (DoubleTanks, "DoubleTanks"), (KidMode, "KidMode"), (GearsOfWar, "GearsOfWar"),
     ];
 
     /// <summary>
@@ -357,6 +380,16 @@ public static partial class MainMenuUI {
         foreach (var (button, key) in DifficultyKeys) {
             var k = key;
             button.HoverColor = Color.White;
+            // in multiplayer only the host changes these (everyone else sees the host's choices)
+            var toggle = button.OnLeftClick;
+            button.OnLeftClick = (elem) => {
+                if (Client.IsConnected() && !Client.IsHost()) {
+                    SoundPlayer.SoundError();
+                    ChatSystem.SendMessage("Only the host can change difficulties.", Color.Orange);
+                    return;
+                }
+                toggle?.Invoke(elem);
+            };
             button.UniqueDraw = (elem, sb) => {
                 bool on = Difficulties.Types.TryGetValue(k, out var v) && v;
                 var sw = ToggleSwitch.RightOf(elem.Hitbox);
