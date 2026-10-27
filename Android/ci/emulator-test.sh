@@ -48,6 +48,11 @@ W=${SIZE%x*}; H=${SIZE#*x}; [ $W -lt $H ] && { T=$W; W=$H; H=$T; }
 CX=$((H * 384 / 1080))
 adb exec-out screencap -p > diag/run2-mainmenu.png
 tapy() { adb shell input tap $CX $((H * $1 / 1000)); sleep ${2:-3}; }
+# Options and back: the main menu buttons must keep their size
+tapy 455 4
+adb exec-out screencap -p > diag/run2-options.png
+adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 3
+adb exec-out screencap -p > diag/run2-options-back.png
 # Play -> play menu (5 slots: Single Player, Multiplayer, Tank Color, Level Editor, Back)
 tapy 314 6
 adb exec-out screencap -p > diag/run2-after-play.png

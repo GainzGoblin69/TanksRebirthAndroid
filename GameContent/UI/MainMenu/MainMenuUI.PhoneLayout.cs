@@ -42,7 +42,7 @@ public static partial class MainMenuUI {
     }
 
     private static Rectangle? InMenuState(UIState state, int i, int n) =>
-        IsActive && MenuState == state && !GameUI.InOptions ? PhoneColumnSlot(i, n) : null;
+        IsActive && MenuState == state ? PhoneColumnSlot(i, n) : null;
 
     /// <summary>Called after the menu and GameUI buttons exist.</summary>
     private static void ApplyPhoneLayout() {

@@ -32,6 +32,10 @@ public static class TouchControls {
     /// <summary>Joystick direction in screen space (-1..1 on each axis, +Y is down). Zero inside the dead zone.</summary>
     public static Vector2 MoveVector { get; private set; }
     public static bool MineJustPressed { get; private set; }
+    /// <summary>Phone tilt (-1..1 each way, screen axes, +Y toward the bottom), from the Android launcher.</summary>
+    public static Vector2 Tilt { get; set; }
+    /// <summary>Whether a finger is on the screen right now.</summary>
+    public static bool AnyTouch => _seen.Count > 0;
     public static bool PauseJustPressed { get; private set; }
 
     /// <summary>True when a second-screen control panel (e.g. the AYN Thor's lower screen) is showing; the

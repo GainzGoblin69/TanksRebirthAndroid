@@ -225,10 +225,19 @@ public class MainActivity : AndroidGameActivity {
     }
 
     private bool _resumed;
+    private TiltSensor? _tilt;
 
     protected override void OnResume() {
         base.OnResume();
         _resumed = true;
+        // the menu logo leans as the phone tilts
+        try {
+            _tilt ??= new TiltSensor(this);
+            _tilt.Start();
+        }
+        catch (Exception e) {
+            Breadcrumb("tilt sensor unavailable: " + e.Message);
+        }
     }
 
     protected override void OnDestroy() {
@@ -264,6 +273,7 @@ public class MainActivity : AndroidGameActivity {
 
     protected override void OnPause() {
         _resumed = false;
+        try { _tilt?.Stop(); } catch { }
         base.OnPause();
     }
 

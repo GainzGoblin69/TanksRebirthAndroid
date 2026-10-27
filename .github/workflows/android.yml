@@ -54,7 +54,21 @@ jobs:
           Invoke-WebRequest "https://github.com/RighteousRyan1/tanks_rebirth_motds/raw/master/Vanilla.campaign" -OutFile Android/Bundled/Vanilla.campaign
 
       - name: Build the APK
-        run: dotnet publish Android/TanksRebirth.Android.csproj -c Release -f net10.0-android
+        shell: pwsh
+        # Signed with the same key every time (Android/signing) so updates install over the old version, and
+        # the version number goes up with each build (Android also refuses to "update" to the same or lower one).
+        run: |
+          $ver = 100 + [int]$env:GITHUB_RUN_NUMBER
+          $ks = Join-Path $PWD 'Android/signing/tanksrebirth.keystore'
+          "Version code $ver"
+          dotnet publish Android/TanksRebirth.Android.csproj -c Release -f net10.0-android `
+            "-p:ApplicationVersion=$ver" `
+            -p:AndroidKeyStore=true `
+            "-p:AndroidSigningKeyStore=$ks" `
+            -p:AndroidSigningKeyAlias=tanksrebirth `
+            -p:AndroidSigningKeyPass=14c05ab702fad9b34d266349d4ebab92 `
+            -p:AndroidSigningStorePass=14c05ab702fad9b34d266349d4ebab92
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Collect the APK
         shell: pwsh

@@ -320,6 +320,7 @@ public static class GameUI
         if (MainMenuUI.MenuState == MainMenuUI.UIState.Settings && MainMenuUI.IsActive && VolumeButton.IsVisible) {
             // Set to main menu, we are going back to it after all.
             MainMenuUI.MenuState = MainMenuUI.UIState.PrimaryMenu;
+            InOptions = false;
             
             // Hide Options buttons and load MMenu buttons.
             MainMenuUI.PlayButton.IsVisible = true;

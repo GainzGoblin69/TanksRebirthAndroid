@@ -8,6 +8,7 @@ using System.IO;
 using TanksRebirth.GameContent.Globals;
 using TanksRebirth.GameContent.ModSupport;
 using TanksRebirth.Internals.Common.Utilities;
+using TanksRebirth.Internals.Common.Framework.Input;
 using TanksRebirth.GameContent.Systems;
 using TanksRebirth.Internals.Common.Framework.Audio;
 using TanksRebirth.Net;
@@ -118,6 +119,21 @@ public static partial class MainMenuUI
             ? new Vector3((PhoneColumnRight + WindowUtils.WindowWidth) / 2f - WindowUtils.WindowWidth / 2f, 40.ToResolutionY(), 0)
             : new Vector3(0, 300.ToResolutionY(), 0);
 
+        // phones: the logo leans with the phone's tilt, and toward the finger while one is down
+        if (Phone) {
+            float sc = MathHelper.PiOver4;
+            var tilt = TouchControls.Tilt;
+            // (the sensor reports "up": tipping the right side down gives a negative X, like a finger on the right)
+            float tx = tilt.X * sc * 0.9f, ty = MathHelper.PiOver2 + tilt.Y * sc * 0.9f;
+            if (TouchControls.AnyTouch && MouseUtils.MouseOnScreen) {
+                tx += -(MouseUtils.Test.X - 0.5f) * sc;
+                ty += (MouseUtils.Test.Y - 0.25f) * sc;
+            }
+            RebirthLogo.Rotation.X = MathUtils.SoftStep(RebirthLogo.Rotation.X, tx, 0.1f * RuntimeData.DeltaTime);
+            RebirthLogo.Rotation.Y = MathUtils.SoftStep(RebirthLogo.Rotation.Y, ty, 0.1f * RuntimeData.DeltaTime);
+            RebirthLogo.Rotation_Tanks = new(MathHelper.PiOver2, 0, 0);
+            return;
+        }
         // slowly return to normal if the mouse is not on-screen
         if (!MouseUtils.MouseOnScreen) {
             RebirthLogo.Rotation.X = MathUtils.SoftStep(RebirthLogo.Rotation.X, 0, 0.05f * RuntimeData.DeltaTime);
