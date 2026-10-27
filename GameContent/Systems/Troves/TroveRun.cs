@@ -40,7 +40,7 @@ public static class TroveRun {
 
     private static bool _starting;
     private static TroveDir? _entry;
-    private static float _roomTime, _deadTimer, _bossTimer;
+    private static float _roomTime, _deadTimer, _bossTimer, _logTimer;
     // fading between rooms: 1 = going dark, -1 = coming back
     private static int _fadeDir;
     public static float Fade { get; private set; }
@@ -133,6 +133,17 @@ public static class TroveRun {
         }
         _starting = false;
         GameUI.RestartButton.IsVisible = false; // a run can't be "restarted" like a campaign mission
+
+        // a status line in the game log every few seconds (helps when testing)
+        _logTimer += Dt;
+        if (_logTimer > 3f) {
+            _logTimer = 0;
+            var me = GameHandler.AllPlayerTanks[NetPlay.GetMyClientId()];
+            float nearest = Room is { } lr && Floor is not null && me is not null
+                ? TroveGen.Doors(Floor, lr).Select(d => Vector2.Distance(me.Position, DoorPoint(d))).DefaultIfEmpty(-1).Min() : -1;
+            TankGame.ClientLog.Write($"Troves: floor {FloorNumber} room {Current} inMission={CampaignGlobals.InMission} cleared={Room?.Cleared} " +
+                $"fade={Fade:0.00}/{_fadeDir} paused={GameUI.Paused} ended={Ended} dt={Dt:0.000} me={me?.Position} nearestDoor={nearest:0}", Internals.LogType.Info);
+        }
 
         if (_fadeDir != 0) {
             Fade = Math.Clamp(Fade + _fadeDir * Dt * 4f, 0f, 1f);

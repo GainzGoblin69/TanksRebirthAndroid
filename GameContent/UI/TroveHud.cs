@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using TanksRebirth.GameContent.Globals;
+using TanksRebirth.GameContent.Systems;
 using TanksRebirth.GameContent.Systems.Troves;
 using TanksRebirth.Internals.Common;
 using TanksRebirth.Internals.Common.Framework.Audio;
@@ -31,7 +32,9 @@ public static class TroveHud {
             return;
         EnsureTextures(sb.GraphicsDevice);
         sb.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.LinearClamp, null, null);
-        if (TroveRun.Floor is { } floor && TroveRun.Room is { } room && TroveRun.Fade < 1f) {
+        // not while the floor banner (intermission) is up
+        bool banner = IntermissionSystem.Alpha > 0.05f || IntermissionSystem.BlackAlpha > 0.05f;
+        if (!banner && TroveRun.Floor is { } floor && TroveRun.Room is { } room && TroveRun.Fade < 1f) {
             DrawDoors(sb, floor, room);
             DrawMap(sb, floor);
         }
@@ -68,7 +71,7 @@ public static class TroveHud {
     // ---- minimap (top middle) and floor name
     private static void DrawMap(SpriteBatch sb, TroveFloor floor) {
         float s = S;
-        float cell = 26 * s, gap = 6 * s;
+        float cell = 38 * s, gap = 7 * s;
         int minX = int.MaxValue, maxX = int.MinValue, minY = int.MaxValue, maxY = int.MinValue;
         foreach (var r in floor.Rooms.Values) {
             if (!r.Seen) continue;
@@ -95,9 +98,9 @@ public static class TroveHud {
             if (here)
                 ToggleSwitch.DrawDisc(sb, rect.Center.ToVector2(), cell * 0.25f, new Color(40, 120, 230));
             else if (r.Kind == TroveRoomKind.Boss)
-                Text(sb, "!", rect.Center.ToVector2(), 0.55f * s, new Color(255, 230, 200));
+                Text(sb, "!", rect.Center.ToVector2(), 0.8f * s, new Color(255, 230, 200));
         }
-        Text(sb, $"Floor {floor.Number}  {floor.Name}", new Vector2(WindowUtils.WindowWidth / 2f, panel.Bottom + 22 * s), 0.6f * s, Color.White, border: true);
+        Text(sb, $"Floor {floor.Number}: {floor.Name}", new Vector2(WindowUtils.WindowWidth / 2f, panel.Bottom + 30 * s), 0.85f * s, Color.White, border: true);
     }
 
     private static void Text(SpriteBatch sb, string t, Vector2 center, float scale, Color color, bool border = false) {
