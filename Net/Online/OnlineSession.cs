@@ -19,7 +19,7 @@ namespace TanksRebirth.Net.Online;
 /// </summary>
 public static class OnlineSession {
     /// <summary>The Firebase Realtime Database URL (set up in the Firebase console).</summary>
-    public const string DatabaseUrl = "";
+    public const string DatabaseUrl = "https://tanks-rebirth-default-rtdb.firebaseio.com";
 
     public static bool Configured => !string.IsNullOrWhiteSpace(DatabaseUrl);
 
