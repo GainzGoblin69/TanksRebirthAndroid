@@ -50,7 +50,9 @@ jobs:
         shell: pwsh
         continue-on-error: true
         run: |
+          # a copy is committed in Android/Bundled (Tank Troves rooms depend on it); only download if it's missing
           New-Item -ItemType Directory -Force Android/Bundled | Out-Null
+          if (Test-Path Android/Bundled/Vanilla.campaign) { exit 0 }
           Invoke-WebRequest "https://github.com/RighteousRyan1/tanks_rebirth_motds/raw/master/Vanilla.campaign" -OutFile Android/Bundled/Vanilla.campaign
 
       - name: Build the APK

@@ -77,6 +77,30 @@ public static class TroveHud {
         // glow
         DiscPM(sb, c - new Vector2(0, r * 0.9f + bob), r * 1.0f, new Color(255, 220, 120) * 0.25f);
         DrawItemIcon(sb, room.Pickup!.Value, c - new Vector2(0, r * 0.9f + bob), r * 0.75f, premultiplied: true);
+
+        // what it does, floating above it (so you can decide before picking it up)
+        var def = TroveItems.Def(room.Pickup.Value);
+        float s = S;
+        var font = FontGlobals.RebirthFont;
+        string kind = def.Kind switch {
+            TroveItemKind.Active => "ITEM button",
+            TroveItemKind.Passive => TroveItems.Stacks(def.Id) ? "whole run, stacks" : "whole run",
+            _ => "right away",
+        };
+        string desc = def.Description.Replace("ITEM button: ", "").Replace(" (whole run)", "");
+        desc = char.ToUpperInvariant(desc[0]) + desc[1..];
+        float nameScale = 0.62f * s, descScale = 0.42f * s;
+        float w = Math.Max(font.MeasureString(def.Name).X * nameScale, font.MeasureString(desc).X * descScale) + 36 * s;
+        float h = 92 * s;
+        var mid = c - new Vector2(0, r * 2.4f + h / 2f + bob * 0.5f);
+        // keep it on screen
+        mid.X = Math.Clamp(mid.X, w / 2f + 8, WindowUtils.WindowWidth - w / 2f - 8);
+        mid.Y = Math.Max(mid.Y, h / 2f + 8);
+        var box = new Rectangle((int)(mid.X - w / 2f), (int)(mid.Y - h / 2f), (int)w, (int)h);
+        ToggleSwitch.DrawRoundedRect(sb, box, 16 * s, new Color(20, 14, 10) * 0.78f);
+        Text(sb, def.Name, new Vector2(mid.X, box.Y + 24 * s), nameScale, Color.Lerp(def.Color, Color.White, 0.35f), border: true);
+        Text(sb, desc, new Vector2(mid.X, box.Y + 54 * s), descScale, Color.White);
+        Text(sb, kind, new Vector2(mid.X, box.Y + 76 * s), 0.34f * s, new Color(200, 190, 170));
     }
 
     // discs inside the game's HUD batch (premultiplied alpha)

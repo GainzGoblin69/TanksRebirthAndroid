@@ -60,6 +60,15 @@ internal static class AssetExtractor {
             using var output = File.Create(dest);
             input.CopyTo(output);
         }
+        // Tank Troves builds rooms from its own copy, which never changes with "Update Campaign":
+        // every phone with this version of the app then builds exactly the same dungeon from a seed.
+        var troves = Path.Combine(saveDir, "Troves");
+        Directory.CreateDirectory(troves);
+        foreach (var name in assets.List("Bundled") ?? []) {
+            using var input = assets.Open("Bundled/" + name);
+            using var output = File.Create(Path.Combine(troves, name));
+            input.CopyTo(output);
+        }
     }
 
     private static void CopyTree(AssetManager assets, string path, string root, ref int count, Action<string>? progress) {

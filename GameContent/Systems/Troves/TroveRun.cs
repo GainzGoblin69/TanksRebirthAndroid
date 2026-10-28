@@ -108,6 +108,8 @@ public static class TroveRun {
             _hooked = true;
             // a floor's first room is set up by the campaign's own sequence: give the players their items then
             CampaignGlobals.OnMissionStart += () => { if (Active) ApplyItems(); };
+            // the new floor's colour appears when its first room is set up (behind the floor banner), not when the boss falls
+            Campaign.OnMissionLoad += (_, _) => { if (Active) SetFloorTint(); };
         }
         ReviveSystem.Clear();
         PlayerTank.StartingLives = Difficulties.Types["GearsOfWar"] ? 1 : STARTING_LIVES;
@@ -354,7 +356,6 @@ public static class TroveRun {
         BossTank = null;
         Floor = TroveGen.Generate(Seed, FloorNumber);
         Current = Floor.Start;
-        SetFloorTint();
         _entry = null;
         _roomTime = 0;
         MarkSeen();

@@ -6,5 +6,4 @@ build/
 build_all.bat
 # Android build outputs
 Android/ContentBuilt/
-Android/Bundled/
 Content/Content.Android.mgcb

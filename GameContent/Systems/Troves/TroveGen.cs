@@ -20,6 +20,8 @@ public sealed class TroveRoom {
     public bool Cleared, Visited, Seen;
     /// <summary>Solid blocks (grid x, y) and their block type / height.</summary>
     public List<(int X, int Y, int Type, int Height)> Blocks = [];
+    /// <summary>Teleporter pads (campaign rooms): grid cell and link number (two pads share one).</summary>
+    public List<(int X, int Y, int Link)> Teleporters = [];
     public List<(int X, int Y, int Tier, float Rotation)> Enemies = [];
     /// <summary>Index into <see cref="Enemies"/> of the boss, or -1.</summary>
     public int BossIndex = -1;
@@ -77,7 +79,10 @@ public static class TroveGen {
             if (!_triedCampaign) {
                 _triedCampaign = true;
                 try {
-                    var path = System.IO.Path.Combine(TankGame.SaveDirectory, "Campaigns", "Vanilla.campaign");
+                    // the app's own fixed copy (the same on every phone), else the installed campaign
+                    var path = System.IO.Path.Combine(TankGame.SaveDirectory, "Troves", "Vanilla.campaign");
+                    if (!System.IO.File.Exists(path))
+                        path = System.IO.Path.Combine(TankGame.SaveDirectory, "Campaigns", "Vanilla.campaign");
                     if (System.IO.File.Exists(path))
                         _campaignMaps = Campaign.Load(path).CachedMissions;
                 }
@@ -244,6 +249,95 @@ public static class TroveGen {
             }
     }
 
+    /// <summary>
+    /// Makes sure every open part of the room can be reached from the middle, by driving or by shooting through
+    /// breakable (cork) blocks: where solid walls shut a part off, the cheapest way through them turns into cork,
+    /// two blocks wide so a tank fits once it's broken. Teleporters count as a way through.
+    /// </summary>
+    /// <returns>Open cells that still can't be reached (shut in by holes): nothing should be put there.</returns>
+    private static HashSet<Point> ConnectRegions(int[,] solid, int[,] type, List<(int X, int Y, int Link)> teleporters) {
+        var stuck = new HashSet<Point>();
+        bool Open(int x, int y) => solid[x, y] == 0 || type[x, y] == BlockID.Cork;
+        IEnumerable<Point> Next(Point p) {
+            if (p.X > 0) yield return new(p.X - 1, p.Y);
+            if (p.X < GW - 1) yield return new(p.X + 1, p.Y);
+            if (p.Y > 0) yield return new(p.X, p.Y - 1);
+            if (p.Y < GH - 1) yield return new(p.X, p.Y + 1);
+            foreach (var t in teleporters)
+                if (t.X == p.X && t.Y == p.Y)
+                    foreach (var o in teleporters)
+                        if (o.Link == t.Link && (o.X != t.X || o.Y != t.Y))
+                            yield return new(o.X, o.Y);
+        }
+        for (int round = 0; round < 40; round++) {
+            // what can be reached now
+            var reached = new bool[GW, GH];
+            var q = new Queue<Point>();
+            q.Enqueue(new Point(10, 8));
+            reached[10, 8] = true;
+            while (q.Count > 0) {
+                var c = q.Dequeue();
+                foreach (var n in Next(c))
+                    if (!reached[n.X, n.Y] && Open(n.X, n.Y)) {
+                        reached[n.X, n.Y] = true;
+                        q.Enqueue(n);
+                    }
+            }
+            Point? lost = null;
+            for (int y = 0; y < GH && lost is null; y++)
+                for (int x = 0; x < GW; x++)
+                    if (solid[x, y] == 0 && !reached[x, y] && !stuck.Contains(new Point(x, y))) {
+                        lost = new Point(x, y);
+                        break;
+                    }
+            if (lost is not { } goal)
+                return stuck;
+
+            // cheapest way from the reached part to it: open cells cost nothing, wooden blocks 1 each, holes can't be crossed
+            var cost = new int[GW, GH];
+            var from = new Point?[GW, GH];
+            for (int x = 0; x < GW; x++)
+                for (int y = 0; y < GH; y++)
+                    cost[x, y] = reached[x, y] ? 0 : int.MaxValue;
+            var dq = new LinkedList<Point>();
+            for (int x = 0; x < GW; x++)
+                for (int y = 0; y < GH; y++)
+                    if (reached[x, y])
+                        dq.AddLast(new Point(x, y));
+            while (dq.Count > 0) {
+                var c = dq.First!.Value;
+                dq.RemoveFirst();
+                foreach (var n in Next(c)) {
+                    if (solid[n.X, n.Y] > 0 && type[n.X, n.Y] == BlockID.Hole)
+                        continue;
+                    int step = Open(n.X, n.Y) ? 0 : 1;
+                    if (cost[c.X, c.Y] + step >= cost[n.X, n.Y])
+                        continue;
+                    cost[n.X, n.Y] = cost[c.X, c.Y] + step;
+                    from[n.X, n.Y] = c;
+                    if (step == 0) dq.AddFirst(n); else dq.AddLast(n);
+                }
+            }
+            if (cost[goal.X, goal.Y] == int.MaxValue) {
+                stuck.Add(goal); // walled in by holes: nothing to do
+                continue;
+            }
+            // turn the walls along the way into cork
+            for (Point? c = goal; c is { } p && !reached[p.X, p.Y]; c = from[p.X, p.Y]) {
+                if (solid[p.X, p.Y] == 0 || type[p.X, p.Y] != BlockID.Wood)
+                    continue;
+                type[p.X, p.Y] = BlockID.Cork;
+                // and one beside it, so the gap is wide enough to drive through
+                var prev = from[p.X, p.Y];
+                bool vertical = prev is { } pv && pv.X == p.X;
+                int wx = vertical ? p.X + 1 : p.X, wy = vertical ? p.Y : p.Y + 1;
+                if (wx < GW && wy < GH && solid[wx, wy] > 0 && type[wx, wy] == BlockID.Wood)
+                    type[wx, wy] = BlockID.Cork;
+            }
+        }
+        return stuck;
+    }
+
     private static readonly Vector2[] DoorCells = [new(10.5f, 0), new(21, 8), new(10.5f, 16), new(0, 8)];
 
     /// <summary>A fight room laid out like a campaign mission (its blocks and its tanks), with paths cut to the doors.</summary>
@@ -256,16 +350,28 @@ public static class TroveGen {
         var doors = Doors(f, room).ToList();
         var solid = new int[GW, GH];
         var type = new int[GW, GH];
+        var pads = new List<(int X, int Y, int Link)>();
         foreach (var b in m.Blocks) {
-            if (b.Type is not (BlockID.Wood or BlockID.Cork or BlockID.Hole))
-                continue; // no teleporters (their links wouldn't survive the cut paths)
             var g = ToGrid(b.Position);
             if (g.X < 0 || g.Y < 0 || g.X >= GW || g.Y >= GH)
+                continue;
+            if (b.Type == BlockID.Teleporter) {
+                // not in the middle (where pickups and the floor's first spawn are)
+                if (!(g.X is >= 8 and <= 13 && g.Y is >= 6 and <= 10))
+                    pads.Add((g.X, g.Y, b.TpLink));
+                continue;
+            }
+            if (b.Type is not (BlockID.Wood or BlockID.Cork or BlockID.Hole))
                 continue;
             solid[g.X, g.Y] = Math.Max(1, (int)b.Stack);
             type[g.X, g.Y] = b.Type;
         }
         Carve(solid, doors);
+        // teleporters work in pairs: keep only complete pairs, on open floor
+        pads.RemoveAll(t => solid[t.X, t.Y] > 0);
+        pads = pads.GroupBy(t => t.Link).Where(g => g.Count() == 2).SelectMany(g => g).ToList();
+        room.Teleporters = pads;
+        var stuck = ConnectRegions(solid, type, pads);
         room.Shape = TroveShape.Open;
         room.CampaignMap = m.Name;
         for (int x = 0; x < GW; x++)
@@ -283,7 +389,7 @@ public static class TroveGen {
             if (t.IsPlayer || room.Enemies.Count >= cap)
                 continue;
             var g = ToGrid(t.Position);
-            if (g.X < 1 || g.Y < 1 || g.X >= GW - 1 || g.Y >= GH - 1 || solid[g.X, g.Y] > 0)
+            if (g.X < 1 || g.Y < 1 || g.X >= GW - 1 || g.Y >= GH - 1 || solid[g.X, g.Y] > 0 || stuck.Contains(g) || pads.Any(p => p.X == g.X && p.Y == g.Y))
                 continue;
             if (used.Any(dc => Vector2.Distance(dc, new Vector2(g.X, g.Y)) < 5f))
                 continue;
@@ -298,7 +404,7 @@ public static class TroveGen {
             float bestD = -1;
             for (int x = 1; x < GW - 1; x++)
                 for (int y = 1; y < GH - 1; y++)
-                    if (solid[x, y] == 0) {
+                    if (solid[x, y] == 0 && !stuck.Contains(new Point(x, y)) && !pads.Any(p => p.X == x && p.Y == y)) {
                         float d = used.Count == 0 ? 0 : used.Min(dc => Vector2.Distance(dc, new Vector2(x, y)));
                         if (d > bestD) { bestD = d; best = new Point(x, y); }
                     }
@@ -377,8 +483,9 @@ public static class TroveGen {
             else Mirror(x, y + 1, h, t);
         }
 
-        // keep every door's path to the middle open (and the middle itself)
+        // keep every door's path to the middle open (and the middle itself), and no part of the room shut off
         Carve(solid, doors);
+        var stuck = ConnectRegions(solid, type, []);
 
         for (int x = 0; x < GW; x++)
             for (int y = 0; y < GH; y++)
@@ -400,7 +507,7 @@ public static class TroveGen {
         var free = new List<Point>();
         for (int x = 1; x < GW - 1; x++)
             for (int y = 1; y < GH - 1; y++)
-                if (solid[x, y] == 0)
+                if (solid[x, y] == 0 && !stuck.Contains(new Point(x, y)))
                     free.Add(new Point(x, y));
         var doorCells = new[] { new Vector2(10.5f, 0), new Vector2(21, 8), new Vector2(10.5f, 16), new Vector2(0, 8) };
         float Far(Point p) => doorCells.Min(dc => Vector2.Distance(dc, new Vector2(p.X, p.Y)));
@@ -476,7 +583,12 @@ public static class TroveGen {
             Stack = (byte)b.Height,
             Position = new BlockMapPosition(b.X, b.Y),
             TpLink = -1,
-        }).ToArray();
+        }).Concat(room.Teleporters.Select(t => new BlockTemplate {
+            Type = BlockID.Teleporter,
+            Stack = 1,
+            Position = new BlockMapPosition(t.X, t.Y),
+            TpLink = (sbyte)t.Link,
+        })).ToArray();
         return new Mission(tanks.ToArray(), blocks) {
             Name = $"Floor {f.Number}: {f.Name}",
             Note = string.Empty,
