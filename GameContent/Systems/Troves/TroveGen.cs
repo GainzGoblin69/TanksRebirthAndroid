@@ -7,7 +7,7 @@ using TanksRebirth.GameContent.Systems.Coordinates;
 
 namespace TanksRebirth.GameContent.Systems.Troves;
 
-public enum TroveRoomKind { Start, Normal, Boss, Item }
+public enum TroveRoomKind { Start, Normal, Boss, Item, Challenge, Secret }
 public enum TroveShape { Open, Pillars, Wide, Tall, Small, Cross, Corner }
 
 /// <summary>Directions between rooms. North is the board edge at the lowest Z (grid row 0).</summary>
@@ -25,13 +25,16 @@ public sealed class TroveRoom {
     public List<(int X, int Y, int Tier, float Rotation)> Enemies = [];
     /// <summary>Index into <see cref="Enemies"/> of the boss, or -1.</summary>
     public int BossIndex = -1;
+    /// <summary>Challenge rooms: the second wave (comes in once the first is beaten).</summary>
+    public List<(int X, int Y, int Tier, float Rotation)> Wave2 = [];
+    public bool Wave2Spawned;
     /// <summary>An item in the middle of the room: on a pedestal in item rooms, or left behind once a fight room is cleared.</summary>
     public TroveItemId? Pickup;
     public bool PickupTaken;
     /// <summary>The campaign mission this room's layout came from, or null for a made-up room.</summary>
     public string? CampaignMap;
     /// <summary>Whether the pickup is showing (item rooms always; other rooms after they're cleared).</summary>
-    public bool PickupVisible => Pickup is not null && !PickupTaken && (Kind == TroveRoomKind.Item || Cleared);
+    public bool PickupVisible => Pickup is not null && !PickupTaken && (Kind is TroveRoomKind.Item or TroveRoomKind.Secret || Cleared);
 }
 
 public sealed class TroveFloor {
@@ -40,6 +43,9 @@ public sealed class TroveFloor {
     public Dictionary<Point, TroveRoom> Rooms = [];
     public Point Start, Boss;
     public Point? ItemRoom;
+    /// <summary>A hidden room: its doorway is walled up with cork until an explosion goes off near it.</summary>
+    public Point? Secret;
+    public bool SecretFound;
 
     public bool Has(Point p) => Rooms.ContainsKey(p);
 }
@@ -58,12 +64,14 @@ public static class TroveGen {
 
     // enemy pools per floor (repeats = more common)
     private static readonly int[][] Pools = [
-        [TankID.Brown, TankID.Brown, TankID.Ash, TankID.Ash, TankID.Marine],
+        [TankID.Brown, TankID.Brown, TankID.Brown, TankID.Ash, TankID.Ash, TankID.Ash, TankID.Marine],
         [TankID.Ash, TankID.Marine, TankID.Yellow, TankID.Pink, TankID.Pink],
         [TankID.Marine, TankID.Pink, TankID.Yellow, TankID.Violet, TankID.Green],
         [TankID.Violet, TankID.Green, TankID.White, TankID.Black, TankID.Pink],
         [TankID.Black, TankID.White, TankID.Green, TankID.Sapphire, TankID.Ruby, TankID.Citrine, TankID.Amethyst, TankID.Emerald],
     ];
+    /// <summary>The toughest tank a floor's rooms can have (campaign rooms swap anything tougher for one from the floor's pool).</summary>
+    private static readonly int[] MaxTier = [TankID.Marine, TankID.Yellow, TankID.Green, TankID.Black, TankID.Obsidian];
     private static readonly int[] Bosses = [TankID.Marine, TankID.Violet, TankID.Green, TankID.Black, TankID.Obsidian];
 
     // ------------------------------------------------------------------ campaign rooms
@@ -110,12 +118,33 @@ public static class TroveGen {
     };
     public static TroveDir Opposite(TroveDir d) => (TroveDir)(((int)d + 2) % 4);
 
+    /// <summary>The doors you can see and use (a secret room's doorway only once it's been found).</summary>
     public static IEnumerable<TroveDir> Doors(TroveFloor f, TroveRoom r) {
+        foreach (TroveDir d in Enum.GetValues<TroveDir>()) {
+            var s = Step(d);
+            var n = new Point(r.Cell.X + s.X, r.Cell.Y + s.Y);
+            if (f.Has(n) && (n != f.Secret || f.SecretFound || r.Kind == TroveRoomKind.Secret))
+                yield return d;
+        }
+    }
+    /// <summary>Every doorway, hidden ones too (for building rooms).</summary>
+    public static IEnumerable<TroveDir> DoorsAll(TroveFloor f, TroveRoom r) {
         foreach (TroveDir d in Enum.GetValues<TroveDir>()) {
             var s = Step(d);
             if (f.Has(new Point(r.Cell.X + s.X, r.Cell.Y + s.Y)))
                 yield return d;
         }
+    }
+    /// <summary>The direction from this room to the floor's secret room, if they're next to each other.</summary>
+    public static TroveDir? SecretDoor(TroveFloor f, TroveRoom r) {
+        if (f.Secret is not { } sc || r.Kind == TroveRoomKind.Secret)
+            return null;
+        foreach (TroveDir d in Enum.GetValues<TroveDir>()) {
+            var s = Step(d);
+            if (r.Cell.X + s.X == sc.X && r.Cell.Y + s.Y == sc.Y)
+                return d;
+        }
+        return null;
     }
 
     // ------------------------------------------------------------------ the floor map
@@ -206,12 +235,38 @@ public static class TroveGen {
             itemOptions = cells.Where(c => c != start && c != boss && Neighbors(cells, c) <= 2).OrderBy(c => c.X).ThenBy(c => c.Y).ToList();
         Point? item = itemOptions.Count > 0 ? itemOptions[rng.Next(itemOptions.Count)] : null;
 
-        var floorMap = new TroveFloor { Number = floor, Name = FloorNames[floor - 1], Start = start, Boss = boss, ItemRoom = item };
+        // challenge room: another dead end, if there's one left
+        var challengeOptions = deadEnds.Where(c => c != boss && c != item).OrderBy(c => c.X).ThenBy(c => c.Y).ToList();
+        Point? challenge = challengeOptions.Count > 0 ? challengeOptions[rng.Next(challengeOptions.Count)] : null;
+
+        // secret room: an empty spot touching the dungeon (most neighbours first), never next to the boss or the start
+        var secretOptions = new List<(Point P, int N)>();
+        for (int x = 0; x <= 8; x++)
+            for (int y = 0; y <= 7; y++) {
+                var p = new Point(x, y);
+                if (cells.Contains(p))
+                    continue;
+                int n = Neighbors(cells, p);
+                bool bad = Enum.GetValues<TroveDir>().Any(d => { var s = Step(d); var q = new Point(x + s.X, y + s.Y); return q == boss || q == start; });
+                if (n > 0 && !bad)
+                    secretOptions.Add((p, n));
+            }
+        Point? secret = null;
+        if (secretOptions.Count > 0) {
+            int best = secretOptions.Max(o => o.N);
+            var top = secretOptions.Where(o => o.N == best).Select(o => o.P).OrderBy(c => c.X).ThenBy(c => c.Y).ToList();
+            secret = top[rng.Next(top.Count)];
+        }
+
+        var floorMap = new TroveFloor { Number = floor, Name = FloorNames[floor - 1], Start = start, Boss = boss, ItemRoom = item, Secret = secret };
         foreach (var c in cells.OrderBy(c => c.Y).ThenBy(c => c.X))
             floorMap.Rooms[c] = new TroveRoom {
                 Cell = c,
-                Kind = c == start ? TroveRoomKind.Start : c == boss ? TroveRoomKind.Boss : c == item ? TroveRoomKind.Item : TroveRoomKind.Normal,
+                Kind = c == start ? TroveRoomKind.Start : c == boss ? TroveRoomKind.Boss : c == item ? TroveRoomKind.Item
+                    : c == challenge ? TroveRoomKind.Challenge : TroveRoomKind.Normal,
             };
+        if (secret is { } sp)
+            floorMap.Rooms[sp] = new TroveRoom { Cell = sp, Kind = TroveRoomKind.Secret };
         return floorMap;
     }
 
@@ -238,6 +293,25 @@ public static class TroveGen {
     };
 
     /// <summary>Clears the middle of the room and a path from every door to it.</summary>
+    /// <summary>A cork wall across a hidden doorway (blow it open, or find the room with an explosion).</summary>
+    public static bool InCrack(int x, int y, TroveDir dir) => dir switch {
+        TroveDir.North => x is >= 9 and <= 12 && y <= 1,
+        TroveDir.South => x is >= 9 and <= 12 && y >= GH - 2,
+        TroveDir.West => y is >= 7 and <= 9 && x <= 1,
+        _ => y is >= 7 and <= 9 && x >= GW - 2,
+    };
+    private static void SecretCrack(int[,] solid, int[,] type, TroveDir? d) {
+        if (d is not { } dir)
+            return;
+        for (int x = 0; x < GW; x++)
+            for (int y = 0; y < GH; y++) {
+                if (InCrack(x, y, dir)) {
+                    solid[x, y] = 1;
+                    type[x, y] = BlockID.Cork;
+                }
+            }
+    }
+
     private static void Carve(int[,] solid, List<TroveDir> doors) {
         for (int x = 0; x < GW; x++)
             for (int y = 0; y < GH; y++) {
@@ -347,7 +421,7 @@ public static class TroveGen {
         var m = maps[(f.Number - 1) * per + rng.Next(per)];
         if (m.Blocks is null || m.Tanks is null)
             return false;
-        var doors = Doors(f, room).ToList();
+        var doors = DoorsAll(f, room).ToList();
         var solid = new int[GW, GH];
         var type = new int[GW, GH];
         var pads = new List<(int X, int Y, int Link)>();
@@ -367,6 +441,7 @@ public static class TroveGen {
             type[g.X, g.Y] = b.Type;
         }
         Carve(solid, doors);
+        SecretCrack(solid, type, SecretDoor(f, room));
         // teleporters work in pairs: keep only complete pairs, on open floor
         pads.RemoveAll(t => solid[t.X, t.Y] > 0);
         pads = pads.GroupBy(t => t.Link).Where(g => g.Count() == 2).SelectMany(g => g).ToList();
@@ -395,7 +470,9 @@ public static class TroveGen {
                 continue;
             if (g.X is >= 8 and <= 13 && g.Y is >= 6 and <= 10)
                 continue; // the middle (where the pickups go)
-            room.Enemies.Add((g.X, g.Y, t.AiTier, t.Rotation));
+            // nothing tougher than this floor allows (early campaign missions have purple and green tanks)
+            int tier = t.AiTier > MaxTier[f.Number - 1] || t.AiTier < TankID.Brown ? Pools[f.Number - 1][rng.Next(Pools[f.Number - 1].Length)] : t.AiTier;
+            room.Enemies.Add((g.X, g.Y, tier, t.Rotation));
         }
         if (room.Enemies.Count == 0) {
             // none left: one from this floor's pool, as far from the doors as possible
@@ -414,7 +491,7 @@ public static class TroveGen {
     }
 
     private static void BuildRoom(TroveFloor f, TroveRoom room, Random rng) {
-        var doors = Doors(f, room).ToList();
+        var doors = DoorsAll(f, room).ToList();
         var solid = new int[GW, GH];   // 0 = free, else height
         var type = new int[GW, GH];
 
@@ -433,7 +510,7 @@ public static class TroveGen {
         }
 
         room.Shape = room.Kind switch {
-            TroveRoomKind.Start or TroveRoomKind.Item => TroveShape.Open,
+            TroveRoomKind.Start or TroveRoomKind.Item or TroveRoomKind.Secret or TroveRoomKind.Challenge => TroveShape.Open,
             TroveRoomKind.Boss => rng.Next(2) == 0 ? TroveShape.Open : TroveShape.Pillars,
             _ => (TroveShape)rng.Next(Enum.GetValues<TroveShape>().Length),
         };
@@ -473,7 +550,7 @@ public static class TroveGen {
         }
 
         // cover inside the open part: a few mirrored pieces, some breakable
-        int pieces = room.Kind is TroveRoomKind.Start or TroveRoomKind.Item ? 2 : rng.Next(2, 5);
+        int pieces = room.Kind is TroveRoomKind.Start or TroveRoomKind.Item or TroveRoomKind.Secret ? 2 : rng.Next(2, 5);
         for (int i = 0; i < pieces; i++) {
             int x = rng.Next(2, 9), y = rng.Next(1, 7);
             int h = rng.Next(1, 3);
@@ -485,6 +562,7 @@ public static class TroveGen {
 
         // keep every door's path to the middle open (and the middle itself), and no part of the room shut off
         Carve(solid, doors);
+        SecretCrack(solid, type, SecretDoor(f, room));
         var stuck = ConnectRegions(solid, type, []);
 
         for (int x = 0; x < GW; x++)
@@ -492,12 +570,19 @@ public static class TroveGen {
                 if (solid[x, y] > 0)
                     room.Blocks.Add((x, y, type[x, y], solid[x, y]));
 
-        // item room: an item on a pedestal and nothing to fight
+        // item room: an item on a pedestal and nothing to fight (secret rooms: a rarer one)
         if (room.Kind == TroveRoomKind.Item) {
             room.Pickup = TroveItems.PedestalPool[rng.Next(TroveItems.PedestalPool.Length)];
             room.Cleared = true;
             return;
         }
+        if (room.Kind == TroveRoomKind.Secret) {
+            room.Pickup = TroveItems.SecretPool[rng.Next(TroveItems.SecretPool.Length)];
+            room.Cleared = true;
+            return;
+        }
+        if (room.Kind == TroveRoomKind.Challenge)
+            room.Pickup = TroveItems.ChallengePool[rng.Next(TroveItems.ChallengePool.Length)];
         // enemies
         if (room.Kind == TroveRoomKind.Start)
             return;
@@ -534,10 +619,18 @@ public static class TroveGen {
                     room.Enemies.Add((gp.X, gp.Y, pool[rng.Next(pool.Length)], rng.NextSingle() * MathHelper.TwoPi));
             return;
         }
-        int count = 2 + f.Number / 2 + rng.Next(0, 2);
+        // floor 1: lots of easy tanks; deeper floors: fewer but tougher
+        int count = f.Number == 1 ? rng.Next(3, 6) : 2 + f.Number / 2 + rng.Next(0, 2);
         for (int i = 0; i < count; i++)
             if ((Pick(6) ?? Pick(3)) is { } ep)
                 room.Enemies.Add((ep.X, ep.Y, pool[rng.Next(pool.Length)], rng.NextSingle() * MathHelper.TwoPi));
+        if (room.Kind == TroveRoomKind.Challenge) {
+            // a second wave, a bit bigger, from wherever's free (the first wave's spots are fine: they're gone by then)
+            taken.Clear();
+            for (int i = 0; i < count + 1; i++)
+                if ((Pick(6) ?? Pick(3)) is { } wp)
+                    room.Wave2.Add((wp.X, wp.Y, pool[rng.Next(pool.Length)], rng.NextSingle() * MathHelper.TwoPi));
+        }
     }
 
     // ------------------------------------------------------------------ turning a room into a playable mission

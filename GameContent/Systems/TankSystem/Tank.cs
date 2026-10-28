@@ -549,6 +549,8 @@ public abstract class Tank {
     public virtual void PreUpdate() { }
     public virtual void PostUpdate() { }
     /// <summary>Damage this <see cref="Tank"/>. If it has no armor, destroy it.</summary>
+    /// <summary>Set by Tank Troves: extra armor a hit takes off (Boss Hunter).</summary>
+    public static Func<Tank, ITankHurtContext, int>? ExtraArmorDamage;
     public virtual void Damage(ITankHurtContext context, bool netSend, Color? colorOverride = null) {
         if (IsDestroyed || Properties.Immortal)
             return;
@@ -569,8 +571,12 @@ public abstract class Tank {
         bool willDestroy = true;
 
         // this method returns 0 if Armor is null
-        if (Properties.SafeGetArmorHitPoints() > 0) {
-            Properties.Armor!.HitPoints--;
+        int extraHit = Properties.SafeGetArmorHitPoints() > 0 ? ExtraArmorDamage?.Invoke(this, context) ?? 0 : 0;
+        if (Properties.SafeGetArmorHitPoints() > 0 && Properties.Armor!.HitPoints - 1 - extraHit < 0) {
+            Properties.Armor.HitPoints = 0; // the extra damage finishes it
+        }
+        else if (Properties.SafeGetArmorHitPoints() > 0) {
+            Properties.Armor!.HitPoints -= 1 + extraHit;
             var ding = SoundPlayer.PlaySoundInstance(
                 $"Assets/sounds/armor_ding_{Client.ClientRandom.Next(1, 3)}.ogg", SoundContext.Effect);
 

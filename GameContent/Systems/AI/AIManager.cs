@@ -967,6 +967,7 @@ public static class AIManager {
         for (var i = 0; i < aiTanks.Length; i++) {
             var tank = Unsafe.Add(ref tanksSearchSpace, i);
             if (tank is null || tank.IsDestroyed) continue;
+            if (AITank.IsFrozen?.Invoke(tank) == true) continue; // Tank Troves Stopwatch
 
             tank.DoAI();
 

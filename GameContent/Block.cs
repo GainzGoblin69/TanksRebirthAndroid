@@ -221,6 +221,9 @@ public class Block : IGameObject
         if (Properties.IsCollidable) {
             Physics = Tank.CollisionsWorld.CreateRectangle(SIDE_LENGTH / Tank.UNITS_PER_METER, SIDE_LENGTH / Tank.UNITS_PER_METER, 1f, position / Tank.UNITS_PER_METER, 0f, BodyType.Static);
             Physics.Tag = this;
+            // breakable blocks are their own collision group (Tank Troves' Ghost Treads drive through them)
+            if (Properties.IsDestructible)
+                Physics.SetCollisionCategories(Category.Cat2);
         }
         else
             Position = position;

@@ -29,6 +29,8 @@ public class Explosion : IAITankDanger {
     public const int MINE_EXPLOSIONS_MAX = 80;
 
     public static Explosion[] Explosions = new Explosion[MINE_EXPLOSIONS_MAX];
+    /// <summary>Doesn't hurt the tank that caused it (Tank Troves items).</summary>
+    public bool SparesOwner;
     public Vector2 Position { get; set; }
     public bool IsPlayerSourced { get; set; }
     /// <summary>
@@ -143,7 +145,8 @@ public class Explosion : IAITankDanger {
             }
             foreach (var tank in GameHandler.AllTanks) {
                 if (tank is null || Vector2.Distance(tank.Position, Position) > Scale * MAGIC_EXPLOSION_NUMBER
-                    || tank.IsDestroyed || HasHit[tank.WorldId] || tank.Properties.InvulnerableToMines)
+                    || tank.IsDestroyed || HasHit[tank.WorldId] || tank.Properties.InvulnerableToMines
+                    || (SparesOwner && ReferenceEquals(tank, Owner)))
                     continue;
                 HasHit[tank.WorldId] = true;
                 if (Owner is null)

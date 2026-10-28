@@ -317,6 +317,13 @@ public class PlayerTank : Tank {
         base.Remove(nullifyMe);
     }
     public override void Shoot(bool fxOnly, bool netSend = true) {
+        // Tank Troves: every shell this shot makes gets this player's items (whatever the shot was)
+        var before = Systems.Troves.TroveRun.Active ? Systems.Troves.TroveItems.MyShells(this) : null;
+        ShootInner(fxOnly, netSend);
+        if (before is not null)
+            Systems.Troves.TroveItems.AfterShot(this, before);
+    }
+    private void ShootInner(bool fxOnly, bool netSend) {
         PlayerStatistics.ShellsShot++;
         // Gears of War missile upgrade: this shot is a missile
         if (MissileUpgrade.ShotsLeft(PlayerId) > 0) {
@@ -345,17 +352,19 @@ public class PlayerTank : Tank {
         PlayerStatistics.MinesLaid++;
         int before = OwnedMineCount;
         base.LayMine();
-        if (OwnedMineCount > before && !Client.IsConnected() && Systems.Troves.TroveItems.HasDetonator(this))
+        if (OwnedMineCount > before)
             foreach (var m in Mine.AllMines)
                 if (m is not null && ReferenceEquals(m.Owner, this) && m.DetonateTime >= m.DetonateTimeMax - 1)
-                    m.DetonateTime *= 2.5f; // waits for you to set it off
+                    Systems.Troves.TroveItems.AfterMine(this, m);
     }
     /// <summary>A slow bomb that slides along the floor the way the turret points, and explodes when it hits something.</summary>
     private void FireSliderBomb() {
         CurMineCooldown = Properties.MineCooldown;
         var dir = Vector2.UnitY.Rotate(TurretRotation);
         var shell = new Shell(TurretPosition, new Vector2(-dir.X, dir.Y) * Properties.ShellSpeed * 0.7f, ShellID.Explosive, this, 0) {
-            IsSliderBomb = true
+            IsSliderBomb = true,
+            ExplodeScale = 9f * Systems.Troves.TroveItems.BlastSize(PlayerId),
+            SparesOwner = Systems.Troves.TroveItems.BlastProof(PlayerId),
         };
         if (NetPlay.IsClientMatched(PlayerId))
             Client.SyncShellFire(shell);

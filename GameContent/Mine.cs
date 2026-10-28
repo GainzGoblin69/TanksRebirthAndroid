@@ -71,6 +71,8 @@ public sealed class Mine : IAITankDanger {
     public bool IsNearDestructibles { get; private set; }
 
     public float MineScale = 1f;
+    /// <summary>Its explosion doesn't hurt its owner (Tank Troves' Blast Proof synergy).</summary>
+    public bool SparesOwner;
     /// <summary>The radius of this <see cref="Mine"/>'s explosion.</summary>
     public float ExplosionRadius;
     public float ExplosionRadiusInUnits => ExplosionRadius * 65f;
@@ -132,7 +134,7 @@ public sealed class Mine : IAITankDanger {
     public void Detonate() {
         Detonated = true;
         var scale = ExplosionRadiusInUnits * 0.101f * (Difficulties.Types["UltraMines"] ? 2 : 1);
-        var expl = new Explosion(Position, scale, Owner);
+        var expl = new Explosion(Position, scale, Owner) { SparesOwner = SparesOwner };
 
         if (Owner != null)
             Owner.OwnedMineCount--;

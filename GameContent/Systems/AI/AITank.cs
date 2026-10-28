@@ -249,7 +249,11 @@ public partial class AITank : Tank {
     public List<Tank> TanksNearMineAwareness = [];
     public List<Tank> TanksNearShootAwareness = [];
     public List<Block> BlocksNear = [];
+    /// <summary>Set by Tank Troves: true while this tank is frozen (Stopwatch).</summary>
+    public static Func<AITank, bool>? IsFrozen;
     public override void Update() {
+        if (IsFrozen?.Invoke(this) == true)
+            Velocity = Vector2.Zero;
         base.Update();
     }
     public override void PreUpdate() {

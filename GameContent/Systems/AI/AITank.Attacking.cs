@@ -289,8 +289,12 @@ public partial class AITank {
         return target;
     }
     /// <summary>A method that simply changes an AI </summary>
+    /// <summary>Set by Tank Troves: a tank this AI must aim at instead (a Decoy).</summary>
+    public static Func<AITank, Tank?>? TargetOverride;
     public Tank? TryOverrideTarget() {
         Tank? target = TargetTank;
+        if (TargetOverride?.Invoke(this) is { } forced)
+            return forced;
         if (GameHandler.AllPlayerTanks.Any(x => x is not null && x.IsOnSameTeamAs(Team))) {
             foreach (var ping in IngamePing.AllIngamePings) {
                 if (ping is null) break;

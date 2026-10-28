@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using FontStashSharp;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -16,7 +18,7 @@ namespace TanksRebirth.GameContent.UI;
 
 /// <summary>Tank Troves on screen: the mouse-hole doors, the minimap, the floor name, room fades and the end screen.</summary>
 public static class TroveHud {
-    private static Texture2D? _hole, _holeLocked, _holeBoss, _holeItem;
+    private static Texture2D? _hole, _holeLocked, _holeBoss, _holeItem, _holeChallenge, _holeSecret;
     private static Vector2 _press = new(-1);
     private static bool _down, _wasDown;
 
@@ -35,9 +37,11 @@ public static class TroveHud {
         // not while the floor banner (intermission) is up
         bool banner = IntermissionSystem.Alpha > 0.05f || IntermissionSystem.BlackAlpha > 0.05f;
         if (!banner && TroveRun.Floor is { } floor && TroveRun.Fade < 1f) {
+            DrawInRoom(sb);
             DrawMap(sb, floor);
             DrawBossBar(sb);
             DrawPickupBanner(sb);
+            DrawSynergyBanner(sb);
         }
         if (TroveRun.Fade > 0)
             sb.Draw(TextureGlobals.Pixels[Color.White], new Rectangle(0, 0, WindowUtils.WindowWidth, WindowUtils.WindowHeight), Color.Black * TroveRun.Fade);
@@ -57,50 +61,109 @@ public static class TroveHud {
             return;
         EnsureTextures(sb.GraphicsDevice);
         DrawDoors(sb, floor, room);
+    }
+
+    // ---- things in the room: the item on the floor, orbiters, buddy/decoy tags, the Stopwatch freeze
+    private static void DrawInRoom(SpriteBatch sb) {
+        if (TroveRun.Room is not { } room || !CampaignGlobals.InMission)
+            return;
+        float s = S;
+        if (TroveItems.Frozen) {
+            sb.Draw(TextureGlobals.Pixels[Color.White], new Rectangle(0, 0, WindowUtils.WindowWidth, WindowUtils.WindowHeight), new Color(120, 200, 255) * 0.14f);
+            Text(sb, $"FROZEN  {Math.Ceiling(TroveItems.FrozenUntil - TroveRun.PlayTime)}", new Vector2(WindowUtils.WindowWidth / 2f, 120 * s), 0.8f * s, new Color(190, 235, 255), border: true);
+        }
+        for (int i = 0; i < 4; i++)
+            foreach (var (pos, r) in TroveItems.Orbiters(i)) {
+                var c = ToScreen(pos);
+                float rr = Math.Max(5f, Vector2.Distance(c, ToScreen(pos + new Vector2(r, 0))));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, rr * 0.3f), rr * 1.05f, Color.Black * 0.3f);
+                ToggleSwitch.DrawDisc(sb, c, rr, new Color(200, 210, 230));
+                ToggleSwitch.DrawDisc(sb, c - new Vector2(rr * 0.25f), rr * 0.4f, Color.White);
+            }
+        for (int i = 0; i < 4; i++)
+            if (TroveItems.Buddies[i] is { IsDestroyed: false } b)
+                Text(sb, "BUDDY", ToScreen(b.Position) - new Vector2(0, 46 * s), 0.42f * s, new Color(150, 210, 255), border: true);
+        if (TroveItems.DecoyTank is { IsDestroyed: false } d)
+            Text(sb, "DECOY", ToScreen(d.Position) - new Vector2(0, 52 * s), 0.5f * s, new Color(255, 220, 140), border: true);
         if (room.PickupVisible)
             DrawPedestal(sb, room);
     }
 
-    // ---- an item in the middle of the room (on a stone pedestal in item rooms)
+    /// <summary>Splits text into lines no wider than maxWidth at this scale.</summary>
+    private static List<string> Wrap(string text, float scale, float maxWidth) {
+        var font = FontGlobals.RebirthFont;
+        var lines = new List<string>();
+        string line = "";
+        foreach (var word in text.Split(' ')) {
+            string tryLine = line.Length == 0 ? word : line + " " + word;
+            if (line.Length > 0 && font.MeasureString(tryLine).X * scale > maxWidth) {
+                lines.Add(line);
+                line = word;
+            }
+            else
+                line = tryLine;
+        }
+        if (line.Length > 0)
+            lines.Add(line);
+        return lines;
+    }
+
+    // ---- an item in the middle of the room (on a stone pedestal in item and secret rooms), with what it does above it
     private static void DrawPedestal(SpriteBatch sb, TroveRoom room) {
         var c = ToScreen(TroveRun.PickupPoint);
         var edge = ToScreen(TroveRun.PickupPoint + new Vector2(Block.SIDE_LENGTH * 0.8f, 0));
         float r = Math.Max(14f, Vector2.Distance(c, edge));
         float bob = MathF.Sin((float)TroveRun.PlayTime * 3f) * r * 0.12f;
-        if (room.Kind == TroveRoomKind.Item) {
-            DiscPM(sb, c + new Vector2(0, r * 0.25f), r * 1.15f, new Color(0, 0, 0) * 0.35f);
-            DiscPM(sb, c, r * 1.05f, new Color(110, 104, 98));
-            DiscPM(sb, c, r * 0.85f, new Color(150, 144, 136));
+        if (room.Kind is TroveRoomKind.Item or TroveRoomKind.Secret) {
+            ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.25f), r * 1.15f, Color.Black * 0.35f);
+            ToggleSwitch.DrawDisc(sb, c, r * 1.05f, new Color(110, 104, 98));
+            ToggleSwitch.DrawDisc(sb, c, r * 0.85f, new Color(150, 144, 136));
         }
         else
-            DiscPM(sb, c + new Vector2(0, r * 0.2f), r * 0.8f, new Color(0, 0, 0) * 0.3f);
-        // glow
-        DiscPM(sb, c - new Vector2(0, r * 0.9f + bob), r * 1.0f, new Color(255, 220, 120) * 0.25f);
-        DrawItemIcon(sb, room.Pickup!.Value, c - new Vector2(0, r * 0.9f + bob), r * 0.75f, premultiplied: true);
+            ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.2f), r * 0.8f, Color.Black * 0.3f);
+        var iconAt = c - new Vector2(0, r * 0.9f + bob);
+        ToggleSwitch.DrawDisc(sb, iconAt, r * 1.15f, new Color(255, 220, 120) * 0.3f); // glow
+        DrawItemIcon(sb, room.Pickup!.Value, iconAt, r * 0.8f);
 
-        // what it does, floating above it (so you can decide before picking it up)
+        // the label: name, what it does, how it works, and any synergy it would switch on for you
         var def = TroveItems.Def(room.Pickup.Value);
         float s = S;
-        var font = FontGlobals.RebirthFont;
         string kind = def.Kind switch {
-            TroveItemKind.Active => "ITEM button",
-            TroveItemKind.Passive => TroveItems.Stacks(def.Id) ? "whole run, stacks" : "whole run",
-            _ => "right away",
+            TroveItemKind.Active => def.Recharge > 0 ? $"ITEM button  -  recharges every {def.Recharge} room{(def.Recharge > 1 ? "s" : "")}" : "ITEM button  -  one use",
+            TroveItemKind.Passive => TroveItems.Stacks(def.Id) ? "Lasts the whole run  -  stacks" : "Lasts the whole run",
+            _ => "Takes effect right away",
         };
-        string desc = def.Description.Replace("ITEM button: ", "").Replace(" (whole run)", "");
-        desc = char.ToUpperInvariant(desc[0]) + desc[1..];
-        float nameScale = 0.62f * s, descScale = 0.42f * s;
-        float w = Math.Max(font.MeasureString(def.Name).X * nameScale, font.MeasureString(desc).X * descScale) + 36 * s;
-        float h = 92 * s;
-        var mid = c - new Vector2(0, r * 2.4f + h / 2f + bob * 0.5f);
-        // keep it on screen
+        var hint = TroveItems.SynergyHint(Net.NetPlay.GetMyClientId(), def.Id);
+        float nameScale = 0.95f * s, descScale = 0.62f * s, kindScale = 0.5f * s;
+        float maxW = 820 * s;
+        var descLines = Wrap(def.Description, descScale, maxW);
+        var font = FontGlobals.RebirthFont;
+        float lineH = font.MeasureString("Ag").Y;
+        float w = Math.Max(font.MeasureString(def.Name).X * nameScale, descLines.Max(l => font.MeasureString(l).X) * descScale);
+        w = Math.Max(w, font.MeasureString(kind).X * kindScale);
+        if (hint is not null)
+            w = Math.Max(w, font.MeasureString($"Synergy: {hint.Name}!").X * kindScale * 1.1f);
+        w += 56 * s;
+        float h = lineH * nameScale + descLines.Count * lineH * descScale * 1.05f + lineH * kindScale * 1.2f + (hint is not null ? lineH * kindScale * 1.3f : 0) + 40 * s;
+        var mid = c - new Vector2(0, r * 2.6f + h / 2f + bob * 0.5f);
         mid.X = Math.Clamp(mid.X, w / 2f + 8, WindowUtils.WindowWidth - w / 2f - 8);
         mid.Y = Math.Max(mid.Y, h / 2f + 8);
         var box = new Rectangle((int)(mid.X - w / 2f), (int)(mid.Y - h / 2f), (int)w, (int)h);
-        ToggleSwitch.DrawRoundedRect(sb, box, 16 * s, new Color(20, 14, 10) * 0.78f);
-        Text(sb, def.Name, new Vector2(mid.X, box.Y + 24 * s), nameScale, Color.Lerp(def.Color, Color.White, 0.35f), border: true);
-        Text(sb, desc, new Vector2(mid.X, box.Y + 54 * s), descScale, Color.White);
-        Text(sb, kind, new Vector2(mid.X, box.Y + 76 * s), 0.34f * s, new Color(200, 190, 170));
+        ToggleSwitch.DrawRoundedRect(sb, new Rectangle(box.X - 3, box.Y - 3, box.Width + 6, box.Height + 6), 18 * s, Color.Lerp(def.Color, Color.Black, 0.25f));
+        ToggleSwitch.DrawRoundedRect(sb, box, 16 * s, new Color(30, 22, 16));
+        float y = box.Y + 20 * s + lineH * nameScale / 2f;
+        Text(sb, def.Name, new Vector2(mid.X, y), nameScale, Color.Lerp(def.Color, Color.White, 0.45f), border: true);
+        y += lineH * nameScale / 2f + lineH * descScale * 0.6f;
+        foreach (var l in descLines) {
+            Text(sb, l, new Vector2(mid.X, y), descScale, Color.White);
+            y += lineH * descScale * 1.05f;
+        }
+        y += lineH * kindScale * 0.15f;
+        Text(sb, kind, new Vector2(mid.X, y), kindScale, new Color(205, 195, 175));
+        if (hint is not null) {
+            y += lineH * kindScale * 1.3f;
+            Text(sb, $"Synergy: {hint.Name}!", new Vector2(mid.X, y), kindScale * 1.1f, new Color(255, 215, 80), border: true);
+        }
     }
 
     // discs inside the game's HUD batch (premultiplied alpha)
@@ -185,6 +248,133 @@ public static class TroveHud {
                 ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.3f, -r * 0.5f), c + new Vector2(r * 0.3f, -r * 0.5f), t * 1.2f, w);
                 break;
             }
+            case TroveItemId.BigMines:
+                ToggleSwitch.DrawDisc(sb, c, r * 0.62f, new Color(240, 210, 60));
+                ToggleSwitch.DrawDisc(sb, c, r * 0.3f, new Color(210, 40, 30));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.45f, -r * 0.45f), c + new Vector2(r * 0.75f, -r * 0.75f), t * 0.7f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.45f, r * 0.45f), c + new Vector2(-r * 0.75f, r * 0.75f), t * 0.7f, w);
+                break;
+            case TroveItemId.TripleShot:
+                foreach (float ang in new[] { -0.45f, 0f, 0.45f }) {
+                    var dir = new Vector2(MathF.Sin(ang), -MathF.Cos(ang));
+                    ToggleSwitch.DrawLine(sb, c + dir * r * 0.05f, c + dir * r * 0.6f, r * 0.18f, w);
+                }
+                break;
+            case TroveItemId.QuickReload:
+                foreach (float dx in new[] { -0.25f, 0.15f }) {
+                    ToggleSwitch.DrawLine(sb, c + new Vector2((dx - 0.12f) * r, -r * 0.35f), c + new Vector2((dx + 0.18f) * r, 0), t, w);
+                    ToggleSwitch.DrawLine(sb, c + new Vector2((dx + 0.18f) * r, 0), c + new Vector2((dx - 0.12f) * r, r * 0.35f), t, w);
+                }
+                break;
+            case TroveItemId.OrbitGuard:
+                ToggleSwitch.DrawDisc(sb, c, r * 0.3f, new Color(60, 70, 90));
+                for (int i = 0; i < 3; i++) {
+                    float a = i * MathHelper.TwoPi / 3f + 0.4f;
+                    ToggleSwitch.DrawDisc(sb, c + new Vector2(MathF.Cos(a), MathF.Sin(a)) * r * 0.55f, r * 0.15f, w);
+                }
+                break;
+            case TroveItemId.TreasureMap: {
+                var box = new Rectangle((int)(c.X - r * 0.5f), (int)(c.Y - r * 0.38f), (int)(r * 1.0f), (int)(r * 0.76f));
+                ToggleSwitch.DrawRoundedRect(sb, box, r * 0.06f, new Color(240, 220, 170));
+                var red = new Color(200, 40, 30);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.05f, -r * 0.15f), c + new Vector2(r * 0.3f, r * 0.15f), t * 0.7f, red);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.3f, -r * 0.15f), c + new Vector2(r * 0.05f, r * 0.15f), t * 0.7f, red);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.35f, r * 0.2f), c + new Vector2(-r * 0.05f, r * 0.0f), t * 0.4f, new Color(120, 90, 50));
+                break;
+            }
+            case TroveItemId.BuddyTank: {
+                var body = new Rectangle((int)(c.X - r * 0.45f), (int)(c.Y - r * 0.1f), (int)(r * 0.9f), (int)(r * 0.45f));
+                ToggleSwitch.DrawRoundedRect(sb, body, r * 0.08f, w);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, -r * 0.12f), r * 0.22f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(0, -r * 0.12f), c + new Vector2(r * 0.55f, -r * 0.35f), t * 0.8f, w);
+                break;
+            }
+            case TroveItemId.HeavyShells:
+                ToggleSwitch.DrawLine(sb, c + new Vector2(0, r * 0.45f), c + new Vector2(0, -r * 0.2f), r * 0.5f, new Color(60, 55, 50));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, -r * 0.22f), r * 0.25f, new Color(60, 55, 50));
+                break;
+            case TroveItemId.ExplosiveShells:
+                for (int i = 0; i < 8; i++) {
+                    float a = i * MathHelper.TwoPi / 8f;
+                    var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
+                    ToggleSwitch.DrawLine(sb, c + dir * r * 0.25f, c + dir * r * (i % 2 == 0 ? 0.68f : 0.5f), t * 0.8f, new Color(255, 230, 120));
+                }
+                ToggleSwitch.DrawDisc(sb, c, r * 0.25f, w);
+                break;
+            case TroveItemId.GhostTreads: {
+                var ghost = new Color(255, 255, 255, 170);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, -r * 0.12f), r * 0.38f, ghost);
+                var body = new Rectangle((int)(c.X - r * 0.38f), (int)(c.Y - r * 0.12f), (int)(r * 0.76f), (int)(r * 0.5f));
+                ToggleSwitch.DrawRoundedRect(sb, body, r * 0.05f, ghost);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.13f, -r * 0.15f), r * 0.07f, new Color(40, 40, 60));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.13f, -r * 0.15f), r * 0.07f, new Color(40, 40, 60));
+                break;
+            }
+            case TroveItemId.ShellShield: {
+                var top = c + new Vector2(0, -r * 0.55f);
+                var l = c + new Vector2(-r * 0.45f, -r * 0.35f);
+                var rr = c + new Vector2(r * 0.45f, -r * 0.35f);
+                var bot = c + new Vector2(0, r * 0.6f);
+                ToggleSwitch.DrawLine(sb, top, l, t, w);
+                ToggleSwitch.DrawLine(sb, top, rr, t, w);
+                ToggleSwitch.DrawLine(sb, l, bot, t, w);
+                ToggleSwitch.DrawLine(sb, rr, bot, t, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(0, r * 0.25f), c + new Vector2(0, -r * 0.2f), r * 0.16f, w);
+                break;
+            }
+            case TroveItemId.BossHunter: {
+                var red = new Color(255, 230, 230);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.5f, red);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.38f, def.Color);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.1f, red);
+                ToggleSwitch.DrawLine(sb, c - new Vector2(r * 0.72f, 0), c - new Vector2(r * 0.3f, 0), t * 0.7f, red);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.72f, 0), c + new Vector2(r * 0.3f, 0), t * 0.7f, red);
+                ToggleSwitch.DrawLine(sb, c - new Vector2(0, r * 0.72f), c - new Vector2(0, r * 0.3f), t * 0.7f, red);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(0, r * 0.72f), c + new Vector2(0, r * 0.3f), t * 0.7f, red);
+                break;
+            }
+            case TroveItemId.Stopwatch:
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.05f), r * 0.52f, w);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, -r * 0.55f), r * 0.1f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(0, r * 0.05f), c + new Vector2(0, -r * 0.3f), t * 0.7f, new Color(40, 50, 60));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(0, r * 0.05f), c + new Vector2(r * 0.25f, r * 0.12f), t * 0.7f, new Color(40, 50, 60));
+                break;
+            case TroveItemId.ShellBurst:
+                for (int i = 0; i < 8; i++) {
+                    float a = i * MathHelper.TwoPi / 8f;
+                    var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
+                    ToggleSwitch.DrawLine(sb, c + dir * r * 0.3f, c + dir * r * 0.65f, r * 0.13f, w);
+                }
+                break;
+            case TroveItemId.Nuke: {
+                var dark = new Color(40, 30, 20);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.16f, dark);
+                for (int i = 0; i < 3; i++) {
+                    float a = i * MathHelper.TwoPi / 3f - MathHelper.PiOver2;
+                    var dir = new Vector2(MathF.Cos(a), MathF.Sin(a));
+                    ToggleSwitch.DrawLine(sb, c + dir * r * 0.28f, c + dir * r * 0.62f, r * 0.32f, dark);
+                }
+                break;
+            }
+            case TroveItemId.Decoy:
+                ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(c.X - r * 0.45f), (int)(c.Y - r * 0.05f), (int)(r * 0.9f), (int)(r * 0.42f)), r * 0.08f, new Color(240, 220, 190));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, -r * 0.08f), r * 0.2f, new Color(240, 220, 190));
+                Text(sb, "?", c + new Vector2(0, -r * 0.48f), r * 0.02f, w, border: true);
+                break;
+            case TroveItemId.Invincibility:
+                for (int i = 0; i < 5; i++) {
+                    float a1 = i * MathHelper.TwoPi / 5f - MathHelper.PiOver2, a2 = (i + 2) * MathHelper.TwoPi / 5f - MathHelper.PiOver2;
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(MathF.Cos(a1), MathF.Sin(a1)) * r * 0.6f, c + new Vector2(MathF.Cos(a2), MathF.Sin(a2)) * r * 0.6f, t, w);
+                }
+                break;
+            case TroveItemId.Reroll: {
+                var box = new Rectangle((int)(c.X - r * 0.45f), (int)(c.Y - r * 0.45f), (int)(r * 0.9f), (int)(r * 0.9f));
+                ToggleSwitch.DrawRoundedRect(sb, box, r * 0.15f, w);
+                var pip = new Color(40, 40, 50);
+                foreach (var o in new[] { new Vector2(-0.22f, -0.22f), new Vector2(0.22f, 0.22f), Vector2.Zero, new Vector2(0.22f, -0.22f), new Vector2(-0.22f, 0.22f) })
+                    ToggleSwitch.DrawDisc(sb, c + o * r, r * 0.08f, pip);
+                break;
+            }
             case TroveItemId.BlockBust: {
                 // a cracked block
                 var box = new Rectangle((int)(c.X - r * 0.45f), (int)(c.Y - r * 0.45f), (int)(r * 0.9f), (int)(r * 0.9f));
@@ -215,7 +405,9 @@ public static class TroveHud {
             var s = TroveGen.Step(d);
             var neighbor = floor.Rooms[new Point(room.Cell.X + s.X, room.Cell.Y + s.Y)];
             var tex = !room.Cleared ? _holeLocked! : neighbor.Kind == TroveRoomKind.Boss ? _holeBoss!
-                : neighbor.Kind == TroveRoomKind.Item && neighbor.Seen ? _holeItem! : _hole!;
+                : neighbor.Kind == TroveRoomKind.Item && neighbor.Seen ? _holeItem!
+                : neighbor.Kind == TroveRoomKind.Challenge && neighbor.Seen ? _holeChallenge!
+                : neighbor.Kind == TroveRoomKind.Secret ? _holeSecret! : _hole!;
             float rot = MathF.Atan2(outward.Y, outward.X) + MathHelper.PiOver2;
             float scale = width / tex.Width;
             sb.Draw(tex, screen, null, Color.White, rot, new Vector2(tex.Width / 2f, tex.Height), scale, SpriteEffects.None, 0f);
@@ -248,14 +440,17 @@ public static class TroveHud {
             var rect = new Rectangle((int)(panel.X + gap + cx * (cell * 1.3f + gap)), (int)(panel.Y + gap + cy * (cell + gap)), (int)(cell * 1.3f), (int)cell);
             bool here = r.Cell == TroveRun.Current;
             var col = here ? Color.White : r.Kind == TroveRoomKind.Boss ? new Color(190, 40, 30)
-                : r.Kind == TroveRoomKind.Item ? new Color(220, 175, 40) : r.Visited ? new Color(180, 170, 150) : new Color(95, 85, 75);
+                : r.Kind == TroveRoomKind.Item ? new Color(220, 175, 40) : r.Kind == TroveRoomKind.Challenge ? new Color(140, 60, 170)
+                : r.Kind == TroveRoomKind.Secret ? new Color(120, 120, 135) : r.Visited ? new Color(180, 170, 150) : new Color(95, 85, 75);
             ToggleSwitch.DrawRoundedRect(sb, rect, 5 * s, col);
             if (here)
                 ToggleSwitch.DrawDisc(sb, rect.Center.ToVector2(), cell * 0.25f, new Color(40, 120, 230));
             else if (r.Kind == TroveRoomKind.Boss)
                 Text(sb, "!", rect.Center.ToVector2(), 0.8f * s, new Color(255, 230, 200));
-            else if (r.Kind == TroveRoomKind.Item && r.PickupVisible)
-                Text(sb, "$", rect.Center.ToVector2(), 0.7f * s, new Color(110, 70, 10));
+            else if (r.Kind is TroveRoomKind.Item or TroveRoomKind.Secret && r.PickupVisible)
+                Text(sb, r.Kind == TroveRoomKind.Secret && !floor.SecretFound ? "?" : "$", rect.Center.ToVector2(), 0.7f * s, new Color(60, 40, 10));
+            else if (r.Kind == TroveRoomKind.Challenge && !r.Cleared)
+                Text(sb, "X", rect.Center.ToVector2(), 0.6f * s, new Color(255, 220, 255));
         }
         var nameAt = new Vector2(panel.Center.X, panel.Bottom + 28 * s);
         Text(sb, $"Floor {floor.Number}: {floor.Name}", nameAt, 0.75f * s, Color.White, border: true);
@@ -273,8 +468,44 @@ public static class TroveHud {
         }
         if (mine.Shields > 0) {
             DrawItemIcon(sb, TroveItemId.Shield, new Vector2(x, y), ir);
-            Text(sb, $"x{mine.Shields}", new Vector2(x + ir * 1.6f, y), 0.55f * s, Color.White, border: true);
+            Text(sb, $"x{mine.Shields}", new Vector2(x + ir * 0.75f, y + ir * 0.8f), 0.5f * s, Color.White, border: true);
+            x += ir * 2.4f;
         }
+        // the ITEM slot, with its charge
+        if (mine.Active is { } act) {
+            var at = new Vector2(x + ir * 0.3f, y);
+            ToggleSwitch.DrawDisc(sb, at, ir * 1.3f, mine.ActiveReady ? new Color(255, 230, 120) : new Color(70, 60, 50));
+            DrawItemIcon(sb, act, at, ir);
+            int max = TroveItems.Def(act).Recharge;
+            if (max > 0 && !mine.ActiveReady)
+                Text(sb, $"{mine.Charge}/{max}", at + new Vector2(0, ir * 1.1f), 0.45f * s, Color.White, border: true);
+        }
+        // synergies you have
+        float sy = y + ir * 2.1f;
+        foreach (var syn in TroveItems.Synergies)
+            if (mine.Has(syn)) {
+                var font = FontGlobals.RebirthFont;
+                var t = "* " + syn.Name;
+                sb.DrawString(font, t, new Vector2(panel.X + 2, sy) + new Vector2(2), Color.Black * 0.7f, new Vector2(0.42f * s), 0f, Vector2.Zero);
+                sb.DrawString(font, t, new Vector2(panel.X + 2, sy), new Color(255, 215, 80), new Vector2(0.42f * s), 0f, Vector2.Zero);
+                sy += font.MeasureString(t).Y * 0.42f * s * 1.1f;
+            }
+    }
+
+    // ---- "SYNERGY!" for a few seconds after two items click
+    private static void DrawSynergyBanner(SpriteBatch sb) {
+        if (TroveItems.LastSynergy is not { } ls)
+            return;
+        double age = TroveRun.PlayTime - ls.Time;
+        if (age < 0.6 || age > 5)
+            return;
+        float s = S;
+        float a = (float)Math.Clamp(Math.Min((age - 0.6) * 4, (5 - age) * 2), 0, 1);
+        var c = new Vector2(WindowUtils.WindowWidth / 2f, (TroveRun.BossTank is { IsDestroyed: false } ? 160 : 110) * s + 150 * s);
+        var box = new Rectangle((int)(c.X - 430 * s), (int)(c.Y - 50 * s), (int)(860 * s), (int)(100 * s));
+        ToggleSwitch.DrawRoundedRect(sb, box, 22 * s, new Color(60, 30, 90) * (0.95f * a));
+        Text(sb, $"SYNERGY!  {ls.Synergy.Name.ToUpperInvariant()}", new Vector2(c.X, box.Y + 32 * s), 0.85f * s, new Color(255, 215, 80) * a, border: true);
+        Text(sb, ls.Synergy.Description, new Vector2(c.X, box.Y + 74 * s), 0.55f * s, Color.White * a);
     }
 
     // ---- the boss's health, across the top of the screen
@@ -391,6 +622,8 @@ public static class TroveHud {
         _holeLocked = MakeHole(gd, new Color(120, 96, 70), true);
         _holeBoss = MakeHole(gd, new Color(170, 34, 26), false);
         _holeItem = MakeHole(gd, new Color(220, 175, 40), false);
+        _holeChallenge = MakeHole(gd, new Color(140, 50, 170), false);
+        _holeSecret = MakeHole(gd, new Color(120, 120, 130), false);
     }
 
     private static Texture2D MakeHole(GraphicsDevice gd, Color rim, bool bars) {

@@ -24,7 +24,8 @@ public static class TroveRun {
 
     public enum EndKind { None, RunOver, Victory }
     // multiplayer events (host -> everyone)
-    public const int EV_START = 1, EV_MOVE = 2, EV_RETRY = 3, EV_NEXT_FLOOR = 4, EV_RUN_OVER = 5, EV_VICTORY = 6, EV_MENU = 7, EV_ITEM = 8, EV_BLOCK_BUST = 9;
+    public const int EV_START = 1, EV_MOVE = 2, EV_RETRY = 3, EV_NEXT_FLOOR = 4, EV_RUN_OVER = 5, EV_VICTORY = 6, EV_MENU = 7, EV_ITEM = 8, EV_BLOCK_BUST = 9,
+        EV_REROLL = 10, EV_SECRET = 11, EV_WAVE2 = 12, EV_STOPWATCH = 13, EV_NUKE = 14, EV_DECOY = 15, EV_INVINCIBLE = 16;
     /// <summary>How close (game units) a tank has to get to an item to pick it up.</summary>
     public const float PICKUP_REACH = 26f;
     public static Vector2 PickupPoint => new Coordinates.BlockMapPosition(10, 8);
@@ -103,11 +104,13 @@ public static class TroveRun {
         LevelProgress.CurrentCampaignKey = "TankTroves";
         MissileUpgrade.Reset();
         TroveItems.Reset();
+        TestSetup();
+        RevealMap();
         BossTank = null;
         if (!_hooked) {
             _hooked = true;
             // a floor's first room is set up by the campaign's own sequence: give the players their items then
-            CampaignGlobals.OnMissionStart += () => { if (Active) ApplyItems(); };
+            CampaignGlobals.OnMissionStart += () => { if (Active) { ApplyItems(); TroveItems.SpawnBuddies(); } };
             // the new floor's colour appears when its first room is set up (behind the floor banner), not when the boss falls
             Campaign.OnMissionLoad += (_, _) => { if (Active) SetFloorTint(); };
         }
@@ -139,6 +142,78 @@ public static class TroveRun {
         Ended = EndKind.None;
         Fade = 0;
         _fadeDir = 0;
+    }
+
+    /// <summary>
+    /// For automated testing only: if "troves_test.txt" is in the save folder, player 1 starts with the items it lists
+    /// (one line: names separated by spaces) and the second line names an item to put on the floor of the first room.
+    /// </summary>
+    private static void TestSetup() {
+        try {
+            var path = System.IO.Path.Combine(TankGame.SaveDirectory, "troves_test.txt");
+            if (!System.IO.File.Exists(path) || Floor is null)
+                return;
+            var lines = System.IO.File.ReadAllLines(path);
+            foreach (var name in lines.ElementAtOrDefault(0)?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [])
+                if (Enum.TryParse<TroveItemId>(name, out var id))
+                    TroveItems.Give(0, id);
+            if (Enum.TryParse<TroveItemId>(lines.ElementAtOrDefault(1)?.Trim(), out var floorItem))
+                Floor.Rooms[Floor.Start].Pickup = floorItem;
+            TroveItems.LastPickup = null;
+            TankGame.ClientLog.Write($"Troves: test setup from {path}", Internals.LogType.Info);
+        }
+        catch (Exception e) {
+            TankGame.ClientLog.Write($"Troves: test setup failed: {e.Message}", Internals.LogType.Warn);
+        }
+    }
+
+    /// <summary>Treasure Map: every room of the floor shows on the minimap (the secret one too, marked "?").</summary>
+    public static void RevealMap() {
+        if (Floor is null || !TroveItems.Players.Any(p => p.Has(TroveItemId.TreasureMap)))
+            return;
+        foreach (var r in Floor.Rooms.Values)
+            r.Seen = true;
+    }
+
+    /// <summary>Reroll: a different item on this room's floor.</summary>
+    public static void SetPickup(TroveItemId id) {
+        if (Room is not { } room)
+            return;
+        room.Pickup = id;
+        room.PickupTaken = false;
+        GameHandler.Particles.MakeShineSpot(new Vector3(PickupPoint.X, 12, PickupPoint.Y), Color.White, 1.5f);
+    }
+
+    /// <summary>The secret room's doorway is open now.</summary>
+    private static void RevealSecret() {
+        if (Floor is null || Floor.SecretFound || Floor.Secret is not { } sp)
+            return;
+        Floor.SecretFound = true;
+        Floor.Rooms[sp].Seen = true;
+        // the cork walls in front of it stay gone (also when you come back to those rooms)
+        foreach (var r in Floor.Rooms.Values)
+            if (TroveGen.SecretDoor(Floor, r) is { } d)
+                r.Blocks.RemoveAll(b => TroveGen.InCrack(b.X, b.Y, d));
+        SoundPlayer.PlaySoundInstance("Assets/music/fanfares/life_get.ogg", SoundContext.Effect, 0.6f, pitchOverride: -0.3f);
+        ChatSystem.SendMessage("You found a secret room!", Color.Gold);
+    }
+
+    /// <summary>Challenge rooms: the second wave arrives.</summary>
+    private static void SpawnWave2(TroveRoom room) {
+        if (room.Wave2Spawned)
+            return;
+        room.Wave2Spawned = true;
+        foreach (var e in room.Wave2) {
+            var t = new TankTemplate {
+                IsPlayer = false, AiTier = e.Tier, Rotation = e.Rotation, Team = TeamID.Blue,
+                Position = new Coordinates.BlockMapPosition(e.X, e.Y),
+            }.GetAiTank();
+            t.Team = TeamID.Blue;
+            GameHandler.Particles.MakeShineSpot(t.Position3D + new Vector3(0, 10, 0), Color.Red, 1.2f);
+        }
+        _roomTime = 0;
+        SoundPlayer.PlaySoundInstance("Assets/sounds/menu/client_join.ogg", SoundContext.Effect, 0.8f, pitchOverride: -0.5f);
+        ChatSystem.SendMessage("Wave 2!", Color.OrangeRed);
     }
 
     private static void MarkSeen() {
@@ -195,14 +270,39 @@ public static class TroveRun {
         _roomTime += Dt;
 
         // a room is cleared when its enemies are gone
-        bool enemies = GameHandler.AllAITanks.Any(t => t is not null && !t.IsDestroyed);
-        if (!room.Cleared && !enemies && _roomTime > 0.6f && _fadeDir == 0) {
+        bool enemies = GameHandler.AllAITanks.Any(t => t is not null && !t.IsDestroyed && t.Team != TeamID.Red);
+        if (!room.Cleared && !enemies && _roomTime > 0.6f && _fadeDir == 0 && room.Kind == TroveRoomKind.Challenge && !room.Wave2Spawned) {
+            // a challenge room's first wave is down: the host sends in the second
+            if (Authority) {
+                Send(EV_WAVE2);
+                SpawnWave2(room);
+            }
+        }
+        else if (!room.Cleared && !enemies && _roomTime > 0.6f && _fadeDir == 0) {
             room.Cleared = true;
+            TroveItems.OnRoomCleared();
             RoomsCleared++;
-            TanksDestroyed += room.Enemies.Count;
+            TanksDestroyed += room.Enemies.Count + room.Wave2.Count;
             SoundPlayer.PlaySoundInstance("Assets/sounds/menu/client_join.ogg", SoundContext.Effect, 0.8f);
             if (room.Kind == TroveRoomKind.Boss)
                 _bossTimer = 2.5f;
+        }
+
+        // an explosion next to the hidden doorway opens the secret room
+        if (Floor is { SecretFound: false } && TroveGen.SecretDoor(Floor, room) is { } sd) {
+            var door = DoorPoint(sd);
+            // ...or once the cork wall in front of it is shot away
+            bool wallGone = _roomTime > 1f && !Block.AllBlocks.Any(b => b is not null && b.Properties.IsDestructible && Vector2.Distance(b.Position, door) < 60f);
+            if (wallGone) {
+                SendAny(EV_SECRET);
+                RevealSecret();
+            }
+            else foreach (var ex in Explosion.Explosions)
+                if (ex is not null && Vector2.Distance(ex.Position, door) < 80f + ex.Scale * Explosion.MAGIC_EXPLOSION_NUMBER * 0.5f) {
+                    SendAny(EV_SECRET);
+                    RevealSecret();
+                    break;
+                }
         }
 
         if (!Authority || _fadeDir != 0)
@@ -309,10 +409,13 @@ public static class TroveRun {
         _deadTimer = 0;
         MarkSeen();
         ReviveSystem.Clear();
+        if (!room.Cleared)
+            room.Wave2Spawned = false; // a challenge starts over from wave 1
         var mission = TroveGen.BuildMission(Floor, room, entry);
         CampaignGlobals.LoadedCampaign.LoadMission(mission);
         CampaignGlobals.LoadedCampaign.SetupLoadedMission(true);
         ApplyItems();
+        TroveItems.SpawnBuddies();
         // what normally happens when a mission starts (invisible tanks vanish, free-for-all teams)
         foreach (var t in GameHandler.AllTanks)
             if (t is not null && !t.IsDestroyed)
@@ -338,7 +441,7 @@ public static class TroveRun {
         BossTank = null;
         if (TroveGen.BossPosition(room) is not { } pos)
             return;
-        var boss = GameHandler.AllAITanks.Where(t => t is not null && !t.IsDestroyed)
+        var boss = GameHandler.AllAITanks.Where(t => t is not null && !t.IsDestroyed && t.Team != TeamID.Red)
             .OrderBy(t => Vector2.Distance(t!.Position, pos)).FirstOrDefault();
         if (boss is null)
             return;
@@ -359,6 +462,7 @@ public static class TroveRun {
         _entry = null;
         _roomTime = 0;
         MarkSeen();
+        RevealMap();
         ReviveSystem.Clear();
         // the campaign's own "next mission" sequence shows the floor banner and sets the new room up
         CampaignGlobals.LoadedCampaign.CachedMissions[FloorNumber - 1] = TroveGen.BuildMission(Floor, Room!, null);
@@ -408,6 +512,11 @@ public static class TroveRun {
         if (Client.IsConnected() && Client.IsHost())
             Client.SendTroveEvent(ev, a);
     }
+    /// <summary>Events any phone can send (the server passes them to everyone else).</summary>
+    private static void SendAny(int ev, int a = 0) {
+        if (Client.IsConnected())
+            Client.SendTroveEvent(ev, a);
+    }
 
     /// <summary>Joined players: an event from the host.</summary>
     public static void OnEvent(int ev, int a) {
@@ -439,6 +548,27 @@ public static class TroveRun {
                 break;
             case EV_BLOCK_BUST:
                 if (Active && CampaignGlobals.InMission) TroveItems.BustBlocks();
+                break;
+            case EV_REROLL:
+                if (Active) SetPickup((TroveItemId)a);
+                break;
+            case EV_SECRET:
+                if (Active) RevealSecret();
+                break;
+            case EV_WAVE2:
+                if (Active && CampaignGlobals.InMission && Room is { } wr) SpawnWave2(wr);
+                break;
+            case EV_STOPWATCH:
+                if (Active) TroveItems.StartFreeze(a);
+                break;
+            case EV_NUKE:
+                if (Active && CampaignGlobals.InMission) TroveItems.Nuke(a);
+                break;
+            case EV_DECOY:
+                if (Active && CampaignGlobals.InMission) TroveItems.SpawnDecoy(a);
+                break;
+            case EV_INVINCIBLE:
+                if (Active) TroveItems.StartInvincible(a);
                 break;
             case EV_MENU:
                 if (Active) {

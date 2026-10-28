@@ -153,6 +153,24 @@ public class Shell : IAITankDanger {
     public void SwapTexture(Texture2D texture) => _shellTexture = texture;
     /// <summary>Tank Troves slider bomb: explodes wherever it stops.</summary>
     public bool IsSliderBomb { get; set; }
+
+    // ---- Tank Troves item effects (all default to the normal shell)
+    /// <summary>How many more tanks this shell goes through before it stops (Heavy Shells).</summary>
+    public int Pierce;
+    /// <summary>Breaks breakable blocks it hits and keeps going (Heavy Shells).</summary>
+    public bool BreaksCork;
+    /// <summary>Hit size against tanks, and against other shells (Shell Shield makes the second bigger).</summary>
+    public float HitRadius = 7f, ShellHitRadius = 7f;
+    public float VisualScale = 1f;
+    /// <summary>When above 0, this shell blows up (that big) wherever it ends (Explosive Shells).</summary>
+    public float ExplodeScale;
+    /// <summary>Also blows up each time it goes through a tank (Heavy + Explosive).</summary>
+    public bool ExplodeOnPierce;
+    /// <summary>Its explosions don't hurt the tank that fired it.</summary>
+    public bool SparesOwner;
+    private Tank? _lastPierced;
+    /// <summary>Set by Tank Troves: true while a shell should stand still (Stopwatch freezes enemy shells).</summary>
+    public static Func<Shell, bool>? IsFrozen;
     public void Swap(int type) {
         Type = type;
 
@@ -287,9 +305,11 @@ public class Shell : IAITankDanger {
         if (!GameScene.ShouldRenderAll || (!CampaignGlobals.InMission && !MainMenuUI.IsActive))
             return;
 
+        if (IsFrozen?.Invoke(this) == true)
+            return;
         Rotation = Velocity.ToRotation() - MathHelper.PiOver2;
         Position += Velocity * 0.62f * RuntimeData.DeltaTime;
-        World = Matrix.CreateFromYawPitchRoll(-Rotation, 0, 0)
+        World = Matrix.CreateScale(VisualScale) * Matrix.CreateFromYawPitchRoll(-Rotation, 0, 0)
                 * Matrix.CreateTranslation(Position3D);
 
         //if (TrailSound != null) {
@@ -324,7 +344,10 @@ public class Shell : IAITankDanger {
         Collision.HandleCollisionSimple_ForBlocks(Hitbox, Velocity, ref dummy, out var dir, out var block,
             out bool corner, false, (c) => c.Properties.IsSolid);
 
-        if (Type == ShellID.Missile && block is not null && (dir != CollisionDirection.None || corner)) {
+        if (BreaksCork && block is { Properties.IsDestructible: true } && (dir != CollisionDirection.None || corner)) {
+            block.Destroy(); // heavy shells smash breakable blocks and keep going
+        }
+        else if (Type == ShellID.Missile && block is not null && (dir != CollisionDirection.None || corner)) {
             // missiles break through destructible blocks and keep going; anything else stops them
             if (block.Properties.IsDestructible)
                 block.Destroy();
@@ -585,7 +608,18 @@ public class Shell : IAITankDanger {
             var tank = Unsafe.Add(ref tankSSpace, i);
             if (tank == null || tank.IsDestroyed) continue;
 
-            if (!tank.CollisionCircle.Intersects(HitCircle)) continue;
+            if (!tank.CollisionCircle.Intersects(new Circle { Center = Position, Radius = HitRadius })) continue;
+            if (ReferenceEquals(tank, _lastPierced)) continue;
+
+            // heavy shells go through enemies (not their owner's side)
+            if (Pierce > 0 && Owner is not null && !tank.IsOnSameTeamAs(Owner.Team)) {
+                Pierce--;
+                _lastPierced = tank;
+                if (ExplodeOnPierce && ExplodeScale > 0)
+                    new Explosion(Position, ExplodeScale, Owner, 0.25f) { SparesOwner = SparesOwner };
+                tank.Damage(new TankHurtContextShell(this), true);
+                continue;
+            }
 
             if (!Properties.CanFriendlyFire) {
                 if (tank.Team == Owner?.Team && tank != Owner && tank.Team != TeamID.NoTeam)
@@ -608,7 +642,7 @@ public class Shell : IAITankDanger {
         for (var i = 0; i < AllShells.Length; i++) {
             ref var bullet = ref Unsafe.Add(ref bulletSSpace, i);
             if (bullet == null || bullet == this) continue;
-            if (!bullet.HitCircle.Intersects(HitCircle)) continue;
+            if (Vector2.Distance(bullet.Position, Position) > bullet.ShellHitRadius + ShellHitRadius) continue;
 
             if (bullet.Properties.IsDestructible)
                 bullet.Destroy(DestructionContext.WithShell);
@@ -668,7 +702,9 @@ public class Shell : IAITankDanger {
         TrailSound = null;
 
         if (Owner is not null) {
-            if (IsSliderBomb)
+            if (ExplodeScale > 0)
+                new Explosion(Position, ExplodeScale, Owner, 0.25f) { SparesOwner = SparesOwner }; // Tank Troves explosive shells / slider bombs
+            else if (IsSliderBomb)
                 new Explosion(Position, 9f, Owner, 0.25f); // Tank Troves slider bomb
             else if (Owner.Properties.ShellType == ShellID.Explosive)
                 new Explosion(Position, 7f, Owner, 0.25f);
