@@ -64,6 +64,11 @@ public class Explosion : IAITankDanger {
         IsPlayerSourced = owner is not null && owner is PlayerTank;
 
         int index = Array.IndexOf(Explosions, null);
+        if (index < 0) {
+            // every slot taken: the oldest explosion finishes early
+            Explosions.OrderByDescending(e => e!.LifeTime).First()!.Remove();
+            index = Array.IndexOf(Explosions, null);
+        }
 
         var destroysound = "Assets/sounds/mine_explode.ogg";
 

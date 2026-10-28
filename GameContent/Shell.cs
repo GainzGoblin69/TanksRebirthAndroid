@@ -326,6 +326,11 @@ public class Shell : IAITankDanger {
         //TankGame.OnFocusRegained += TankGame_OnFocusRegained;
 
         int index = Array.IndexOf(AllShells, null);
+        if (index < 0) {
+            // every slot taken (Tank Troves can make a lot of shells): the oldest one quietly goes away
+            System.Linq.Enumerable.First(System.Linq.Enumerable.OrderByDescending(AllShells, s => s!.LifeTime))!.Remove();
+            index = Array.IndexOf(AllShells, null);
+        }
 
         Id = index;
 

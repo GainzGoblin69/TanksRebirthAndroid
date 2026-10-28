@@ -123,7 +123,14 @@ public sealed class Mine : IAITankDanger {
 
         MineReactRadius = ExplosionRadius * ExplosionRadiusInUnits;
 
-        int index = Array.IndexOf(AllMines, AllMines.First(mine => mine is null));
+        int index = Array.IndexOf(AllMines, null);
+        if (index < 0) {
+            // every slot taken (lots of Tank Troves mines): the oldest one quietly goes away
+            var oldest = AllMines.OrderBy(m => m!.DetonateTime).First()!;
+            if (oldest.Owner is not null) oldest.Owner.OwnedMineCount--;
+            oldest.Remove();
+            index = Array.IndexOf(AllMines, null);
+        }
 
         Id = index;
 

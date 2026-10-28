@@ -110,7 +110,7 @@ adb exec-out screencap -p > diag/run2-levelrun.png
 
 # Tank Troves: pause, Quit, then Play > Single Player > Tank Troves; the first room of floor 1
 # (test setup: start with a pile of items that make synergies, and an item on the floor of the first room)
-adb shell "printf 'GhostShells SplitShot OrbitGuard Stopwatch Decoy MirrorShield\nClone\nMamaBrown\n' > '$EXT/troves_test.txt'"
+adb shell "printf 'GhostShells SplitShot OrbitGuard Stopwatch Decoy MirrorShield\nClone\nnone\ntour\n' > '$EXT/troves_test.txt'"
 adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 5
 tapy 314 4
@@ -123,6 +123,10 @@ adb shell input tap $((W * 75 / 100)) $((H * 30 / 100)); sleep 1
 adb exec-out screencap -p > diag/run2-troves-fire.png
 sleep 4
 adb exec-out screencap -p > diag/run2-troves-boss.png
+# the tour keeps hopping rooms with more and more items: give it a minute, then check the app is still running
+sleep 60
+adb exec-out screencap -p > diag/run2-troves-tour.png
+adb shell pidof $PKG > diag/run2-tour-pid.txt 2>&1
 sleep 2
 # hold the joystick up, then left, to drive into a door (if the start room has one there)
 adb shell input swipe $((W * 15 / 100)) $((H * 75 / 100)) $((W * 15 / 100)) $((H * 45 / 100)) 6000; sleep 2

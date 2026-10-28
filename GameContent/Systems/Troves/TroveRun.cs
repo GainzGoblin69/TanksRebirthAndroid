@@ -177,8 +177,31 @@ public static class TroveRun {
     }
 
     private static bool _testHoldPickup;
+    /// <summary>Testing ("tour" on the 4th line of troves_test.txt): every couple of seconds take a random item and go
+    /// through a random door, to shake out crashes when moving between rooms with lots of items.</summary>
+    private static bool _testTour;
+    private static double _tourAt;
+    private static int _tourSteps;
+    private static void TourStep() {
+        if (!_testTour || Floor is null || Room is not { } room || PlayTime < _tourAt || _fadeDir != 0)
+            return;
+        _tourAt = PlayTime + 2.5;
+        var items = TroveItems.PedestalPool;
+        var item = items[Random.Shared.Next(items.Length)];
+        TroveItems.Give(0, item);
+        room.Cleared = true;
+        var doors = TroveGen.Doors(Floor, room).ToList();
+        var d = doors[Random.Shared.Next(doors.Count)];
+        _tourSteps++;
+        TankGame.ClientLog.Write($"Troves tour {_tourSteps}: got {item}, going {d}", Internals.LogType.Info);
+        Move(d);
+        // use whatever is in the ITEM slot, too
+        if (TroveItems.HasActive(0))
+            TroveItems.UseActive(0);
+    }
     private static void TestSetup() {
         _testHoldPickup = false;
+        _testTour = false;
         try {
             var path = System.IO.Path.Combine(TankGame.SaveDirectory, "troves_test.txt");
             if (!System.IO.File.Exists(path) || Floor is null)
@@ -187,6 +210,8 @@ public static class TroveRun {
             foreach (var name in lines.ElementAtOrDefault(0)?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [])
                 if (Enum.TryParse<TroveItemId>(name, out var id))
                     TroveItems.Give(0, id);
+            _testTour = lines.ElementAtOrDefault(3)?.Trim() == "tour";
+            _tourAt = 0;
             if (Enum.TryParse<TroveItemId>(lines.ElementAtOrDefault(1)?.Trim(), out var floorItem)) {
                 Floor.Rooms[Floor.Start].Pickup = floorItem;
                 _testHoldPickup = true; // players start on top of it: leave it there so its label shows
@@ -303,6 +328,8 @@ public static class TroveRun {
         }
 
         TroveItems.Update();
+        if (CampaignGlobals.InMission && Ended == EndKind.None)
+            TourStep();
         TroveBosses.Update();
         TroveBosses.UpdateBossOrbiters();
         if (!CampaignGlobals.InMission || Ended != EndKind.None || GameUI.Paused || Room is not { } room)
