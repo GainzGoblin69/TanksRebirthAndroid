@@ -645,6 +645,8 @@ public class Shell : IAITankDanger {
             ref var bullet = ref Unsafe.Add(ref bulletSSpace, i);
             if (bullet == null || bullet == this) continue;
             if (Vector2.Distance(bullet.Position, Position) > bullet.ShellHitRadius + ShellHitRadius) continue;
+            // Tank Troves: your own shells (a Triple Shot volley, a Shell Burst) don't knock each other out
+            if (Systems.Troves.TroveRun.Active && Owner is not null && ReferenceEquals(bullet.Owner, Owner)) continue;
 
             if (bullet.Properties.IsDestructible)
                 bullet.Destroy(DestructionContext.WithShell);
