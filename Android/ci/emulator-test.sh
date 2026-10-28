@@ -124,8 +124,9 @@ adb exec-out screencap -p > diag/run2-troves-fire.png
 sleep 4
 adb exec-out screencap -p > diag/run2-troves-boss.png
 # the tour keeps hopping rooms with more and more items: give it a minute, then check the app is still running
-sleep 60
+sleep 150
 adb exec-out screencap -p > diag/run2-troves-tour.png
+adb shell dumpsys meminfo $PKG > diag/run2-tour-meminfo.txt 2>&1
 adb shell pidof $PKG > diag/run2-tour-pid.txt 2>&1
 sleep 2
 # hold the joystick up, then left, to drive into a door (if the start room has one there)

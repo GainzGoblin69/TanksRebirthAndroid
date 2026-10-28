@@ -193,7 +193,10 @@ public static class TroveRun {
         var doors = TroveGen.Doors(Floor, room).ToList();
         var d = doors[Random.Shared.Next(doors.Count)];
         _tourSteps++;
-        TankGame.ClientLog.Write($"Troves tour {_tourSteps}: got {item}, going {d}", Internals.LogType.Info);
+        TankGame.ClientLog.Write($"Troves tour {_tourSteps}: got {item}, going {d} | managed={GC.GetTotalMemory(false) / 1048576}MB "
+            + $"process={System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / 1048576}MB particles={GameHandler.Particles.CurrentParticles.Count} "
+            + $"shells={Shell.AllShells.Count(x => x is not null)} mines={Mine.AllMines.Count(x => x is not null)} ai={GameHandler.AllAITanks.Count(x => x is not null)} "
+            + $"blocks={Block.AllBlocks.Count(x => x is not null)}", Internals.LogType.Info);
         Move(d);
         // use whatever is in the ITEM slot, too
         if (TroveItems.HasActive(0))
