@@ -366,6 +366,7 @@ public class PlayerTank : Tank {
             ExplodeScale = 9f * Systems.Troves.TroveItems.BlastSize(PlayerId),
             SparesOwner = Systems.Troves.TroveItems.BlastProof(PlayerId),
         };
+        Systems.Troves.TroveItems.AfterSliderBomb(this, shell);
         if (NetPlay.IsClientMatched(PlayerId))
             Client.SyncShellFire(shell);
     }

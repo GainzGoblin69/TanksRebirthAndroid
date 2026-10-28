@@ -188,7 +188,7 @@ public abstract class Tank {
     public BoundingBox Worldbox { get; set; }
 
     /// <summary>The 2D circle-represented hitbox of this <see cref="Tank"/>.</summary>
-    public Circle CollisionCircle => new() { Center = Position, Radius = TNK_WIDTH / 2 };
+    public Circle CollisionCircle => new() { Center = Position, Radius = TNK_WIDTH / 2 * Scaling.X }; // bigger/smaller tanks are bigger/smaller targets
 
     /// <summary>The 2D rectangle-represented hitbox of this <see cref="Tank"/>.</summary>
     public Rectangle CollisionBox => new((int)(Position.X - TNK_WIDTH / 2 + 3), (int)(Position.Y - TNK_WIDTH / 2 + 2),
@@ -639,7 +639,10 @@ public abstract class Tank {
         };
     }
     /// <summary>Destroy this <see cref="Tank"/>.</summary>
+    /// <summary>Set by Tank Troves: a tank was destroyed (Vampire Treads counts kills).</summary>
+    public static Action<Tank, ITankHurtContext>? OnDestroyed;
     public virtual void Destroy(ITankHurtContext context, bool netSend) {
+        OnDestroyed?.Invoke(this, context);
         CampaignGlobals.OnMissionStart -= OnMissionStart;
 
         // i think this is right? | (Probably, a destroyed tank is a dead tank!)

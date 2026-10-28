@@ -18,13 +18,16 @@ public enum TroveItemId {
     Rocket, Homing, SliderBomb, ExtraLife, Shield, SpeedTreads, BouncyShells, ExtraShell, MinePack, Detonator, BlockBust,
     BigMines, TripleShot, QuickReload, OrbitGuard, TreasureMap, BuddyTank, HeavyShells, ExplosiveShells, GhostTreads, ShellShield, BossHunter,
     Stopwatch, ShellBurst, Nuke, Decoy, Invincibility, Reroll,
+    SplitShot, SniperShells, ChainLightning, RegenPlating, ClusterMines, HomingMines, TinyTank, VampireTreads, RicochetMaster, GiantTank, EchoShot,
+    Airstrike, WallBuilder, Dash, MineStorm, Convert, ShrinkRay, RepairKit, LightningStorm,
 }
 
 /// <summary>How an item works: used with the ITEM button, takes effect when picked up, or lasts the whole run.</summary>
 public enum TroveItemKind { Active, Instant, Passive }
 
 /// <param name="Recharge">Active items: rooms to clear before it can be used again (0 = used up).</param>
-public sealed record TroveItemDef(TroveItemId Id, string Name, string Description, TroveItemKind Kind, Color Color, int Recharge = 0);
+/// <param name="RechargeSeconds">Active items that recharge over time instead of by rooms.</param>
+public sealed record TroveItemDef(TroveItemId Id, string Name, string Description, TroveItemKind Kind, Color Color, int Recharge = 0, float RechargeSeconds = 0);
 
 /// <summary>Two items that do something extra together.</summary>
 public sealed record TroveSynergy(string Name, string Description, TroveItemId A, TroveItemId B);
@@ -67,6 +70,25 @@ public static class TroveItems {
         new(TroveItemId.Decoy, "Decoy", "Drops a fake tank that enemies aim at for 6 seconds", TroveItemKind.Active, new Color(160, 120, 80), Recharge: 1),
         new(TroveItemId.Invincibility, "Invincibility", "5 seconds where nothing hurts you; ram enemies to destroy them", TroveItemKind.Active, new Color(255, 200, 60), Recharge: 3),
         new(TroveItemId.Reroll, "Reroll", "Swaps the item on the floor for a different one", TroveItemKind.Active, new Color(230, 230, 240), Recharge: 2),
+        new(TroveItemId.SplitShot, "Split Shot", "Shells split in two the first time they bounce", TroveItemKind.Passive, new Color(240, 140, 200)),
+        new(TroveItemId.SniperShells, "Sniper Shells", "Much faster shells, +1 bounce", TroveItemKind.Passive, new Color(90, 110, 80)),
+        new(TroveItemId.ChainLightning, "Chain Lightning", "Hitting an enemy zaps the nearest other enemy", TroveItemKind.Passive, new Color(120, 200, 255)),
+        new(TroveItemId.RegenPlating, "Regen Plating", "+1 shield every 3 rooms you clear", TroveItemKind.Passive, new Color(100, 210, 160)),
+        new(TroveItemId.ClusterMines, "Cluster Mines", "Your mines burst into 4 more explosions", TroveItemKind.Passive, new Color(230, 120, 60)),
+        new(TroveItemId.HomingMines, "Homing Mines", "Your mines crawl toward the nearest enemy", TroveItemKind.Passive, new Color(200, 170, 60)),
+        new(TroveItemId.TinyTank, "Tiny Tank", "You're smaller and harder to hit, but a bit slower", TroveItemKind.Passive, new Color(150, 220, 120)),
+        new(TroveItemId.VampireTreads, "Vampire Treads", "Every 6 enemies you destroy gives you a shield", TroveItemKind.Passive, new Color(150, 20, 40)),
+        new(TroveItemId.RicochetMaster, "Ricochet Master", "Shells get faster and bigger after every bounce", TroveItemKind.Passive, new Color(255, 160, 60)),
+        new(TroveItemId.GiantTank, "Giant Tank", "You're bigger and slower, with +1 shield every floor", TroveItemKind.Passive, new Color(120, 90, 160)),
+        new(TroveItemId.EchoShot, "Echo Shot", "Every shot fires again a moment later", TroveItemKind.Passive, new Color(170, 150, 230)),
+        new(TroveItemId.Airstrike, "Airstrike", "5 explosions rain down on enemies", TroveItemKind.Active, new Color(200, 70, 50), Recharge: 3),
+        new(TroveItemId.WallBuilder, "Wall Builder", "Drops 3 cork blocks in front of you for cover", TroveItemKind.Active, new Color(225, 185, 130), Recharge: 1),
+        new(TroveItemId.Dash, "Dash", "A quick burst of speed the way you're driving", TroveItemKind.Active, new Color(80, 220, 230), RechargeSeconds: 3),
+        new(TroveItemId.MineStorm, "Mine Storm", "Drops 6 mines around you at once", TroveItemKind.Active, new Color(240, 200, 40)),
+        new(TroveItemId.Convert, "Convert", "The nearest enemy fights for you for the rest of the room", TroveItemKind.Active, new Color(220, 120, 220), Recharge: 4),
+        new(TroveItemId.ShrinkRay, "Shrink Ray", "Every enemy turns tiny and slow for 6 seconds", TroveItemKind.Active, new Color(120, 230, 150), Recharge: 2),
+        new(TroveItemId.RepairKit, "Repair Kit", "+2 shields right now", TroveItemKind.Active, new Color(200, 210, 220)),
+        new(TroveItemId.LightningStorm, "Lightning Storm", "3 bolts each zap a random enemy", TroveItemKind.Active, new Color(110, 160, 255), Recharge: 2),
     ];
     public static TroveItemDef Def(TroveItemId id) => All[(int)id];
 
@@ -80,6 +102,35 @@ public static class TroveItems {
         new("Fireworks", "Shell explosions are bigger", TroveItemId.ExplosiveShells, TroveItemId.TripleShot),
         new("Minefield", "+1 more mine", TroveItemId.BigMines, TroveItemId.MinePack),
         new("Phantom", "Even faster treads", TroveItemId.GhostTreads, TroveItemId.SpeedTreads),
+        new("Shrapnel", "Shells split into three instead of two", TroveItemId.SplitShot, TroveItemId.RicochetMaster),
+        new("Carpet Bomb", "Cluster mines burst into 6 bigger explosions", TroveItemId.ClusterMines, TroveItemId.BigMines),
+        new("Guided Missile", "Homing mines go off as soon as they reach an enemy", TroveItemId.HomingMines, TroveItemId.Detonator),
+        new("Thunderclap", "Every lightning zap explodes", TroveItemId.ChainLightning, TroveItemId.ExplosiveShells),
+        new("Zippy", "Tiny and fast: no slowdown, extra speed", TroveItemId.TinyTank, TroveItemId.SpeedTreads),
+        new("Fortress", "Regen Plating every 2 rooms", TroveItemId.GiantTank, TroveItemId.RegenPlating),
+        new("Bloodbank", "Vampire Treads every 4 kills", TroveItemId.VampireTreads, TroveItemId.RegenPlating),
+        new("Railgun", "Sniper shells go through one more enemy", TroveItemId.SniperShells, TroveItemId.HeavyShells),
+        new("Echo Chamber", "Echo shells get +1 bounce", TroveItemId.EchoShot, TroveItemId.BouncyShells),
+        // with the item in your ITEM slot
+        new("Echo Burst", "Shell Burst fires twice", TroveItemId.ShellBurst, TroveItemId.EchoShot),
+        new("Booby Trap", "Your decoy blows up when it disappears", TroveItemId.Decoy, TroveItemId.BigMines),
+        new("Time Lord", "Stopwatch lasts 8 seconds", TroveItemId.Stopwatch, TroveItemId.QuickReload),
+        new("Juggernaut", "Invincibility lasts 8 seconds and rams from further away", TroveItemId.Invincibility, TroveItemId.GiantTank),
+        new("Storm Caller", "Lightning Storm throws 5 bolts", TroveItemId.LightningStorm, TroveItemId.ChainLightning),
+        new("Battering Ram", "Dashing into enemies damages them", TroveItemId.Dash, TroveItemId.HeavyShells),
+        new("Great Wall", "Wall Builder makes walls 5 blocks wide", TroveItemId.WallBuilder, TroveItemId.GiantTank),
+        new("Recruiter", "Converted tanks can't be destroyed", TroveItemId.Convert, TroveItemId.BuddyTank),
+        new("Saturation", "Airstrike drops 8 bombs, and each one clusters", TroveItemId.Airstrike, TroveItemId.ClusterMines),
+        new("Swarm", "Mine Storm drops 10 mines", TroveItemId.MineStorm, TroveItemId.HomingMines),
+        new("Stomp", "Drive into shrunken enemies to crush them", TroveItemId.ShrinkRay, TroveItemId.GiantTank),
+        new("Fortune Teller", "Reroll recharges twice as fast", TroveItemId.Reroll, TroveItemId.TreasureMap),
+        new("Overhaul", "Repair Kit gives 3 shields", TroveItemId.RepairKit, TroveItemId.RegenPlating),
+        new("Tesla Coil", "Your orbiters zap nearby enemies", TroveItemId.OrbitGuard, TroveItemId.ChainLightning),
+        new("Nuclear Option", "The Nuke is twice as big", TroveItemId.Nuke, TroveItemId.BigMines),
+        new("Bunker Buster", "Rockets go through 2 enemies", TroveItemId.Rocket, TroveItemId.HeavyShells),
+        new("Smart Bomb", "Slider bombs steer toward enemies", TroveItemId.SliderBomb, TroveItemId.Homing),
+        new("Seeker Swarm", "Homing shells find targets from much further away", TroveItemId.Homing, TroveItemId.TripleShot),
+        new("Demolition", "Every block Block Bust breaks explodes", TroveItemId.BlockBust, TroveItemId.ExplosiveShells),
     ];
 
     // item rooms draw from nearly everything; challenge and secret rooms have stronger pools; rooms mostly drop small stuff
@@ -89,22 +140,29 @@ public static class TroveItems {
         TroveItemId.Detonator, TroveItemId.BigMines, TroveItemId.TripleShot, TroveItemId.QuickReload, TroveItemId.OrbitGuard, TroveItemId.TreasureMap,
         TroveItemId.HeavyShells, TroveItemId.ExplosiveShells, TroveItemId.GhostTreads, TroveItemId.ShellShield, TroveItemId.BossHunter,
         TroveItemId.BuddyTank, TroveItemId.ExtraLife, TroveItemId.Shield,
+        TroveItemId.SplitShot, TroveItemId.SniperShells, TroveItemId.ChainLightning, TroveItemId.RegenPlating, TroveItemId.ClusterMines,
+        TroveItemId.HomingMines, TroveItemId.TinyTank, TroveItemId.VampireTreads, TroveItemId.RicochetMaster, TroveItemId.GiantTank,
+        TroveItemId.EchoShot, TroveItemId.WallBuilder, TroveItemId.Dash, TroveItemId.MineStorm, TroveItemId.ShrinkRay, TroveItemId.RepairKit,
+        TroveItemId.LightningStorm,
     ];
     public static readonly TroveItemId[] ChallengePool = [
         TroveItemId.TripleShot, TroveItemId.QuickReload, TroveItemId.HeavyShells, TroveItemId.ExplosiveShells, TroveItemId.BigMines,
         TroveItemId.OrbitGuard, TroveItemId.ShellBurst, TroveItemId.Stopwatch, TroveItemId.BossHunter, TroveItemId.Invincibility, TroveItemId.Nuke,
+        TroveItemId.ChainLightning, TroveItemId.EchoShot, TroveItemId.Airstrike, TroveItemId.Convert, TroveItemId.SplitShot, TroveItemId.RicochetMaster,
     ];
     public static readonly TroveItemId[] SecretPool = [
         TroveItemId.Nuke, TroveItemId.Invincibility, TroveItemId.BuddyTank, TroveItemId.TripleShot, TroveItemId.OrbitGuard,
         TroveItemId.BossHunter, TroveItemId.TreasureMap, TroveItemId.ExplosiveShells, TroveItemId.HeavyShells,
+        TroveItemId.Airstrike, TroveItemId.Convert, TroveItemId.EchoShot, TroveItemId.VampireTreads,
     ];
     /// <summary>Items that stack: every extra one adds more.</summary>
     public static bool Stacks(TroveItemId id) => id is TroveItemId.BouncyShells or TroveItemId.ExtraShell or TroveItemId.MinePack
-        or TroveItemId.SpeedTreads or TroveItemId.QuickReload or TroveItemId.OrbitGuard or TroveItemId.HeavyShells or TroveItemId.TripleShot;
+        or TroveItemId.SpeedTreads or TroveItemId.QuickReload or TroveItemId.OrbitGuard or TroveItemId.HeavyShells or TroveItemId.TripleShot
+        or TroveItemId.SniperShells or TroveItemId.RegenPlating or TroveItemId.VampireTreads;
     // cleared rooms mostly leave hearts and shields, sometimes a stacking item or a Block Bust
     public static readonly TroveItemId[] DropPool = [
         TroveItemId.ExtraLife, TroveItemId.ExtraLife, TroveItemId.Shield, TroveItemId.Shield, TroveItemId.Shield,
-        TroveItemId.BouncyShells, TroveItemId.ExtraShell, TroveItemId.MinePack, TroveItemId.BlockBust,
+        TroveItemId.BouncyShells, TroveItemId.ExtraShell, TroveItemId.MinePack, TroveItemId.BlockBust, TroveItemId.RepairKit,
     ];
 
     public sealed class PlayerItems {
@@ -115,15 +173,24 @@ public static class TroveItems {
         public int SliderBombs;
         public int Shields;
         public double InvincibleUntil = -1;
+        public double ReadyAt = -1;     // time-based actives (Dash)
+        public int RoomsForRegen, KillsForVampire;
+        public double DashUntil = -1, TeslaAt;
+        public readonly HashSet<Tank> Rammed = [];
         public bool WasInvincible;
         public readonly Dictionary<TroveItemId, int> Passives = [];
         public int Count(TroveItemId id) => Passives.TryGetValue(id, out var n) ? n : 0;
-        public bool Has(TroveItemId id) => Count(id) > 0;
+        /// <summary>Has it: a whole-run item, or the item in the ITEM slot (so actives can be part of synergies).</summary>
+        public int Id;
+        public bool Has(TroveItemId id) => Count(id) > 0 || Active == id
+            // one-use items count while they're working
+            || id == TroveItemId.Homing && HomingOn || id == TroveItemId.SliderBomb && SliderBombs > 0
+            || id == TroveItemId.Rocket && MissileUpgrade.ShotsLeft(Id) > 0;
         public bool Has(TroveSynergy s) => Has(s.A) && Has(s.B);
-        public bool ActiveReady => Active is { } a && Charge >= Def(a).Recharge;
+        public bool ActiveReady => Active is { } a && Charge >= Def(a).Recharge && (Def(a).RechargeSeconds <= 0 || TroveRun.PlayTime >= ReadyAt);
     }
 
-    public static readonly PlayerItems[] Players = [new(), new(), new(), new()];
+    public static readonly PlayerItems[] Players = [new() { Id = 0 }, new() { Id = 1 }, new() { Id = 2 }, new() { Id = 3 }];
 
     /// <summary>The last pickup, for the banner (name, description, how many you have now, when).</summary>
     public static (TroveItemDef Def, double Time, int Stack)? LastPickup;
@@ -134,7 +201,15 @@ public static class TroveItems {
     public static double FrozenUntil = -1;
     public static AITank? DecoyTank;
     private static double _decoyUntil;
+    private static int _decoyOwner;
     public static readonly AITank?[] Buddies = new AITank?[4];
+    /// <summary>Lightning to draw: from, to, when.</summary>
+    public static readonly List<(Vector2 From, Vector2 To, double Time)> Bolts = [];
+    private static readonly List<(AITank Tank, Vector3 Scale, float Speed)> _shrunk = [];
+    private static double _shrinkUntil = -1;
+    private static readonly List<(int Player, double Due, List<(Vector2 Vel, int Type, uint Ricochets)> Shots)> _echoes = [];
+    private static readonly List<(Vector2 At, double Due, int Player)> _airstrikes = [];
+    private static bool _echoing;
 
     private static bool _hooked;
     private static PlayerItems P(int id) => Players[Math.Clamp(id, 0, 3)];
@@ -145,12 +220,16 @@ public static class TroveItems {
 
     public static void Reset() {
         for (int i = 0; i < 4; i++)
-            Players[i] = new PlayerItems();
+            Players[i] = new PlayerItems { Id = i };
         LastPickup = null;
         LastSynergy = null;
         FrozenUntil = -1;
         DecoyTank = null;
         Array.Clear(Buddies);
+        Bolts.Clear();
+        _shrunk.Clear();
+        _echoes.Clear();
+        _airstrikes.Clear();
         InstallHooks();
     }
 
@@ -182,11 +261,74 @@ public static class TroveItems {
                 return 1;
             return 0;
         };
+        // chain lightning: a hit zaps the nearest other enemy
+        Shell.OnHitTank = (shell, hit) => {
+            if (!TroveRun.Active || !IsEnemy(hit) || shell.Owner is null)
+                return;
+            // whose shell: a player's (on their phone), or a buddy's (on the host, which runs the AI)
+            int pid = shell.Owner is PlayerTank sp ? sp.PlayerId : Array.IndexOf(Buddies, shell.Owner as AITank);
+            if (pid < 0 || !P(pid).Has(TroveItemId.ChainLightning))
+                return;
+            bool runsHere = shell.Owner is PlayerTank ? IsLocal(pid) : !Client.IsConnected() || Client.IsHost();
+            if (runsHere)
+                Chain(shell.Owner, pid, hit, Has(pid, Syn("Thunderclap")) ? 2 : 1);
+        };
+        // vampire treads: count kills
+        Tank.OnDestroyed = (victim, ctx) => {
+            if (!TroveRun.Active || victim is not AITank || !IsEnemy(victim) || ctx.Source is not PlayerTank pt || !IsLocal(pt.PlayerId))
+                return;
+            var p = P(pt.PlayerId);
+            int n = p.Count(TroveItemId.VampireTreads);
+            if (n == 0)
+                return;
+            int need = Math.Max(2, (p.Has(Syn("Bloodbank")) ? 4 : 6) - (n - 1));
+            if (++p.KillsForVampire >= need) {
+                p.KillsForVampire = 0;
+                p.Shields++;
+                ApplyTo(pt);
+                SoundPlayer.PlaySoundInstance("Assets/sounds/armor_ding_1.ogg", SoundContext.Effect, 0.8f);
+            }
+        };
+        // cluster mines
+        Mine.OnExplode += mine => {
+            if (TroveRun.Active && mine.Owner is PlayerTank pt && P(pt.PlayerId).Has(TroveItemId.ClusterMines))
+                ClusterBurst(pt, mine.Position, mine.SparesOwner);
+        };
+        // slider bombs are mines too: they cluster
+        Shell.OnDestroy += (shell, _) => {
+            if (TroveRun.Active && shell.IsSliderBomb && shell.Owner is PlayerTank pt && P(pt.PlayerId).Has(TroveItemId.ClusterMines))
+                ClusterBurst(pt, shell.Position, shell.SparesOwner);
+        };
         // buddy tanks fire shells with their owner's items too
         Tank.OnShoot += (tank, shell) => {
             if (TroveRun.Active && tank is AITank ai && Array.IndexOf(Buddies, ai) is int owner and >= 0)
                 ModifyShell(owner, shell);
         };
+    }
+
+    /// <summary>Cluster Mines: a ring of smaller explosions (Carpet Bomb: more and bigger).</summary>
+    private static void ClusterBurst(PlayerTank pt, Vector2 at, bool sparesOwner) {
+        bool carpet = Has(pt.PlayerId, Syn("Carpet Bomb"));
+        int n = carpet ? 6 : 4;
+        for (int i = 0; i < n; i++) {
+            var dir = Vector2.UnitX.Rotate(i * MathHelper.TwoPi / n + 0.4f);
+            new Explosion(at + dir * (carpet ? 60f : 45f), (carpet ? 5f : 3.5f) * BlastSize(pt.PlayerId) / (carpet ? 1.5f : 1f), pt, 0.3f, 0.3f) { SparesOwner = sparesOwner };
+        }
+    }
+
+    /// <summary>Chain Lightning: from a hit tank to the nearest other enemy (and on, with Thunderclap).</summary>
+    private static void Chain(Tank source, int pid, Tank from, int jumps) {
+        var hitSet = new HashSet<Tank> { from };
+        var at = from;
+        for (int j = 0; j < jumps; j++) {
+            var next = GameHandler.AllAITanks.Where(t => t is { IsDestroyed: false } && IsEnemy(t) && !hitSet.Contains(t) && Vector2.Distance(t.Position, at.Position) < 170f)
+                .OrderBy(t => Vector2.Distance(t!.Position, at.Position)).FirstOrDefault();
+            if (next is null)
+                return;
+            Zap(source, pid, at.Position, next);
+            hitSet.Add(next);
+            at = next;
+        }
     }
 
     // ------------------------------------------------------------------ picking up
@@ -225,6 +367,8 @@ public static class TroveItems {
         }
         if (id == TroveItemId.TreasureMap)
             TroveRun.RevealMap();
+        if (id == TroveItemId.GiantTank && local)
+            p.Shields++;
         if (id == TroveItemId.BuddyTank && Buddies[playerId] is null && CampaignGlobals.InMission)
             SpawnBuddy(playerId);
         if (local && GameHandler.AllPlayerTanks[playerId] is { IsDestroyed: false } tank)
@@ -244,9 +388,30 @@ public static class TroveItems {
 
     /// <summary>A room was cleared: active items recharge.</summary>
     public static void OnRoomCleared() {
-        foreach (var p in Players)
+        for (int i = 0; i < 4; i++) {
+            var p = Players[i];
             if (p.Active is { } a && p.Charge < Def(a).Recharge)
-                p.Charge++;
+                p.Charge = Math.Min(Def(a).Recharge, p.Charge + (a == TroveItemId.Reroll && p.Has(Syn("Fortune Teller")) ? 2 : 1));
+            // regen plating: a shield every few rooms
+            int n = p.Count(TroveItemId.RegenPlating);
+            if (n > 0 && IsLocal(i)) {
+                int need = Math.Max(1, (p.Has(Syn("Fortress")) ? 2 : 3) - (n - 1));
+                if (++p.RoomsForRegen >= need) {
+                    p.RoomsForRegen = 0;
+                    p.Shields++;
+                    if (GameHandler.AllPlayerTanks[i] is { IsDestroyed: false } t)
+                        ApplyTo(t);
+                }
+            }
+        }
+        RestoreShrunk();
+    }
+
+    /// <summary>A new floor: Giant Tank gives a shield.</summary>
+    public static void OnNewFloor() {
+        for (int i = 0; i < 4; i++)
+            if (IsLocal(i) && Players[i].Has(TroveItemId.GiantTank))
+                Players[i].Shields += Players[i].Count(TroveItemId.GiantTank);
     }
 
     public static void UseActive(int playerId) {
@@ -270,12 +435,13 @@ public static class TroveItems {
                 p.SliderBombs += 5;
                 break;
             case TroveItemId.BlockBust:
-                BustBlocks();
-                SendAny(TroveRun.EV_BLOCK_BUST, 0);
+                BustBlocks(playerId);
+                SendAny(TroveRun.EV_BLOCK_BUST, playerId);
                 break;
             case TroveItemId.Stopwatch:
-                StartFreeze(5);
-                SendAny(TroveRun.EV_STOPWATCH, 5);
+                int secs = Has(playerId, Syn("Time Lord")) ? 8 : 5;
+                StartFreeze(secs);
+                SendAny(TroveRun.EV_STOPWATCH, secs);
                 break;
             case TroveItemId.ShellBurst:
                 if (tank is null || tank.IsDestroyed) { SoundPlayer.SoundError(); return; }
@@ -295,6 +461,72 @@ public static class TroveItems {
                 StartInvincible(playerId);
                 SendAny(TroveRun.EV_INVINCIBLE, playerId);
                 break;
+            case TroveItemId.Airstrike: {
+                var targets = GameHandler.AllAITanks.Where(t => t is { IsDestroyed: false } && IsEnemy(t)).ToList();
+                if (targets.Count == 0) { SoundPlayer.SoundError(); return; }
+                int bombs = Has(playerId, Syn("Saturation")) ? 8 : 5;
+                for (int i = 0; i < bombs; i++) {
+                    var t = targets[i % targets.Count]!;
+                    var at = t.Position + new Vector2(Random.Shared.NextSingle() * 30 - 15, Random.Shared.NextSingle() * 30 - 15);
+                    _airstrikes.Add((at, Now + 0.4 + i * 0.25, playerId));
+                }
+                break;
+            }
+            case TroveItemId.WallBuilder:
+                if (tank is null || tank.IsDestroyed) { SoundPlayer.SoundError(); return; }
+                BuildWall(playerId);
+                SendAny(TroveRun.EV_WALL, playerId);
+                break;
+            case TroveItemId.Dash: {
+                if (tank is null || tank.IsDestroyed) { SoundPlayer.SoundError(); return; }
+                var dir = tank.Velocity.LengthSquared() > 0.01f ? Vector2.Normalize(tank.Velocity) : Vector2.UnitY.Rotate(tank.ChassisRotation);
+                tank.KnockbackVelocity = dir * 7f;
+                p.DashUntil = Now + 0.5;
+                p.Rammed.Clear();
+                for (int i = 0; i < 6; i++)
+                    GameHandler.Particles.MakeShineSpot(tank.Position3D - new Vector3(dir.X, 0, dir.Y) * i * 6, new Color(120, 230, 255), 0.5f);
+                break;
+            }
+            case TroveItemId.MineStorm:
+                if (tank is null || tank.IsDestroyed) { SoundPlayer.SoundError(); return; }
+                int count = Has(playerId, Syn("Swarm")) ? 10 : 6;
+                for (int i = 0; i < count; i++) {
+                    var pos = tank.Position + Vector2.UnitX.Rotate(i * MathHelper.TwoPi / count) * (count > 6 ? 50f : 40f);
+                    var m = new Mine(tank, pos, 600);
+                    tank.OwnedMineCount++;
+                    AfterMine(tank, m);
+                    if (Client.IsConnected())
+                        Client.SyncMinePlace(m.Position, m.DetonateTime, tank.WorldId);
+                }
+                break;
+            case TroveItemId.Convert: {
+                if (tank is null) { SoundPlayer.SoundError(); return; }
+                var target = GameHandler.AllAITanks.Where(t => t is { IsDestroyed: false } && IsEnemy(t) && !ReferenceEquals(t, TroveRun.BossTank))
+                    .OrderBy(t => Vector2.Distance(t!.Position, tank.Position)).FirstOrDefault();
+                if (target is null) { SoundPlayer.SoundError(); return; }
+                ConvertTank(target.WorldId * 4 + playerId);
+                SendAny(TroveRun.EV_CONVERT, target.WorldId * 4 + playerId);
+                break;
+            }
+            case TroveItemId.ShrinkRay:
+                Shrink();
+                SendAny(TroveRun.EV_SHRINK, 0);
+                break;
+            case TroveItemId.RepairKit:
+                p.Shields += Has(playerId, Syn("Overhaul")) ? 3 : 2;
+                break;
+            case TroveItemId.LightningStorm: {
+                int bolts = Has(playerId, Syn("Storm Caller")) ? 5 : 3;
+                var targets = GameHandler.AllAITanks.Where(t => t is { IsDestroyed: false } && IsEnemy(t)).OrderBy(_ => Random.Shared.Next()).ToList();
+                if (targets.Count == 0 || tank is null) { SoundPlayer.SoundError(); return; }
+                for (int i = 0; i < bolts; i++) {
+                    var t = targets[i % targets.Count]!;
+                    Zap(tank, playerId, t.Position + new Vector2(0, -400), t);
+                    if (p.Has(TroveItemId.ChainLightning))
+                        Chain(tank, playerId, t, 1); // each bolt chains on
+                }
+                break;
+            }
             case TroveItemId.Reroll: {
                 if (TroveRun.Room is not { PickupVisible: true } room) {
                     SoundPlayer.SoundError(); // nothing to reroll here: keep it
@@ -308,7 +540,9 @@ public static class TroveItems {
             }
         }
         // used up, or recharging
-        if (Def(id).Recharge > 0)
+        if (Def(id).RechargeSeconds > 0)
+            p.ReadyAt = Now + Def(id).RechargeSeconds;
+        else if (Def(id).Recharge > 0)
             p.Charge = 0;
         else
             p.Active = null;
@@ -323,11 +557,17 @@ public static class TroveItems {
     }
 
     /// <summary>Block Bust: every breakable block in the room breaks (and stays broken if you come back).</summary>
-    public static void BustBlocks() {
+    public static void BustBlocks(int playerId) {
         int n = 0;
+        // Demolition: they blow up as they go (a dozen at most)
+        bool boom = Has(playerId, Syn("Demolition"));
+        var owner = GameHandler.AllPlayerTanks[Math.Clamp(playerId, 0, 3)];
         foreach (var b in Block.AllBlocks.ToArray())
             if (b is not null && b.Properties.IsDestructible) {
+                var at = b.Position;
                 b.Destroy();
+                if (boom && n < 12)
+                    new Explosion(at, 3f * BlastSize(playerId), owner, 0.4f, 0.4f) { SparesOwner = true };
                 n++;
             }
         TroveRun.Room?.Blocks.RemoveAll(b => b.Type == BlockID.Cork);
@@ -341,26 +581,30 @@ public static class TroveItems {
     }
 
     public static void StartInvincible(int playerId) {
-        P(playerId).InvincibleUntil = Now + 5;
+        P(playerId).InvincibleUntil = Now + (Has(playerId, Syn("Juggernaut")) ? 8 : 5);
         SoundPlayer.PlaySoundInstance("Assets/music/fanfares/life_get.ogg", SoundContext.Effect, 0.5f, pitchOverride: 0.6f);
     }
 
     /// <summary>8 shells in a ring, each with all of this player's shell items.</summary>
     private static void ShellBurst(PlayerTank tank) {
         var props = tank.Properties;
+        var shots = new List<(Vector2, int, uint)>();
         for (int i = 0; i < 8; i++) {
             var dir = Vector2.UnitY.Rotate(i * MathHelper.TwoPi / 8f);
             var shell = new Shell(tank.Position + dir * 18f, dir * props.ShellSpeed, props.ShellType, tank, props.RicochetCount, homing: props.ShellHoming);
+            shots.Add((shell.Velocity, shell.Type, shell.RicochetsRemaining));
             ModifyShell(tank.PlayerId, shell);
             if (Client.IsConnected())
                 Client.SyncShellFire(shell);
         }
+        if (P(tank.PlayerId).Has(TroveItemId.EchoShot))
+            _echoes.Add((tank.PlayerId, Now + 0.3, shots)); // Echo Burst
     }
 
     public static void Nuke(int playerId) {
         if (GameHandler.AllPlayerTanks[playerId] is not { IsDestroyed: false } tank)
             return;
-        new Explosion(tank.Position, 15f * BlastSize(playerId), tank, 0.6f, -0.3f) { SparesOwner = true };
+        new Explosion(tank.Position, 15f * BlastSize(playerId) * (Has(playerId, Syn("Nuclear Option")) ? 1.35f : 1f), tank, 0.6f, -0.3f) { SparesOwner = true };
     }
 
     public static void SpawnDecoy(int playerId) {
@@ -373,6 +617,7 @@ public static class TroveItems {
         d.Properties.ShellLimit = 0;
         d.Properties.MineLimit = 0;
         DecoyTank = d;
+        _decoyOwner = playerId;
         _decoyUntil = Now + 6;
     }
 
@@ -401,6 +646,76 @@ public static class TroveItems {
         Buddies[playerId] = b;
     }
 
+    /// <summary>A lightning zap from a point to an enemy (Chain Lightning, Lightning Storm).</summary>
+    private static void Zap(Tank source, int pid, Vector2 from, Tank target) {
+        Bolts.Add((from, target.Position, Now));
+        SoundPlayer.PlaySoundInstance("Assets/sounds/bullet_ricochet.ogg", SoundContext.Effect, 0.8f, pitchOverride: 0.8f);
+        target.Damage(new TankHurtContextOther(source, TankHurtContextOther.HurtContext.FromIngame, "Lightning"), true);
+        // with Explosive Shells every zap blows up too
+        if (P(pid).Has(TroveItemId.ExplosiveShells))
+            new Explosion(target.Position, 3f * BlastSize(pid), source, 0.3f, 0.5f) { SparesOwner = true };
+    }
+
+    /// <summary>Wall Builder: 3 cork blocks across the way this player's turret points, 2 blocks out.</summary>
+    public static void BuildWall(int playerId) {
+        if (GameHandler.AllPlayerTanks[playerId] is not { IsDestroyed: false } tank)
+            return;
+        var aim = Vector2.UnitY.Rotate(tank.TurretRotation);
+        aim = new Vector2(-aim.X, aim.Y);
+        var side = new Vector2(-aim.Y, aim.X);
+        Vector2 origin = new Coordinates.BlockMapPosition(0, 0);
+        int half = Has(playerId, Syn("Great Wall")) ? 2 : 1;
+        for (int i = -half; i <= half; i++) {
+            var at = tank.Position + aim * Block.SIDE_LENGTH * 2f + side * Block.SIDE_LENGTH * i;
+            // snap to the block grid
+            var gx = (int)MathF.Round((at.X - origin.X) / Block.SIDE_LENGTH);
+            var gy = (int)MathF.Round((at.Y - origin.Y) / Block.SIDE_LENGTH);
+            if (gx < 0 || gy < 0 || gx >= Coordinates.BlockMapPosition.MAP_WIDTH_169 || gy >= Coordinates.BlockMapPosition.MAP_HEIGHT)
+                continue;
+            Vector2 pos = new Coordinates.BlockMapPosition(gx, gy);
+            if (Block.AllBlocks.Any(b => b is not null && Vector2.Distance(b.Position, pos) < 4f))
+                continue;
+            if (GameHandler.AllTanks.Any(t => t is { IsDestroyed: false } && Vector2.Distance(t.Position, pos) < Block.SIDE_LENGTH))
+                continue;
+            new Block(BlockID.Cork, 1, pos);
+        }
+        SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 1f, pitchOverride: -0.3f);
+    }
+
+    /// <param name="packed">The tank's WorldId * 4 + the player who converted it.</param>
+    public static void ConvertTank(int packed) {
+        int worldId = packed / 4, playerId = packed % 4;
+        if (worldId < 0 || worldId >= GameHandler.AllTanks.Length || GameHandler.AllTanks[worldId] is not AITank { IsDestroyed: false } t)
+            return;
+        t.Team = TeamID.Red;
+        if (Has(playerId, Syn("Recruiter")))
+            t.Properties.Immortal = true;
+        GameHandler.Particles.MakeShineSpot(t.Position3D + new Vector3(0, 10, 0), new Color(230, 140, 230), 1.4f);
+        SoundPlayer.PlaySoundInstance("Assets/music/fanfares/life_get.ogg", SoundContext.Effect, 0.4f, pitchOverride: 0.3f);
+    }
+
+    /// <summary>Shrink Ray: every enemy tiny and slow for 6 seconds.</summary>
+    public static void Shrink() {
+        RestoreShrunk();
+        foreach (var t in GameHandler.AllAITanks)
+            if (t is { IsDestroyed: false } && IsEnemy(t)) {
+                _shrunk.Add((t, t.Scaling, t.Properties.MaxSpeed));
+                t.Scaling *= 0.55f;
+                t.Properties.MaxSpeed *= 0.5f;
+            }
+        _shrinkUntil = Now + 6;
+        SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 1f, pitchOverride: 0.9f);
+    }
+    private static void RestoreShrunk() {
+        foreach (var (t, sc, sp) in _shrunk)
+            if (!t.IsDestroyed) {
+                t.Scaling = sc;
+                t.Properties.MaxSpeed = sp;
+            }
+        _shrunk.Clear();
+        _shrinkUntil = -1;
+    }
+
     /// <summary>A tank on the players' side that can't be destroyed.</summary>
     private static AITank SpawnAlly(int tier, Vector2 at, float scale) {
         var t = new TankTemplate { IsPlayer = false, AiTier = tier, Position = at, Rotation = 0, Team = TeamID.Red }.GetAiTank();
@@ -422,13 +737,36 @@ public static class TroveItems {
     /// <summary>After a player shoots: give every new shell their items (and send the extra Triple Shot shells to the other phones).</summary>
     public static void AfterShot(PlayerTank tank, HashSet<Shell> before) {
         bool sendExtras = Client.IsConnected() && NetPlay.IsClientMatched(tank.PlayerId);
+        bool echo = !_echoing && IsLocal(tank.PlayerId) && P(tank.PlayerId).Has(TroveItemId.EchoShot);
+        var shots = new List<(Vector2, int, uint)>();
         foreach (var s in Shell.AllShells) {
             if (s is null || !ReferenceEquals(s.Owner, tank) || before.Contains(s))
                 continue;
+            if (echo)
+                shots.Add((s.Velocity, s.Type, s.RicochetsRemaining));
             ModifyShell(tank.PlayerId, s);
             if (sendExtras && !ReferenceEquals(s, tank.LastShotShell))
                 Client.SyncShellFire(s);
         }
+        if (shots.Count > 0)
+            _echoes.Add((tank.PlayerId, Now + 0.3, shots));
+    }
+
+    /// <summary>Echo Shot: the same shots again, from where the tank is now.</summary>
+    private static void FireEcho(int playerId, List<(Vector2 Vel, int Type, uint Ricochets)> shots) {
+        if (GameHandler.AllPlayerTanks[playerId] is not { IsDestroyed: false } tank)
+            return;
+        bool chamber = Has(playerId, Syn("Echo Chamber"));
+        _echoing = true;
+        foreach (var (vel, type, ric) in shots) {
+            var dir = vel.LengthSquared() > 0 ? Vector2.Normalize(vel) : Vector2.UnitY;
+            var s = new Shell(tank.Position + dir * 20f, vel, type, tank, ric + (chamber ? 1u : 0u), tank.Properties.ShellHoming);
+            ModifyShell(playerId, s);
+            s.VisualScale *= 0.85f;
+            if (Client.IsConnected())
+                Client.SyncShellFire(s);
+        }
+        _echoing = false;
     }
 
     /// <summary>All of a player's shell items on one shell (they all combine).</summary>
@@ -450,6 +788,16 @@ public static class TroveItems {
         }
         if (p.Has(TroveItemId.ShellShield))
             s.ShellHitRadius = 16f;
+        if (p.Has(Syn("Railgun")))
+            s.Pierce++;
+        if (s.Type == ShellID.Missile && p.Has(Syn("Bunker Buster")))
+            s.Pierce += 2;
+        if (p.Has(TroveItemId.SplitShot)) {
+            s.SplitsOnBounce = true;
+            s.Shrapnel = p.Has(Syn("Shrapnel"));
+        }
+        if (p.Has(TroveItemId.RicochetMaster))
+            s.GrowsOnBounce = true;
     }
 
     public static void AfterMine(PlayerTank tank, Mine m) {
@@ -470,14 +818,26 @@ public static class TroveItems {
         if (!TroveRun.Active || tank.PlayerId is < 0 or >= 4 || !Players[tank.PlayerId].Has(TroveItemId.Detonator))
             return false;
         var mines = Mine.AllMines.Where(m => m is not null && !m.Detonated && ReferenceEquals(m.Owner, tank)).ToArray();
-        if (mines.Length == 0)
+        // slider bombs on their way count too: set them off where they are
+        var bombs = Shell.AllShells.Where(sh => sh is not null && sh.IsSliderBomb && ReferenceEquals(sh.Owner, tank) && sh.LifeTime > 10).ToArray();
+        if (mines.Length == 0 && bombs.Length == 0)
             return false;
         foreach (var m in mines)
             m!.Detonate();
+        foreach (var b in bombs)
+            b!.Destroy(Shell.DestructionContext.WithObstacle);
         return true;
     }
     public static bool HasDetonator(PlayerTank tank) =>
         TroveRun.Active && tank.PlayerId is >= 0 and < 4 && Players[tank.PlayerId].Has(TroveItemId.Detonator);
+
+    /// <summary>A slider bomb was fired: Smart Bomb makes it steer, and Explosive/Heavy shell items apply.</summary>
+    public static void AfterSliderBomb(PlayerTank tank, Shell bomb) {
+        if (!TroveRun.Active || tank.PlayerId is < 0 or >= 4)
+            return;
+        if (Has(tank.PlayerId, Syn("Smart Bomb")))
+            bomb.Properties.HomeProperties = new() { Radius = 300f, Speed = bomb.Velocity.Length(), Power = 0.08f * bomb.Velocity.Length() };
+    }
 
     /// <summary>A slider bomb instead of a mine, if this player has any. True if one was used.</summary>
     public static bool TryUseSliderBomb(PlayerTank tank) {
@@ -500,6 +860,14 @@ public static class TroveItems {
         var props = tank.Properties;
         props.ShellShootCount = 1;
         props.ShellSpread = 0f;
+        // size: Tiny Tank and Giant Tank (both: back to normal)
+        bool tiny = p.Has(TroveItemId.TinyTank), giant = p.Has(TroveItemId.GiantTank);
+        float size = tiny && giant ? 1f : tiny ? 0.7f : giant ? 1.35f : 1f;
+        tank.Scaling = new Vector3(size);
+        props.MaxSpeed *= tiny && !giant ? (p.Has(Syn("Zippy")) ? 1.15f : 0.9f) : giant && !tiny ? 0.85f : 1f;
+        int sniper = p.Count(TroveItemId.SniperShells);
+        props.ShellSpeed *= MathF.Pow(1.6f, Math.Min(sniper, 2));
+        props.RicochetCount += (uint)sniper;
         props.MaxSpeed *= MathF.Pow(1.2f, p.Count(TroveItemId.SpeedTreads)) * (p.Has(Syn("Phantom")) ? 1.15f : 1f);
         props.RicochetCount += (uint)(p.Count(TroveItemId.BouncyShells) + (p.Has(Syn("Ricochet Storm")) ? 1 : 0));
         props.ShellLimit += p.Count(TroveItemId.ExtraShell) + (p.Has(Syn("Machine Gun")) ? 2 : 0);
@@ -512,7 +880,9 @@ public static class TroveItems {
             props.ShellLimit *= n; // a volley still counts as one shot
         }
         if (p.HomingOn)
-            props.ShellHoming = new() { Radius = 200f, Speed = props.ShellSpeed, Power = 0.1f * props.ShellSpeed };
+            props.ShellHoming = p.Has(Syn("Seeker Swarm"))
+                ? new() { Radius = 340f, Speed = props.ShellSpeed, Power = 0.14f * props.ShellSpeed }
+                : new() { Radius = 200f, Speed = props.ShellSpeed, Power = 0.1f * props.ShellSpeed };
         int kidArmor = props.Armor?.HitPoints ?? 0; // Kid Mode's own armor (player 2)
         if (p.Shields > 0)
             props.Armor = new TankArmor(tank, kidArmor + p.Shields);
@@ -568,7 +938,7 @@ public static class TroveItems {
                     GameHandler.Particles.MakeShineSpot(t.Position3D + new Vector3(0, 10, 0), Color.Gold, 0.6f);
                 if (IsLocal(i))
                     foreach (var ai in GameHandler.AllAITanks)
-                        if (ai is { IsDestroyed: false } && IsEnemy(ai) && Vector2.Distance(ai.Position, t.Position) < 24f)
+                        if (ai is { IsDestroyed: false } && IsEnemy(ai) && Vector2.Distance(ai.Position, t.Position) < (Has(i, Syn("Juggernaut")) ? 34f : 24f))
                             ai.Damage(new TankHurtContextOther(t, TankHurtContextOther.HurtContext.FromIngame, "Rammed"), true);
             }
             else if (p.WasInvincible) {
@@ -577,6 +947,31 @@ public static class TroveItems {
             }
             p.WasInvincible = inv;
 
+            if (IsLocal(i)) {
+                // Battering Ram: a dash hits whatever it runs into (once each)
+                if (Now < p.DashUntil && Has(i, Syn("Battering Ram")))
+                    foreach (var ai in GameHandler.AllAITanks)
+                        if (ai is { IsDestroyed: false } && IsEnemy(ai) && !p.Rammed.Contains(ai) && Vector2.Distance(ai.Position, t.Position) < 30f) {
+                            p.Rammed.Add(ai);
+                            ai.Damage(new TankHurtContextOther(t, TankHurtContextOther.HurtContext.FromIngame, "Rammed"), true);
+                        }
+                // Stomp: shrunken enemies get crushed
+                if (_shrinkUntil > Now && Has(i, Syn("Stomp")))
+                    foreach (var (st, _, _) in _shrunk)
+                        if (!st.IsDestroyed && IsEnemy(st) && Vector2.Distance(st.Position, t.Position) < 26f)
+                            st.Damage(new TankHurtContextOther(t, TankHurtContextOther.HurtContext.FromIngame, "Stomped"), true);
+                // Tesla Coil: the orbiters zap the nearest enemy every 1.5 seconds
+                if (Has(i, Syn("Tesla Coil")) && Now >= p.TeslaAt) {
+                    var orbs = Orbiters(i).ToArray();
+                    var near = GameHandler.AllAITanks.Where(a => a is { IsDestroyed: false } && IsEnemy(a) && Vector2.Distance(a.Position, t.Position) < 150f)
+                        .OrderBy(a => Vector2.Distance(a!.Position, t.Position)).FirstOrDefault();
+                    if (near is not null && orbs.Length > 0) {
+                        Zap(t, i, orbs[0].Pos, near);
+                        p.TeslaAt = Now + 1.5;
+                    }
+                }
+            }
+
             // orbit guard: knock enemy shells out of the air (this phone's players)
             if (IsLocal(i) && p.Has(TroveItemId.OrbitGuard))
                 foreach (var (pos, r) in Orbiters(i).ToArray())
@@ -584,11 +979,65 @@ public static class TroveItems {
                         if (s is not null && s.Owner is not null && IsEnemy(s.Owner) && Vector2.Distance(s.Position, pos) < r + 5f)
                             s.Destroy(Shell.DestructionContext.WithShell);
         }
+        if (CampaignGlobals.InMission) {
+            for (int i = _echoes.Count - 1; i >= 0; i--)
+                if (Now >= _echoes[i].Due) {
+                    var e = _echoes[i];
+                    _echoes.RemoveAt(i);
+                    FireEcho(e.Player, e.Shots);
+                }
+            for (int i = _airstrikes.Count - 1; i >= 0; i--)
+                if (Now >= _airstrikes[i].Due) {
+                    var a = _airstrikes[i];
+                    _airstrikes.RemoveAt(i);
+                    var owner = GameHandler.AllPlayerTanks[a.Player];
+                    new Explosion(a.At, 6f * BlastSize(a.Player), owner, 0.5f) { SparesOwner = true };
+                    if (owner is not null && Has(a.Player, Syn("Saturation")))
+                        ClusterBurst(owner, a.At, true);
+                    SendAny(TroveRun.EV_BLAST, EncodePos(a.At) * 4 + a.Player);
+                }
+            // homing mines crawl toward the nearest enemy
+            foreach (var m in Mine.AllMines) {
+                if (m is null || m.Detonated || m.Owner is not PlayerTank mp || !P(mp.PlayerId).Has(TroveItemId.HomingMines))
+                    continue;
+                var target = GameHandler.AllAITanks.Where(t => t is { IsDestroyed: false } && IsEnemy(t)).OrderBy(t => Vector2.Distance(t!.Position, m.Position)).FirstOrDefault();
+                if (target is null)
+                    continue;
+                var to = target.Position - m.Position;
+                float d = to.Length();
+                if (d > 1f)
+                    m.Position += to / d * Math.Min(d, 0.6f * TanksRebirth.RuntimeData.DeltaTime);
+                if (d < 22f && Has(mp.PlayerId, Syn("Guided Missile")) && IsLocal(mp.PlayerId))
+                    m.Detonate();
+            }
+        }
+        else {
+            _echoes.Clear();
+            _airstrikes.Clear();
+        }
+        if (_shrinkUntil > 0 && Now > _shrinkUntil)
+            RestoreShrunk();
+        Bolts.RemoveAll(b => Now - b.Time > 0.35);
         if (DecoyTank is not null && Now > _decoyUntil) {
+            if (Has(_decoyOwner, Syn("Booby Trap")) && !DecoyTank.IsDestroyed)
+                new Explosion(DecoyTank.Position, 9f * BlastSize(_decoyOwner), GameHandler.AllPlayerTanks[_decoyOwner], 0.5f) { SparesOwner = true };
             if (!DecoyTank.IsDestroyed)
                 DecoyTank.Remove(true);
             DecoyTank = null;
         }
+    }
+
+    /// <summary>A world position packed into an int for the network (and back).</summary>
+    public static int EncodePos(Vector2 p) => (int)(Math.Clamp(p.X + 400, 0, 799)) * 1000 + (int)Math.Clamp(p.Y + 400, 0, 799);
+    public static Vector2 DecodePos(int v) => new(v / 1000 - 400, v % 1000 - 400);
+
+    /// <summary>Another phone's airstrike explosion (packed position * 4 + player).</summary>
+    public static void RemoteBlast(int a) {
+        int player = a % 4;
+        var owner = GameHandler.AllPlayerTanks[player];
+        new Explosion(DecodePos(a / 4), 6f * BlastSize(player), owner, 0.5f) { SparesOwner = true };
+        if (owner is not null && Has(player, Syn("Saturation")))
+            ClusterBurst(owner, DecodePos(a / 4), true);
     }
 
     private static string ShortName(TroveItemId id) => id switch {
@@ -602,6 +1051,14 @@ public static class TroveItems {
         TroveItemId.Decoy => "DECOY",
         TroveItemId.Invincibility => "STAR",
         TroveItemId.Reroll => "REROLL",
+        TroveItemId.Airstrike => "AIR",
+        TroveItemId.WallBuilder => "WALL",
+        TroveItemId.Dash => "DASH",
+        TroveItemId.MineStorm => "MINES",
+        TroveItemId.Convert => "CONVERT",
+        TroveItemId.ShrinkRay => "SHRINK",
+        TroveItemId.RepairKit => "REPAIR",
+        TroveItemId.LightningStorm => "ZAP",
         _ => Def(id).Name.ToUpperInvariant(),
     };
 
@@ -611,7 +1068,9 @@ public static class TroveItems {
             return null;
         var p = Players[playerId];
         if (p.Active is { } a)
-            return p.ActiveReady ? (ShortName(a), "tap to use", true) : (ShortName(a), $"charging {p.Charge}/{Def(a).Recharge}", false);
+            return p.ActiveReady ? (ShortName(a), "tap to use", true)
+                : Def(a).RechargeSeconds > 0 ? (ShortName(a), $"{Math.Ceiling(p.ReadyAt - Now)}s", false)
+                : (ShortName(a), $"charging {p.Charge}/{Def(a).Recharge}", false);
         if (MissileUpgrade.ShotsLeft(playerId) > 0)
             return ("ROCKETS", $"{MissileUpgrade.ShotsLeft(playerId)} shots", false);
         if (p.SliderBombs > 0)

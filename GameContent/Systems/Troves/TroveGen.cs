@@ -7,7 +7,7 @@ using TanksRebirth.GameContent.Systems.Coordinates;
 
 namespace TanksRebirth.GameContent.Systems.Troves;
 
-public enum TroveRoomKind { Start, Normal, Boss, Item, Challenge, Secret }
+public enum TroveRoomKind { Start, Normal, Boss, Item, Challenge, Secret, MiniBoss }
 public enum TroveShape { Open, Pillars, Wide, Tall, Small, Cross, Corner }
 
 /// <summary>Directions between rooms. North is the board edge at the lowest Z (grid row 0).</summary>
@@ -258,12 +258,17 @@ public static class TroveGen {
             secret = top[rng.Next(top.Count)];
         }
 
+        // mini-boss: an ordinary room a little way in
+        var miniOptions = cells.Where(c => c != start && c != boss && c != item && c != challenge && dist[c] >= 2)
+            .OrderBy(c => c.X).ThenBy(c => c.Y).ToList();
+        Point? mini = miniOptions.Count > 0 ? miniOptions[rng.Next(miniOptions.Count)] : null;
+
         var floorMap = new TroveFloor { Number = floor, Name = FloorNames[floor - 1], Start = start, Boss = boss, ItemRoom = item, Secret = secret };
         foreach (var c in cells.OrderBy(c => c.Y).ThenBy(c => c.X))
             floorMap.Rooms[c] = new TroveRoom {
                 Cell = c,
                 Kind = c == start ? TroveRoomKind.Start : c == boss ? TroveRoomKind.Boss : c == item ? TroveRoomKind.Item
-                    : c == challenge ? TroveRoomKind.Challenge : TroveRoomKind.Normal,
+                    : c == challenge ? TroveRoomKind.Challenge : c == mini ? TroveRoomKind.MiniBoss : TroveRoomKind.Normal,
             };
         if (secret is { } sp)
             floorMap.Rooms[sp] = new TroveRoom { Cell = sp, Kind = TroveRoomKind.Secret };
@@ -608,6 +613,16 @@ public static class TroveGen {
             return p;
         }
 
+        if (room.Kind == TroveRoomKind.MiniBoss) {
+            // the toughest tank this floor allows, plus a guard from floor 3 on; it always leaves an item
+            room.Pickup = TroveItems.ChallengePool[rng.Next(TroveItems.ChallengePool.Length)];
+            var mp = Pick(7) ?? Pick(4) ?? new Point(10, 8);
+            room.BossIndex = 0;
+            room.Enemies.Add((mp.X, mp.Y, MaxTier[f.Number - 1] == TankID.Obsidian ? TankID.Black : MaxTier[f.Number - 1], rng.NextSingle() * MathHelper.TwoPi));
+            if (f.Number >= 3 && (Pick(6) ?? Pick(3)) is { } gp2)
+                room.Enemies.Add((gp2.X, gp2.Y, pool[rng.Next(pool.Length)], rng.NextSingle() * MathHelper.TwoPi));
+            return;
+        }
         if (room.Kind == TroveRoomKind.Boss) {
             // boss in the middle-ish, a couple of guards
             var bp = Pick(7) ?? Pick(4) ?? new Point(10, 8);

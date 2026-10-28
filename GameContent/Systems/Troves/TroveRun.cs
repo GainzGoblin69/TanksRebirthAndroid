@@ -25,7 +25,8 @@ public static class TroveRun {
     public enum EndKind { None, RunOver, Victory }
     // multiplayer events (host -> everyone)
     public const int EV_START = 1, EV_MOVE = 2, EV_RETRY = 3, EV_NEXT_FLOOR = 4, EV_RUN_OVER = 5, EV_VICTORY = 6, EV_MENU = 7, EV_ITEM = 8, EV_BLOCK_BUST = 9,
-        EV_REROLL = 10, EV_SECRET = 11, EV_WAVE2 = 12, EV_STOPWATCH = 13, EV_NUKE = 14, EV_DECOY = 15, EV_INVINCIBLE = 16;
+        EV_REROLL = 10, EV_SECRET = 11, EV_WAVE2 = 12, EV_STOPWATCH = 13, EV_NUKE = 14, EV_DECOY = 15, EV_INVINCIBLE = 16,
+        EV_WALL = 17, EV_CONVERT = 18, EV_SHRINK = 19, EV_BLAST = 20;
     /// <summary>How close (game units) a tank has to get to an item to pick it up.</summary>
     public const float PICKUP_REACH = 26f;
     public static Vector2 PickupPoint => new Coordinates.BlockMapPosition(10, 8);
@@ -33,6 +34,8 @@ public static class TroveRun {
     // the boss of the current room (for the health bar at the top)
     public static AI.AITank? BossTank { get; private set; }
     public static int BossMaxHits { get; private set; }
+    /// <summary>What the health bar at the top says (a floor's boss, or a mini-boss).</summary>
+    public static string BossTitle { get; private set; } = "";
     public static readonly string[] BossNames = ["Captain Marine", "The Violet Viper", "Green Goliath", "The Black Baron", "Obsidian Overlord"];
     private static bool _hooked;
 
@@ -449,12 +452,23 @@ public static class TroveRun {
             .OrderBy(t => Vector2.Distance(t!.Position, pos)).FirstOrDefault();
         if (boss is null)
             return;
+        if (room.Kind == TroveRoomKind.MiniBoss) {
+            // a tougher-than-usual tank: armored, a bit bigger, one more shell
+            boss.Scaling = new Vector3(1.25f);
+            boss.Properties.Armor = new TankArmor(boss, 2 + FloorNumber);
+            BossTank = boss;
+            BossMaxHits = 2 + FloorNumber + 1;
+            boss.Properties.ShellLimit += 1;
+            BossTitle = "Mini-boss";
+            return;
+        }
         boss.Scaling = new Vector3(1.45f);
         boss.Properties.Armor = new TankArmor(boss, 4 + FloorNumber * 2);
         BossTank = boss;
         BossMaxHits = 4 + FloorNumber * 2 + 1;
         boss.Properties.ShellLimit += 2;
         boss.Properties.MineLimit += 1;
+        BossTitle = BossNames[Math.Clamp(FloorNumber - 1, 0, BossNames.Length - 1)];
     }
 
     private static void NextFloor() {
@@ -463,6 +477,7 @@ public static class TroveRun {
         BossTank = null;
         Floor = TroveGen.Generate(Seed, FloorNumber);
         Current = Floor.Start;
+        TroveItems.OnNewFloor();
         _entry = null;
         _roomTime = 0;
         MarkSeen();
@@ -551,7 +566,7 @@ public static class TroveRun {
                 if (Active) TakePickup(a);
                 break;
             case EV_BLOCK_BUST:
-                if (Active && CampaignGlobals.InMission) TroveItems.BustBlocks();
+                if (Active && CampaignGlobals.InMission) TroveItems.BustBlocks(a);
                 break;
             case EV_REROLL:
                 if (Active) SetPickup((TroveItemId)a);
@@ -573,6 +588,18 @@ public static class TroveRun {
                 break;
             case EV_INVINCIBLE:
                 if (Active) TroveItems.StartInvincible(a);
+                break;
+            case EV_WALL:
+                if (Active && CampaignGlobals.InMission) TroveItems.BuildWall(a);
+                break;
+            case EV_CONVERT:
+                if (Active && CampaignGlobals.InMission) TroveItems.ConvertTank(a);
+                break;
+            case EV_SHRINK:
+                if (Active && CampaignGlobals.InMission) TroveItems.Shrink();
+                break;
+            case EV_BLAST:
+                if (Active && CampaignGlobals.InMission) TroveItems.RemoteBlast(a);
                 break;
             case EV_MENU:
                 if (Active) {

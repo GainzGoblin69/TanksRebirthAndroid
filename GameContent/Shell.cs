@@ -169,6 +169,23 @@ public class Shell : IAITankDanger {
     /// <summary>Its explosions don't hurt the tank that fired it.</summary>
     public bool SparesOwner;
     private Tank? _lastPierced;
+    /// <summary>Splits in two (Shrapnel: three) the first time it bounces (Split Shot).</summary>
+    public bool SplitsOnBounce, Shrapnel;
+    /// <summary>Faster and bigger after every bounce (Ricochet Master).</summary>
+    public bool GrowsOnBounce;
+    /// <summary>Set by Tank Troves: called when this shell hits a tank (Chain Lightning).</summary>
+    public static Action<Shell, Tank>? OnHitTank;
+
+    /// <summary>A copy of this shell going another way, with the same item effects.</summary>
+    public Shell CloneItems(Vector2 velocity, uint ricochets) {
+        var c = new Shell(Position, velocity, Type, Owner, ricochets, Properties.HomeProperties, playSpawnSound: false) {
+            Pierce = Pierce, BreaksCork = BreaksCork, HitRadius = HitRadius, ShellHitRadius = ShellHitRadius,
+            VisualScale = VisualScale * 0.85f, ExplodeScale = ExplodeScale, ExplodeOnPierce = ExplodeOnPierce,
+            SparesOwner = SparesOwner, GrowsOnBounce = GrowsOnBounce,
+        };
+        c.LifeTime = 20; // already clear of its tank
+        return c;
+    }
     /// <summary>Set by Tank Troves: true while a shell should stand still (Stopwatch freezes enemy shells).</summary>
     public static Func<Shell, bool>? IsFrozen;
     public void Swap(int type) {
@@ -575,6 +592,22 @@ public class Shell : IAITankDanger {
         else
             Velocity.Y = -Velocity.Y;
 
+        // Tank Troves: Ricochet Master and Split Shot
+        if (GrowsOnBounce && Velocity.Length() < 12f) {
+            Velocity *= 1.2f;
+            VisualScale *= 1.12f;
+            HitRadius += 1f;
+        }
+        if (SplitsOnBounce) {
+            SplitsOnBounce = false;
+            float spread = 0.4f;
+            CloneItems(Velocity.Rotate(spread), RicochetsRemaining > 0 ? RicochetsRemaining - 1 : 0);
+            if (Shrapnel)
+                CloneItems(Velocity.Rotate(-spread), RicochetsRemaining > 0 ? RicochetsRemaining - 1 : 0);
+            else
+                Velocity = Velocity.Rotate(-spread);
+        }
+
 
         var sound = SoundPlayer.PlaySoundInstance(ricochetSound, SoundContext.Effect, 0.5f);
 
@@ -620,6 +653,7 @@ public class Shell : IAITankDanger {
                 if (ExplodeOnPierce && ExplodeScale > 0)
                     new Explosion(Position, ExplodeScale, Owner, 0.25f) { SparesOwner = SparesOwner };
                 tank.Damage(new TankHurtContextShell(this), true);
+                OnHitTank?.Invoke(this, tank);
                 continue;
             }
 
@@ -637,6 +671,7 @@ public class Shell : IAITankDanger {
             Destroy(cxt);
 
             tank.Damage(new TankHurtContextShell(this), true);
+            OnHitTank?.Invoke(this, tank);
         }
 
         ref var bulletSSpace = ref MemoryMarshal.GetReference((Span<Shell>)AllShells);

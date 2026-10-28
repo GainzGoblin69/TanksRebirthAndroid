@@ -110,7 +110,7 @@ adb exec-out screencap -p > diag/run2-levelrun.png
 
 # Tank Troves: pause, Quit, then Play > Single Player > Tank Troves; the first room of floor 1
 # (test setup: start with a pile of items that make synergies, and an item on the floor of the first room)
-adb shell "printf 'TripleShot ExplosiveShells HeavyShells OrbitGuard ShellShield BuddyTank BigMines Detonator TreasureMap Stopwatch\nQuickReload\n' > '$EXT/troves_test.txt'"
+adb shell "printf 'SplitShot RicochetMaster EchoShot TinyTank ChainLightning ClusterMines HomingMines SniperShells OrbitGuard TreasureMap LightningStorm\nGiantTank\n' > '$EXT/troves_test.txt'"
 adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 5
 tapy 314 4
