@@ -610,6 +610,8 @@ public class Shell : IAITankDanger {
 
             if (!tank.CollisionCircle.Intersects(new Circle { Center = Position, Radius = HitRadius })) continue;
             if (ReferenceEquals(tank, _lastPierced)) continue;
+            // a fresh shell can't hit the tank that fired it (Triple Shot's side shells start right next to it)
+            if (ReferenceEquals(tank, Owner) && LifeTime < 12 && Systems.Troves.TroveRun.Active) continue;
 
             // heavy shells go through enemies (not their owner's side)
             if (Pierce > 0 && Owner is not null && !tank.IsOnSameTeamAs(Owner.Team)) {

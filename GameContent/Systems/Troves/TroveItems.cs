@@ -444,7 +444,7 @@ public static class TroveItems {
             s.Velocity *= 0.8f;
         }
         if (p.Has(TroveItemId.ExplosiveShells)) {
-            s.ExplodeScale = 4f * BlastSize(playerId) * (p.Has(Syn("Fireworks")) ? 1.4f : 1f);
+            s.ExplodeScale = 3.5f * BlastSize(playerId) * (p.Has(Syn("Fireworks")) ? 1.4f : 1f);
             s.SparesOwner = true;
             s.ExplodeOnPierce = p.Has(Syn("Wrecking Ball"));
         }

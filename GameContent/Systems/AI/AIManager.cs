@@ -912,7 +912,8 @@ public static class AIManager {
         ref var tanksSearchSpace = ref MemoryMarshal.GetReference(tanks);
         for (var i = 0; i < tanks.Length; i++) {
             var tank = Unsafe.Add(ref tanksSearchSpace, i);
-            if (tank is not null && !tank.IsDestroyed && (predicate is not null && predicate.Invoke(tank) || predicate is null)) cnt++;
+            if (tank is not null && !tank.IsDestroyed && (predicate is not null && predicate.Invoke(tank) || predicate is null)
+                && !(Troves.TroveRun.Active && tank.Team == TeamID.Red)) cnt++; // Tank Troves allies (buddy, decoy) aren't enemies
         }
 
         return cnt;

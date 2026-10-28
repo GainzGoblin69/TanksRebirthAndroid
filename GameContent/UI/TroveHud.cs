@@ -75,7 +75,7 @@ public static class TroveHud {
         for (int i = 0; i < 4; i++)
             foreach (var (pos, r) in TroveItems.Orbiters(i)) {
                 var c = ToScreen(pos);
-                float rr = Math.Max(5f, Vector2.Distance(c, ToScreen(pos + new Vector2(r, 0))));
+                float rr = Math.Max(4f, Vector2.Distance(c, ToScreen(pos + new Vector2(r, 0))) * 0.45f);
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(0, rr * 0.3f), rr * 1.05f, Color.Black * 0.3f);
                 ToggleSwitch.DrawDisc(sb, c, rr, new Color(200, 210, 230));
                 ToggleSwitch.DrawDisc(sb, c - new Vector2(rr * 0.25f), rr * 0.4f, Color.White);

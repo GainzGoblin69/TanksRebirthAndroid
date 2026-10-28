@@ -148,7 +148,9 @@ public static class TroveRun {
     /// For automated testing only: if "troves_test.txt" is in the save folder, player 1 starts with the items it lists
     /// (one line: names separated by spaces) and the second line names an item to put on the floor of the first room.
     /// </summary>
+    private static bool _testHoldPickup;
     private static void TestSetup() {
+        _testHoldPickup = false;
         try {
             var path = System.IO.Path.Combine(TankGame.SaveDirectory, "troves_test.txt");
             if (!System.IO.File.Exists(path) || Floor is null)
@@ -157,8 +159,10 @@ public static class TroveRun {
             foreach (var name in lines.ElementAtOrDefault(0)?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [])
                 if (Enum.TryParse<TroveItemId>(name, out var id))
                     TroveItems.Give(0, id);
-            if (Enum.TryParse<TroveItemId>(lines.ElementAtOrDefault(1)?.Trim(), out var floorItem))
+            if (Enum.TryParse<TroveItemId>(lines.ElementAtOrDefault(1)?.Trim(), out var floorItem)) {
                 Floor.Rooms[Floor.Start].Pickup = floorItem;
+                _testHoldPickup = true; // players start on top of it: leave it there so its label shows
+            }
             TroveItems.LastPickup = null;
             TankGame.ClientLog.Write($"Troves: test setup from {path}", Internals.LogType.Info);
         }
@@ -346,7 +350,7 @@ public static class TroveRun {
         }
 
         // picking up an item
-        if (room.PickupVisible) {
+        if (room.PickupVisible && !_testHoldPickup) {
             foreach (var p in GameHandler.AllPlayerTanks) {
                 if (p is null || p.IsDestroyed || Vector2.Distance(p.Position, PickupPoint) > PICKUP_REACH)
                     continue;
