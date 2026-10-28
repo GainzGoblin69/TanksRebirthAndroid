@@ -27,6 +27,14 @@ public static class GameScene
     public static bool ShouldRenderFloor { get; set; } = true;
     public static bool ShouldRenderBounds { get; set; } = true;
     public static bool RenderFloorAsBlack { get; set; } = false;
+    /// <summary>Multiplies the floor's and the border's colour (Tank Troves shades each floor differently). White = normal.</summary>
+    public static Vector3 FloorTint { get; set; } = Vector3.One;
+    private static void ApplyFloorTint(BasicEffect effect) {
+        if (FloorTint == Vector3.One)
+            return;
+        effect.DiffuseColor *= FloorTint;
+        effect.AmbientLightColor *= FloorTint;
+    }
 
     public static Vector2 MapCenter => new(0, MIN_Z + MAX_Z / 2);
 
@@ -162,6 +170,7 @@ public static class GameScene
                     effect.World = World * Matrix.CreateScale(scale);
 
                     effect.SetDefaultGameLighting();
+                    ApplyFloorTint(effect);
 
                     effect.TextureEnabled = true;
 
@@ -255,6 +264,7 @@ public static class GameScene
                                 effect.Alpha = 1f;
 
                             effect.SetDefaultGameLighting();
+                            ApplyFloorTint(effect);
                         }
 
                         mesh.Draw();
@@ -275,6 +285,7 @@ public static class GameScene
                                 effect.Alpha = 1f;
 
                             effect.SetDefaultGameLighting();
+                            ApplyFloorTint(effect);
                         }
 
                         mesh.Draw();

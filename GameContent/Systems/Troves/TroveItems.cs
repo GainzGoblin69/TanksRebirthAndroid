@@ -10,7 +10,7 @@ using TanksRebirth.Net;
 
 namespace TanksRebirth.GameContent.Systems.Troves;
 
-public enum TroveItemId { Rocket, Homing, SliderBomb, ExtraLife, Shield, SpeedTreads, BouncyShells, ExtraShell, MinePack }
+public enum TroveItemId { Rocket, Homing, SliderBomb, ExtraLife, Shield, SpeedTreads, BouncyShells, ExtraShell, MinePack, Detonator, BlockBust }
 
 /// <summary>How an item works: used with the ITEM button, takes effect when picked up, or lasts the whole run.</summary>
 public enum TroveItemKind { Active, Instant, Passive }
@@ -34,15 +34,25 @@ public static class TroveItems {
         new(TroveItemId.BouncyShells, "Bouncy Shells", "+1 bounce on every shot (whole run)", TroveItemKind.Passive, new Color(60, 200, 210)),
         new(TroveItemId.ExtraShell, "Extra Shell", "+1 shell on screen at once (whole run)", TroveItemKind.Passive, new Color(150, 110, 200)),
         new(TroveItemId.MinePack, "Mine Pack", "+1 mine at once (whole run)", TroveItemKind.Passive, new Color(230, 190, 40)),
+        new(TroveItemId.Detonator, "Detonator", "Mine button again blows up your mines (whole run)", TroveItemKind.Passive, new Color(200, 50, 40)),
+        new(TroveItemId.BlockBust, "Block Bust", "ITEM button: breaks every breakable block in the room", TroveItemKind.Active, new Color(205, 140, 80)),
     ];
     public static TroveItemDef Def(TroveItemId id) => All[(int)id];
 
     // item rooms draw from everything; rooms only drop hearts and shields
     public static readonly TroveItemId[] PedestalPool = [
         TroveItemId.Rocket, TroveItemId.Rocket, TroveItemId.Homing, TroveItemId.Homing, TroveItemId.SliderBomb, TroveItemId.SliderBomb,
-        TroveItemId.SpeedTreads, TroveItemId.BouncyShells, TroveItemId.ExtraShell, TroveItemId.MinePack, TroveItemId.ExtraLife, TroveItemId.Shield,
+        TroveItemId.SpeedTreads, TroveItemId.BouncyShells, TroveItemId.BouncyShells, TroveItemId.ExtraShell, TroveItemId.ExtraShell,
+        TroveItemId.MinePack, TroveItemId.MinePack, TroveItemId.Detonator, TroveItemId.BlockBust, TroveItemId.BlockBust,
+        TroveItemId.ExtraLife, TroveItemId.Shield,
     ];
-    public static readonly TroveItemId[] DropPool = [TroveItemId.ExtraLife, TroveItemId.Shield, TroveItemId.Shield];
+    /// <summary>Items that stack: every extra one adds another +1.</summary>
+    public static bool Stacks(TroveItemId id) => id is TroveItemId.BouncyShells or TroveItemId.ExtraShell or TroveItemId.MinePack or TroveItemId.SpeedTreads;
+    // cleared rooms mostly leave hearts and shields, sometimes a stacking item or a Block Bust
+    public static readonly TroveItemId[] DropPool = [
+        TroveItemId.ExtraLife, TroveItemId.ExtraLife, TroveItemId.Shield, TroveItemId.Shield, TroveItemId.Shield,
+        TroveItemId.BouncyShells, TroveItemId.ExtraShell, TroveItemId.MinePack, TroveItemId.BlockBust,
+    ];
 
     public sealed class PlayerItems {
         public TroveItemId? Active;
@@ -56,8 +66,8 @@ public static class TroveItems {
 
     public static readonly PlayerItems[] Players = [new(), new(), new(), new()];
 
-    /// <summary>The last pickup, for the banner (name, description, when).</summary>
-    public static (TroveItemDef Def, double Time)? LastPickup;
+    /// <summary>The last pickup, for the banner (name, description, how many you have now, when).</summary>
+    public static (TroveItemDef Def, double Time, int Stack)? LastPickup;
 
     public static void Reset() {
         for (int i = 0; i < 4; i++)
@@ -80,7 +90,8 @@ public static class TroveItems {
         if (playerId is < 0 or >= 4)
             return;
         var def = Def(id);
-        LastPickup = (def, TroveRun.PlayTime);
+        int stack = def.Kind == TroveItemKind.Passive && IsLocal(playerId) ? Players[playerId].Count(id) + 1 : 1;
+        LastPickup = (def, TroveRun.PlayTime, stack);
         SoundPlayer.PlaySoundInstance("Assets/music/fanfares/life_get.ogg", SoundContext.Effect, 0.4f);
         if (!IsLocal(playerId))
             return;
@@ -127,11 +138,44 @@ public static class TroveItems {
             case TroveItemId.SliderBomb:
                 p.SliderBombs += 5;
                 break;
+            case TroveItemId.BlockBust:
+                BustBlocks();
+                if (Client.IsConnected())
+                    Client.SendTroveEvent(TroveRun.EV_BLOCK_BUST, 0);
+                break;
         }
         SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_shoot_rocket.ogg", SoundContext.Effect, 0.7f);
         if (GameHandler.AllPlayerTanks[playerId] is { IsDestroyed: false } tank)
             ApplyTo(tank);
     }
+
+    /// <summary>Block Bust: every breakable block in the room breaks (and stays broken if you come back).</summary>
+    public static void BustBlocks() {
+        int n = 0;
+        foreach (var b in GameContent.Block.AllBlocks.ToArray())
+            if (b is not null && b.Properties.IsDestructible) {
+                b.Destroy();
+                n++;
+            }
+        TroveRun.Room?.Blocks.RemoveAll(b => b.Type == BlockID.Cork);
+        SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_destroy.ogg", SoundContext.Effect, 0.8f);
+        TankGame.ClientLog.Write($"Troves: Block Bust broke {n} blocks", Internals.LogType.Info);
+    }
+
+    /// <summary>Detonator: while this player has mines out, the mine button blows them all up. True if it did.</summary>
+    public static bool TryDetonate(PlayerTank tank) {
+        if (!TroveRun.Active || tank.PlayerId is < 0 or >= 4 || Players[tank.PlayerId].Count(TroveItemId.Detonator) == 0)
+            return false;
+        var mines = Mine.AllMines.Where(m => m is not null && !m.Detonated && ReferenceEquals(m.Owner, tank)).ToArray();
+        if (mines.Length == 0)
+            return false;
+        foreach (var m in mines)
+            m!.Detonate();
+        return true;
+    }
+    /// <summary>Detonator mines wait longer on their own, so you can pick the moment.</summary>
+    public static bool HasDetonator(PlayerTank tank) =>
+        TroveRun.Active && tank.PlayerId is >= 0 and < 4 && Players[tank.PlayerId].Count(TroveItemId.Detonator) > 0;
 
     /// <summary>A slider bomb instead of a mine, if this player has any. True if one was used.</summary>
     public static bool TryUseSliderBomb(PlayerTank tank) {
@@ -190,7 +234,7 @@ public static class TroveItems {
             return null;
         var p = Players[playerId];
         if (p.Active is { } a)
-            return (Def(a).Name.Split(' ')[0].ToUpperInvariant(), "tap to use", true);
+            return (a == TroveItemId.BlockBust ? "BUST" : Def(a).Name.Split(' ')[0].ToUpperInvariant(), "tap to use", true);
         if (MissileUpgrade.ShotsLeft(playerId) > 0)
             return ("ROCKETS", $"{MissileUpgrade.ShotsLeft(playerId)} shots", false);
         if (p.SliderBombs > 0)

@@ -153,6 +153,25 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, c, r * 0.5f, new Color(240, 210, 60));
                 ToggleSwitch.DrawDisc(sb, c, r * 0.18f, new Color(210, 40, 30));
                 break;
+            case TroveItemId.Detonator: {
+                // a plunger box
+                var box = new Rectangle((int)(c.X - r * 0.45f), (int)(c.Y - r * 0.05f), (int)(r * 0.9f), (int)(r * 0.5f));
+                ToggleSwitch.DrawRoundedRect(sb, box, r * 0.08f, new Color(60, 40, 30));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(0, -r * 0.05f), c + new Vector2(0, -r * 0.5f), t, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.3f, -r * 0.5f), c + new Vector2(r * 0.3f, -r * 0.5f), t * 1.2f, w);
+                break;
+            }
+            case TroveItemId.BlockBust: {
+                // a cracked block
+                var box = new Rectangle((int)(c.X - r * 0.45f), (int)(c.Y - r * 0.45f), (int)(r * 0.9f), (int)(r * 0.9f));
+                ToggleSwitch.DrawRoundedRect(sb, box, r * 0.1f, new Color(235, 200, 150));
+                var crack = new Color(110, 60, 30);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.1f, -r * 0.45f), c + new Vector2(r * 0.05f, -r * 0.1f), t * 0.7f, crack);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.05f, -r * 0.1f), c + new Vector2(-r * 0.15f, r * 0.15f), t * 0.7f, crack);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.15f, r * 0.15f), c + new Vector2(r * 0.1f, r * 0.45f), t * 0.7f, crack);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.05f, -r * 0.1f), c + new Vector2(r * 0.42f, r * 0.0f), t * 0.6f, crack);
+                break;
+            }
         }
     }
 
@@ -221,11 +240,12 @@ public static class TroveHud {
         var mine = TroveItems.Players[me];
         float ir = 22 * s, x = panel.X + ir;
         float y = nameAt.Y + 50 * s;
+        // one icon per item, with a count when it's stacked
         foreach (var kv in mine.Passives) {
-            for (int n = 0; n < kv.Value; n++) {
-                DrawItemIcon(sb, kv.Key, new Vector2(x, y), ir);
-                x += ir * 2.3f;
-            }
+            DrawItemIcon(sb, kv.Key, new Vector2(x, y), ir);
+            if (kv.Value > 1)
+                Text(sb, $"x{kv.Value}", new Vector2(x + ir * 0.75f, y + ir * 0.8f), 0.5f * s, Color.White, border: true);
+            x += ir * 2.4f;
         }
         if (mine.Shields > 0) {
             DrawItemIcon(sb, TroveItemId.Shield, new Vector2(x, y), ir);
@@ -263,7 +283,8 @@ public static class TroveHud {
         ToggleSwitch.DrawRoundedRect(sb, box, 22 * s, new Color(250, 244, 230) * (0.95f * a));
         DrawItemIcon(sb, lp.Def.Id, new Vector2(box.X + 70 * s, box.Center.Y), 40 * s);
         var font = FontGlobals.RebirthFont;
-        sb.DrawString(font, lp.Def.Name.ToUpperInvariant(), new Vector2(box.X + 130 * s, box.Y + 32 * s), lp.Def.Color * a, new Vector2(1.0f * s), 0f, new Vector2(0, font.MeasureString("A").Y / 2f));
+        var title = lp.Stack > 1 ? $"{lp.Def.Name.ToUpperInvariant()}  x{lp.Stack}" : lp.Def.Name.ToUpperInvariant();
+        sb.DrawString(font, title, new Vector2(box.X + 130 * s, box.Y + 32 * s), lp.Def.Color * a, new Vector2(1.0f * s), 0f, new Vector2(0, font.MeasureString("A").Y / 2f));
         sb.DrawString(font, lp.Def.Description, new Vector2(box.X + 130 * s, box.Y + 82 * s), new Color(80, 62, 46) * a, new Vector2(0.62f * s), 0f, new Vector2(0, font.MeasureString("A").Y / 2f));
     }
 

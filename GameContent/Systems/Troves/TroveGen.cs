@@ -26,6 +26,8 @@ public sealed class TroveRoom {
     /// <summary>An item in the middle of the room: on a pedestal in item rooms, or left behind once a fight room is cleared.</summary>
     public TroveItemId? Pickup;
     public bool PickupTaken;
+    /// <summary>The campaign mission this room's layout came from, or null for a made-up room.</summary>
+    public string? CampaignMap;
     /// <summary>Whether the pickup is showing (item rooms always; other rooms after they're cleared).</summary>
     public bool PickupVisible => Pickup is not null && !PickupTaken && (Kind == TroveRoomKind.Item || Cleared);
 }
@@ -61,6 +63,39 @@ public static class TroveGen {
         [TankID.Black, TankID.White, TankID.Green, TankID.Sapphire, TankID.Ruby, TankID.Citrine, TankID.Amethyst, TankID.Emerald],
     ];
     private static readonly int[] Bosses = [TankID.Marine, TankID.Violet, TankID.Green, TankID.Black, TankID.Obsidian];
+
+    // ------------------------------------------------------------------ campaign rooms
+
+    /// <summary>Some fight rooms use a map from the Vanilla campaign (deeper floors use later missions).
+    /// The seed's lowest bit says whether this run does that, so every phone in a game builds the same rooms.</summary>
+    public const double CAMPAIGN_ROOM_CHANCE = 0.35;
+    public static bool SeedUsesCampaign(int seed) => (seed & 1) == 1;
+    private static Mission[]? _campaignMaps;
+    private static bool _triedCampaign;
+    public static Mission[]? CampaignMaps {
+        get {
+            if (!_triedCampaign) {
+                _triedCampaign = true;
+                try {
+                    var path = System.IO.Path.Combine(TankGame.SaveDirectory, "Campaigns", "Vanilla.campaign");
+                    if (System.IO.File.Exists(path))
+                        _campaignMaps = Campaign.Load(path).CachedMissions;
+                }
+                catch (Exception e) {
+                    TankGame.ClientLog.Write($"Troves: couldn't read the campaign for rooms: {e.Message}", Internals.LogType.Warn);
+                }
+            }
+            return _campaignMaps;
+        }
+    }
+    public static bool CampaignAvailable => CampaignMaps is { Length: >= FLOORS };
+    /// <summary>A new run's seed (its lowest bit: campaign rooms on, if this phone has the campaign).</summary>
+    public static int NewSeed() => (Random.Shared.Next(1, int.MaxValue) & ~1) | (CampaignAvailable ? 1 : 0);
+
+    private static Point ToGrid(Vector2 world) {
+        Vector2 origin = new BlockMapPosition(0, 0);
+        return new Point((int)MathF.Round((world.X - origin.X) / Block.SIDE_LENGTH), (int)MathF.Round((world.Y - origin.Y) / Block.SIDE_LENGTH));
+    }
 
     public static Point Step(TroveDir d) => d switch {
         TroveDir.North => new(0, -1),
@@ -178,8 +213,11 @@ public static class TroveGen {
     // ------------------------------------------------------------------ inside each room
 
     private static void BuildRooms(TroveFloor f, int seed) {
+        bool campaign = SeedUsesCampaign(seed) && CampaignAvailable;
         foreach (var room in f.Rooms.Values) {
             var rng = new Random(unchecked(seed * 131 + f.Number * 977 + room.Cell.X * 61 + room.Cell.Y * 13));
+            if (room.Kind == TroveRoomKind.Normal && campaign && rng.NextDouble() < CAMPAIGN_ROOM_CHANCE && BuildCampaignRoom(f, room, rng))
+                continue;
             BuildRoom(f, room, rng);
         }
         f.Rooms[f.Start].Cleared = true;
@@ -193,6 +231,81 @@ public static class TroveGen {
         TroveDir.West => y is >= 7 and <= 9 && x <= 12,
         _ => y is >= 7 and <= 9 && x >= 9,
     };
+
+    /// <summary>Clears the middle of the room and a path from every door to it.</summary>
+    private static void Carve(int[,] solid, List<TroveDir> doors) {
+        for (int x = 0; x < GW; x++)
+            for (int y = 0; y < GH; y++) {
+                bool keep = x is >= 8 and <= 13 && y is >= 6 and <= 10;
+                foreach (var d in doors)
+                    keep |= InCorridor(x, y, d);
+                if (keep)
+                    solid[x, y] = 0;
+            }
+    }
+
+    private static readonly Vector2[] DoorCells = [new(10.5f, 0), new(21, 8), new(10.5f, 16), new(0, 8)];
+
+    /// <summary>A fight room laid out like a campaign mission (its blocks and its tanks), with paths cut to the doors.</summary>
+    private static bool BuildCampaignRoom(TroveFloor f, TroveRoom room, Random rng) {
+        var maps = CampaignMaps!;
+        int per = maps.Length / FLOORS;
+        var m = maps[(f.Number - 1) * per + rng.Next(per)];
+        if (m.Blocks is null || m.Tanks is null)
+            return false;
+        var doors = Doors(f, room).ToList();
+        var solid = new int[GW, GH];
+        var type = new int[GW, GH];
+        foreach (var b in m.Blocks) {
+            if (b.Type is not (BlockID.Wood or BlockID.Cork or BlockID.Hole))
+                continue; // no teleporters (their links wouldn't survive the cut paths)
+            var g = ToGrid(b.Position);
+            if (g.X < 0 || g.Y < 0 || g.X >= GW || g.Y >= GH)
+                continue;
+            solid[g.X, g.Y] = Math.Max(1, (int)b.Stack);
+            type[g.X, g.Y] = b.Type;
+        }
+        Carve(solid, doors);
+        room.Shape = TroveShape.Open;
+        room.CampaignMap = m.Name;
+        for (int x = 0; x < GW; x++)
+            for (int y = 0; y < GH; y++)
+                if (solid[x, y] > 0)
+                    room.Blocks.Add((x, y, type[x, y], type[x, y] == BlockID.Hole ? 1 : solid[x, y]));
+
+        if (rng.NextDouble() < 0.3)
+            room.Pickup = TroveItems.DropPool[rng.Next(TroveItems.DropPool.Length)];
+
+        // the mission's own enemies, except ones sitting right by a door (you'd drive into them) or inside a block
+        var used = doors.Select(d => DoorCells[(int)d]).ToList();
+        int cap = 3 + f.Number;
+        foreach (var t in m.Tanks) {
+            if (t.IsPlayer || room.Enemies.Count >= cap)
+                continue;
+            var g = ToGrid(t.Position);
+            if (g.X < 1 || g.Y < 1 || g.X >= GW - 1 || g.Y >= GH - 1 || solid[g.X, g.Y] > 0)
+                continue;
+            if (used.Any(dc => Vector2.Distance(dc, new Vector2(g.X, g.Y)) < 5f))
+                continue;
+            if (g.X is >= 8 and <= 13 && g.Y is >= 6 and <= 10)
+                continue; // the middle (where the pickups go)
+            room.Enemies.Add((g.X, g.Y, t.AiTier, t.Rotation));
+        }
+        if (room.Enemies.Count == 0) {
+            // none left: one from this floor's pool, as far from the doors as possible
+            var pool = Pools[f.Number - 1];
+            Point best = new(3, 3);
+            float bestD = -1;
+            for (int x = 1; x < GW - 1; x++)
+                for (int y = 1; y < GH - 1; y++)
+                    if (solid[x, y] == 0) {
+                        float d = used.Count == 0 ? 0 : used.Min(dc => Vector2.Distance(dc, new Vector2(x, y)));
+                        if (d > bestD) { bestD = d; best = new Point(x, y); }
+                    }
+            room.Enemies.Add((best.X, best.Y, pool[rng.Next(pool.Length)], rng.NextSingle() * MathHelper.TwoPi));
+        }
+        return true;
+    }
 
     private static void BuildRoom(TroveFloor f, TroveRoom room, Random rng) {
         var doors = Doors(f, room).ToList();
@@ -265,14 +378,7 @@ public static class TroveGen {
         }
 
         // keep every door's path to the middle open (and the middle itself)
-        for (int x = 0; x < GW; x++)
-            for (int y = 0; y < GH; y++) {
-                bool keep = x is >= 8 and <= 13 && y is >= 6 and <= 10;
-                foreach (var d in doors)
-                    keep |= InCorridor(x, y, d);
-                if (keep)
-                    solid[x, y] = 0;
-            }
+        Carve(solid, doors);
 
         for (int x = 0; x < GW; x++)
             for (int y = 0; y < GH; y++)

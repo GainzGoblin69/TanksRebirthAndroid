@@ -339,8 +339,16 @@ public class PlayerTank : Tank {
             FireSliderBomb();
             return;
         }
+        // Tank Troves Detonator: with mines out, the mine button blows them up instead
+        if (Systems.Troves.TroveItems.TryDetonate(this))
+            return;
         PlayerStatistics.MinesLaid++;
+        int before = OwnedMineCount;
         base.LayMine();
+        if (OwnedMineCount > before && !Client.IsConnected() && Systems.Troves.TroveItems.HasDetonator(this))
+            foreach (var m in Mine.AllMines)
+                if (m is not null && ReferenceEquals(m.Owner, this) && m.DetonateTime >= m.DetonateTimeMax - 1)
+                    m.DetonateTime *= 2.5f; // waits for you to set it off
     }
     /// <summary>A slow bomb that slides along the floor the way the turret points, and explodes when it hits something.</summary>
     private void FireSliderBomb() {

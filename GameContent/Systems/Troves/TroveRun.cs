@@ -24,7 +24,7 @@ public static class TroveRun {
 
     public enum EndKind { None, RunOver, Victory }
     // multiplayer events (host -> everyone)
-    public const int EV_START = 1, EV_MOVE = 2, EV_RETRY = 3, EV_NEXT_FLOOR = 4, EV_RUN_OVER = 5, EV_VICTORY = 6, EV_MENU = 7, EV_ITEM = 8;
+    public const int EV_START = 1, EV_MOVE = 2, EV_RETRY = 3, EV_NEXT_FLOOR = 4, EV_RUN_OVER = 5, EV_VICTORY = 6, EV_MENU = 7, EV_ITEM = 8, EV_BLOCK_BUST = 9;
     /// <summary>How close (game units) a tank has to get to an item to pick it up.</summary>
     public const float PICKUP_REACH = 26f;
     public static Vector2 PickupPoint => new Coordinates.BlockMapPosition(10, 8);
@@ -67,7 +67,7 @@ public static class TroveRun {
             SoundPlayer.SoundError();
             return;
         }
-        int seed = Random.Shared.Next(1, int.MaxValue);
+        int seed = TroveGen.NewSeed();
         if (Client.IsConnected())
             Client.SendTroveEvent(EV_START, seed);
         Begin(seed);
@@ -80,6 +80,7 @@ public static class TroveRun {
         FloorNumber = 1;
         Floor = TroveGen.Generate(seed, 1);
         Current = Floor.Start;
+        SetFloorTint();
         Ended = EndKind.None;
         RoomsCleared = TanksDestroyed = 0;
         PlayTime = 0;
@@ -118,7 +119,19 @@ public static class TroveRun {
         CampaignGlobals.ShouldMissionsProgress = false;
     }
 
+    /// <summary>Each floor's floor colour: it gets darker and stranger the deeper you go.</summary>
+    public static readonly Vector3[] FloorTints = [
+        new(1.00f, 1.00f, 1.00f), // The Cellar: the usual wood
+        new(1.00f, 0.82f, 0.62f), // The Pantry: warm amber
+        new(0.70f, 0.80f, 0.92f), // The Workshop: cold steel blue
+        new(0.82f, 0.52f, 0.48f), // The Armory: rusty red
+        new(0.55f, 0.44f, 0.72f), // The Vault: deep violet
+    ];
+    private static void SetFloorTint() =>
+        Graphics.GameScene.FloorTint = FloorTints[Math.Clamp(FloorNumber - 1, 0, FloorTints.Length - 1)];
+
     public static void Stop() {
+        Graphics.GameScene.FloorTint = Vector3.One;
         Active = false;
         _starting = false;
         Ended = EndKind.None;
@@ -158,7 +171,7 @@ public static class TroveRun {
             float nearest = Room is { } lr && Floor is not null && me is not null
                 ? TroveGen.Doors(Floor, lr).Select(d => Vector2.Distance(me.Position, DoorPoint(d))).DefaultIfEmpty(-1).Min() : -1;
             TankGame.ClientLog.Write($"Troves: floor {FloorNumber} room {Current} inMission={CampaignGlobals.InMission} cleared={Room?.Cleared} " +
-                $"fade={Fade:0.00}/{_fadeDir} paused={GameUI.Paused} ended={Ended} dt={Dt:0.000} me={me?.Position} nearestDoor={nearest:0}", Internals.LogType.Info);
+                $"map={Room?.CampaignMap ?? "-"} fade={Fade:0.00}/{_fadeDir} paused={GameUI.Paused} ended={Ended} dt={Dt:0.000} me={me?.Position} nearestDoor={nearest:0}", Internals.LogType.Info);
         }
 
         if (_fadeDir != 0) {
@@ -341,6 +354,7 @@ public static class TroveRun {
         BossTank = null;
         Floor = TroveGen.Generate(Seed, FloorNumber);
         Current = Floor.Start;
+        SetFloorTint();
         _entry = null;
         _roomTime = 0;
         MarkSeen();
@@ -421,6 +435,9 @@ public static class TroveRun {
                 break;
             case EV_ITEM:
                 if (Active) TakePickup(a);
+                break;
+            case EV_BLOCK_BUST:
+                if (Active && CampaignGlobals.InMission) TroveItems.BustBlocks();
                 break;
             case EV_MENU:
                 if (Active) {
