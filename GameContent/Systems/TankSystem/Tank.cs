@@ -593,9 +593,17 @@ public abstract class Tank {
 
         OnDamage?.Invoke(this, willDestroy, context);
 
+        // Tank Troves Second Wind: survive this one
+        if (willDestroy && PreventDestroy?.Invoke(this) == true)
+            willDestroy = false;
+
         if (willDestroy)
             Destroy(context, netSend);
     }
+    /// <summary>Set by Tank Troves: true to keep a tank alive that would have been destroyed (Second Wind).</summary>
+    public static Func<Tank, bool>? PreventDestroy;
+    /// <summary>Set by Tank Troves: true while a tank can't shoot (EMP).</summary>
+    public static Func<Tank, bool>? ShootBlocked;
     public void DoDamageTextPopup(Color color) {
         var part = GameHandler.Particles.MakeParticle(Position3D + new Vector3(0, 15, 0),
             TankGame.GameLanguage.Hit);
@@ -727,7 +735,7 @@ public abstract class Tank {
         if (!MainMenuUI.IsActive && !CampaignGlobals.InMission || !Properties.HasTurret)
             return;
 
-        if (CurShootCooldown > 0 || OwnedShellCount >= Properties.ShellLimit / Properties.ShellShootCount)
+        if (CurShootCooldown > 0 || OwnedShellCount >= Properties.ShellLimit / Properties.ShellShootCount || ShootBlocked?.Invoke(this) == true)
             return;
 
         bool flip = false;

@@ -13,7 +13,7 @@ adb logcat -c
 launch() {  # $1 = label, $2 = seconds to wait
   adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 > /dev/null
   local elapsed=0
-  for t in 10 25 45 $2; do
+  for t in 3 10 25 45 $2; do
     sleep $((t - elapsed)); elapsed=$t
     adb exec-out screencap -p > "diag/$1-${t}s.png"
   done
@@ -110,7 +110,7 @@ adb exec-out screencap -p > diag/run2-levelrun.png
 
 # Tank Troves: pause, Quit, then Play > Single Player > Tank Troves; the first room of floor 1
 # (test setup: start with a pile of items that make synergies, and an item on the floor of the first room)
-adb shell "printf 'SplitShot RicochetMaster EchoShot TinyTank ChainLightning ClusterMines HomingMines SniperShells OrbitGuard TreasureMap LightningStorm\nGiantTank\n' > '$EXT/troves_test.txt'"
+adb shell "printf 'GhostShells MagnetShells Afterburner LastStand SecondWind RicochetShield SplitShot EchoShot OrbitGuard TreasureMap MirrorShield\nClone\n' > '$EXT/troves_test.txt'"
 adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 5
 tapy 314 4

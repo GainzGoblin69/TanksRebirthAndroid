@@ -201,6 +201,7 @@ public class MainActivity : AndroidGameActivity {
             _overlay.SetPadding(12, 8, 12, 8);
             _overlay.Visibility = ViewStates.Gone; // off unless switched on in Options (or startup goes wrong)
             frame.AddView(_overlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+            AddSplash(frame);
             SetContentView(frame);
             _status = null;
 
@@ -228,6 +229,48 @@ public class MainActivity : AndroidGameActivity {
 
     private bool _resumed;
     private TiltSensor? _tilt;
+
+    // ---- the Larry Slop Software splash: over the game while it loads, at least a couple of seconds, then fades out
+    private View? _splash;
+    private long _splashShownAt;
+    private const long SPLASH_MIN_MS = 2200;
+
+    private void AddSplash(FrameLayout frame) {
+        try {
+            int id = Resources!.GetIdentifier("splash_logo", "drawable", PackageName);
+            if (id == 0)
+                return;
+            var splash = new FrameLayout(this);
+            splash.SetBackgroundColor(Android.Graphics.Color.White);
+            var img = new ImageView(this);
+            img.SetImageResource(id);
+            img.SetScaleType(ImageView.ScaleType.FitCenter);
+            int h = (int)(Resources.DisplayMetrics!.HeightPixels * 0.55f);
+            splash.AddView(img, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, h) { Gravity = GravityFlags.Center });
+            frame.AddView(splash, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+            _splash = splash;
+            _splashShownAt = SystemClock.UptimeMillis();
+            new Handler(Looper.MainLooper!).PostDelayed(HideSplashWhenReady, 300);
+        }
+        catch (Exception e) {
+            Breadcrumb("splash unavailable: " + e.Message);
+        }
+    }
+
+    private void HideSplashWhenReady() {
+        if (_splash is not { } splash)
+            return;
+        bool ready = _firstFrameAt is not null && SystemClock.UptimeMillis() - _splashShownAt >= SPLASH_MIN_MS;
+        bool tooLong = SystemClock.UptimeMillis() - _splashShownAt > 20000; // never hide the game for good
+        if (!ready && !tooLong) {
+            new Handler(Looper.MainLooper!).PostDelayed(HideSplashWhenReady, 100);
+            return;
+        }
+        _splash = null;
+        splash.Animate()!.Alpha(0f).SetDuration(450).WithEndAction(new Java.Lang.Runnable(() => {
+            (splash.Parent as ViewGroup)?.RemoveView(splash);
+        }))!.Start();
+    }
 
     protected override void OnResume() {
         base.OnResume();

@@ -26,7 +26,8 @@ public static class TroveRun {
     // multiplayer events (host -> everyone)
     public const int EV_START = 1, EV_MOVE = 2, EV_RETRY = 3, EV_NEXT_FLOOR = 4, EV_RUN_OVER = 5, EV_VICTORY = 6, EV_MENU = 7, EV_ITEM = 8, EV_BLOCK_BUST = 9,
         EV_REROLL = 10, EV_SECRET = 11, EV_WAVE2 = 12, EV_STOPWATCH = 13, EV_NUKE = 14, EV_DECOY = 15, EV_INVINCIBLE = 16,
-        EV_WALL = 17, EV_CONVERT = 18, EV_SHRINK = 19, EV_BLAST = 20;
+        EV_WALL = 17, EV_CONVERT = 18, EV_SHRINK = 19, EV_BLAST = 20,
+        EV_CLONE = 21, EV_EMP = 22, EV_TURRET = 23, EV_MIRROR = 24, EV_GIVE = 25;
     /// <summary>How close (game units) a tank has to get to an item to pick it up.</summary>
     public const float PICKUP_REACH = 26f;
     public static Vector2 PickupPoint => new Coordinates.BlockMapPosition(10, 8);
@@ -608,6 +609,21 @@ public static class TroveRun {
                 break;
             case EV_BLAST:
                 if (Active && CampaignGlobals.InMission) TroveItems.RemoteBlast(a);
+                break;
+            case EV_CLONE:
+                if (Active && CampaignGlobals.InMission) TroveItems.SpawnClone(a);
+                break;
+            case EV_EMP:
+                if (Active && CampaignGlobals.InMission) TroveItems.StartEmp(a);
+                break;
+            case EV_TURRET:
+                if (Active && CampaignGlobals.InMission) TroveItems.DropTurrets(a);
+                break;
+            case EV_MIRROR:
+                if (Active) TroveItems.StartMirror(a);
+                break;
+            case EV_GIVE:
+                if (Active) TroveItems.Give(a / 100, (TroveItemId)(a % 100));
                 break;
             case EV_MENU:
                 if (Active) {

@@ -173,6 +173,29 @@ public class Shell : IAITankDanger {
     public bool SplitsOnBounce, Shrapnel;
     /// <summary>Faster and bigger after every bounce (Ricochet Master).</summary>
     public bool GrowsOnBounce;
+    /// <summary>How many walls this shell can still pass through instead of bouncing (Ghost Shells).</summary>
+    public int WallPasses;
+    private float _ghostTicks;
+    /// <summary>Set by Tank Troves: true if this shell should bounce back off this tank instead of hitting it (Mirror Shield).</summary>
+    public static Func<Shell, Tank, bool>? Reflects;
+    /// <summary>Set by Tank Troves: a shell was bounced back by a tank (its items may apply).</summary>
+    public static Action<Shell, Tank>? OnReflected;
+
+    /// <summary>Bounces this shell back the way it came; it belongs to <paramref name="newOwner"/> now.</summary>
+    public void Reflect(Tank newOwner) {
+        if (Owner?.OwnedShells is { } old) {
+            var idx = Array.IndexOf(old, this);
+            if (idx > -1)
+                old[idx] = null; // the old owner can shoot again
+        }
+        Owner = newOwner;
+        Velocity = -Velocity;
+        LifeTime = 0;
+        _lastPierced = newOwner;
+        Position += Velocity * 2f;
+        GameHandler.Particles.MakeShineSpot(Position3D, Color.LightBlue, 0.8f);
+        OnReflected?.Invoke(this, newOwner);
+    }
     /// <summary>Set by Tank Troves: called when this shell hits a tank (Chain Lightning).</summary>
     public static Action<Shell, Tank>? OnHitTank;
 
@@ -361,7 +384,15 @@ public class Shell : IAITankDanger {
         Collision.HandleCollisionSimple_ForBlocks(Hitbox, Velocity, ref dummy, out var dir, out var block,
             out bool corner, false, (c) => c.Properties.IsSolid);
 
-        if (BreaksCork && block is { Properties.IsDestructible: true } && (dir != CollisionDirection.None || corner)) {
+        if (_ghostTicks > 0) {
+            _ghostTicks -= RuntimeData.DeltaTime; // passing through a wall (Ghost Shells)
+        }
+        else if (WallPasses > 0 && block is not null && (dir != CollisionDirection.None || corner)) {
+            // go through this wall: ignore blocks until it's out the other side (a block or two)
+            WallPasses--;
+            _ghostTicks = Block.SIDE_LENGTH * 2f / Math.Max(0.5f, Velocity.Length() * 0.62f);
+        }
+        else if (BreaksCork && block is { Properties.IsDestructible: true } && (dir != CollisionDirection.None || corner)) {
             block.Destroy(); // heavy shells smash breakable blocks and keep going
         }
         else if (Type == ShellID.Missile && block is not null && (dir != CollisionDirection.None || corner)) {
@@ -645,6 +676,11 @@ public class Shell : IAITankDanger {
             if (ReferenceEquals(tank, _lastPierced)) continue;
             // a fresh shell can't hit the tank that fired it (Triple Shot's side shells start right next to it)
             if (ReferenceEquals(tank, Owner) && LifeTime < 12 && Systems.Troves.TroveRun.Active) continue;
+            // Mirror Shield: it bounces back instead
+            if (Reflects?.Invoke(this, tank) == true) {
+                Reflect(tank);
+                return;
+            }
 
             // heavy shells go through enemies (not their owner's side)
             if (Pierce > 0 && Owner is not null && !tank.IsOnSameTeamAs(Owner.Team)) {
