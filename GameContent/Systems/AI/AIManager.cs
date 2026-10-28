@@ -893,6 +893,7 @@ public static class AIManager {
             var tank = Unsafe.Add(ref tanksSearchSpace, i);
 
             if (tank is null || tank.IsDestroyed || predicate is not null && !predicate.Invoke(tank)) continue;
+            if (Troves.TroveRun.Active && tank.Team == TeamID.Red) continue; // Tank Troves allies don't set the music
 
             if (tank.AiTankType > highest)
                 highest = tank.AiTankType;

@@ -335,7 +335,7 @@ public static partial class MainMenuUI {
         };
         GearsOfWar = new("Gears of War", font, Color.White) {
             IsVisible = false,
-            Tooltip = "One life each. Revive a teammate by standing where they fell for 5 seconds.",
+            Tooltip = "One life each. Revive a teammate by standing where they fell for 4 seconds.",
             OnLeftClick = (elem) => Difficulties.Types["GearsOfWar"] = !Difficulties.Types["GearsOfWar"]
         };
         DoubleTanks = new("Double Enemies", font, Color.White) {

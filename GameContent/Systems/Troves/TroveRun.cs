@@ -191,6 +191,12 @@ public static class TroveRun {
         GameHandler.Particles.MakeShineSpot(new Vector3(PickupPoint.X, 12, PickupPoint.Y), Color.White, 1.5f);
     }
 
+    /// <summary>Each room starts the music for the tanks in it (the game normally only does this when a mission starts).</summary>
+    private static void RestartMusic() {
+        TankMusicSystem.StopAll();
+        TankMusicSystem.PlayAll();
+    }
+
     /// <summary>The secret room's doorway is open now.</summary>
     private static void RevealSecret() {
         if (Floor is null || Floor.SecretFound || Floor.Secret is not { } sp)
@@ -219,6 +225,7 @@ public static class TroveRun {
             GameHandler.Particles.MakeShineSpot(t.Position3D + new Vector3(0, 10, 0), Color.Red, 1.2f);
         }
         _roomTime = 0;
+        RestartMusic();
         SoundPlayer.PlaySoundInstance("Assets/sounds/menu/client_join.ogg", SoundContext.Effect, 0.8f, pitchOverride: -0.5f);
         ChatSystem.SendMessage("Wave 2!", Color.OrangeRed);
     }
@@ -423,6 +430,7 @@ public static class TroveRun {
         CampaignGlobals.LoadedCampaign.SetupLoadedMission(true);
         ApplyItems();
         TroveItems.SpawnBuddies();
+        RestartMusic();
         // what normally happens when a mission starts (invisible tanks vanish, free-for-all teams)
         foreach (var t in GameHandler.AllTanks)
             if (t is not null && !t.IsDestroyed)

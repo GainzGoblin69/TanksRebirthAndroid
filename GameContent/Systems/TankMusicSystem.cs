@@ -175,7 +175,7 @@ public static class TankMusicSystem
     private static void PlayMissionTracksOnly() {
         const int MaxTracks = 20; // leaves room for sound effects
         var tiers = GameHandler.AllAITanks
-            .Where(t => t is not null && !t.IsDestroyed)
+            .Where(t => t is not null && !t.IsDestroyed && !(Troves.TroveRun.Active && t.Team == TeamID.Red))
             .Select(t => t.AiTankType)
             .Distinct()
             .OrderByDescending(t => t);

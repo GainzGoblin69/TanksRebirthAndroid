@@ -129,15 +129,16 @@ public class ParticleManager
         var p = MakeParticle(position, t);
 
         int frame = 0;
-        int frameHeight = 66;
+        // the frames are 66x66 in a grid, 13 per row (one 6006-pixel-tall strip was too tall for many phones' GPUs: it drew black)
+        const int frameSize = 66, perRow = 13, frameCount = 91;
 
         p.Scale = new(particleScaleMultiplier);
         p.IsIn2DSpace = false;
         p.HasAdditiveBlending = false;
         p.Alpha = 1;
-        p.Origin2D = new Vector2(t.Width / 2, frameHeight / 2);
+        p.Origin2D = new Vector2(frameSize / 2, frameSize / 2);
         void act(Particle b) {
-            b.TextureCrop = new Rectangle(0, frame * frameHeight, t.Width, frameHeight);
+            b.TextureCrop = new Rectangle(frame % perRow * frameSize, frame / perRow * frameSize, frameSize, frameSize);
 
             if (frame < 50) {
                 if (b.LifeTime % 0.8f <= RuntimeData.DeltaTime)
@@ -148,7 +149,7 @@ public class ParticleManager
                     frame++;
             }
 
-            if (frame * frameHeight >= t.Height)
+            if (frame >= frameCount)
                 p.Destroy();
         }
         ourAction = act;

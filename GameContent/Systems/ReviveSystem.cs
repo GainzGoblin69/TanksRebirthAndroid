@@ -19,7 +19,7 @@ namespace TanksRebirth.GameContent.Systems;
 /// others), so it only happens once.
 /// </summary>
 public static class ReviveSystem {
-    public const float REVIVE_SECONDS = 5f;
+    public const float REVIVE_SECONDS = 4f;
     /// <summary>How close (game units) a teammate has to be to the spot.</summary>
     public const float REVIVE_RADIUS = 26f;
 
