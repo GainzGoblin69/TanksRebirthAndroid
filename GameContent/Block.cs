@@ -389,7 +389,7 @@ public class Block : IGameObject
                     }
                     else if (mesh.Name == "Teleporter_Ring") {
                         World = Matrix.CreateScale(1f) * Matrix.CreateTranslation(Position3D);
-                        effect.Texture = GameResources.GetGameResource<Texture2D>("Assets/textures/tank/wee/tank_rocket");
+                        effect.Texture = GameResources.GetGameResource<Texture2D>("Assets/textures/tank/tank_marine") /* (the original "wee/tank_rocket" texture isn't in this version: it crashed the game) */;
                     }
 
                     effect.SetDefaultGameLighting_IngameEntities(8f);
