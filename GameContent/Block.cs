@@ -437,6 +437,21 @@ public class Block : IGameObject
                 tnk.Position = otherTp.Position;
                 tnk.Physics.Position = otherTp.Position / Tank.UNITS_PER_METER;
             }
+            // Tank Troves: shells go through teleporters too, and keep going the same way out of the other one
+            if (Systems.Troves.TroveRun.Active) {
+                foreach (var sh in Shell.AllShells) {
+                    if (sh is null || sh.TeleportCooldown > 0 || Vector2.Distance(sh.Position, Position) > SIDE_LENGTH * 0.45f)
+                        continue;
+                    var other = AllBlocks.FirstOrDefault(bl => bl != null && bl != this && bl.Type == BlockID.Teleporter && bl.TpLink == TpLink);
+                    if (other is null)
+                        continue;
+                    var dir = sh.Velocity.LengthSquared() > 0 ? Vector2.Normalize(sh.Velocity) : Vector2.UnitY;
+                    GameHandler.Particles.MakeShineSpot(sh.Position3D, Color.Cyan, 0.6f);
+                    sh.Position = other.Position + dir * SIDE_LENGTH * 0.55f;
+                    sh.TeleportCooldown = 25;
+                    GameHandler.Particles.MakeShineSpot(sh.Position3D, Color.Cyan, 0.6f);
+                }
+            }
         }
         UpdateOffset();
         ModdedData?.PostUpdate();

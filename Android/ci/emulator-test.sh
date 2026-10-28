@@ -110,7 +110,7 @@ adb exec-out screencap -p > diag/run2-levelrun.png
 
 # Tank Troves: pause, Quit, then Play > Single Player > Tank Troves; the first room of floor 1
 # (test setup: start with a pile of items that make synergies, and an item on the floor of the first room)
-adb shell "printf 'GhostShells SplitShot OrbitGuard Stopwatch Decoy MirrorShield\nClone\n' > '$EXT/troves_test.txt'"
+adb shell "printf 'GhostShells SplitShot OrbitGuard Stopwatch Decoy MirrorShield\nClone\nMamaBrown\n' > '$EXT/troves_test.txt'"
 adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 5
 tapy 314 4
@@ -121,6 +121,8 @@ adb exec-out screencap -p > diag/run2-troves-room.png
 # fire (tap the right side: triple explosive heavy shells), then use the ITEM (Stopwatch) - the item button sits above the mine button
 adb shell input tap $((W * 75 / 100)) $((H * 30 / 100)); sleep 1
 adb exec-out screencap -p > diag/run2-troves-fire.png
+sleep 4
+adb exec-out screencap -p > diag/run2-troves-boss.png
 sleep 2
 # hold the joystick up, then left, to drive into a door (if the start room has one there)
 adb shell input swipe $((W * 15 / 100)) $((H * 75 / 100)) $((W * 15 / 100)) $((H * 45 / 100)) 6000; sleep 2

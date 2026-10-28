@@ -31,10 +31,12 @@ public sealed class TroveRoom {
     /// <summary>An item in the middle of the room: on a pedestal in item rooms, or left behind once a fight room is cleared.</summary>
     public TroveItemId? Pickup;
     public bool PickupTaken;
+    /// <summary>A pickup dropped mid-fight (the Gold Hoarder's), showing before the room is cleared.</summary>
+    public bool ForcePickup;
     /// <summary>The campaign mission this room's layout came from, or null for a made-up room.</summary>
     public string? CampaignMap;
     /// <summary>Whether the pickup is showing (item rooms always; other rooms after they're cleared).</summary>
-    public bool PickupVisible => Pickup is not null && !PickupTaken && (Kind is TroveRoomKind.Item or TroveRoomKind.Secret || Cleared);
+    public bool PickupVisible => Pickup is not null && !PickupTaken && (Kind is TroveRoomKind.Item or TroveRoomKind.Secret || Cleared || ForcePickup);
 }
 
 public sealed class TroveFloor {
@@ -46,6 +48,8 @@ public sealed class TroveFloor {
     /// <summary>A hidden room: its doorway is walled up with cork until an explosion goes off near it.</summary>
     public Point? Secret;
     public bool SecretFound;
+    /// <summary>The tank this floor's boss is built on (it depends on which boss this run has).</summary>
+    public int BossTier = TankID.Marine;
 
     public bool Has(Point p) => Rooms.ContainsKey(p);
 }
@@ -278,6 +282,7 @@ public static class TroveGen {
     // ------------------------------------------------------------------ inside each room
 
     private static void BuildRooms(TroveFloor f, int seed) {
+        f.BossTier = TroveBosses.PickFor(f.Number, seed).Tier;
         bool campaign = SeedUsesCampaign(seed) && CampaignAvailable;
         foreach (var room in f.Rooms.Values) {
             var rng = new Random(unchecked(seed * 131 + f.Number * 977 + room.Cell.X * 61 + room.Cell.Y * 13));
@@ -415,6 +420,31 @@ public static class TroveGen {
             }
         }
         return stuck;
+    }
+
+    public const double TELEPORTER_CHANCE = 0.3;
+
+    /// <summary>Two linked teleporter pads in open spots on opposite sides of the room (never in doorways or the middle).</summary>
+    private static List<(int X, int Y, int Link)> PlaceTeleporters(int[,] solid, List<TroveDir> doors, Random rng) {
+        bool Ok(int x, int y) {
+            if (x < 1 || y < 1 || x > GW - 2 || y > GH - 2 || solid[x, y] > 0)
+                return false;
+            if (x is >= 7 and <= 14 && y is >= 5 and <= 11)
+                return false; // the middle (spawns and pickups)
+            foreach (var d in doors)
+                if (InCorridor(x, y, d))
+                    return false;
+            return true;
+        }
+        var spots = new List<Point>();
+        for (int x = 1; x < GW - 1; x++)
+            for (int y = 1; y < GH - 1; y++)
+                if (Ok(x, y) && Ok(GW - 1 - x, GH - 1 - y) && Math.Abs(GW - 1 - 2 * x) + Math.Abs(GH - 1 - 2 * y) >= 10)
+                    spots.Add(new Point(x, y));
+        if (spots.Count == 0)
+            return [];
+        var a = spots[rng.Next(spots.Count)];
+        return [(a.X, a.Y, 0), (GW - 1 - a.X, GH - 1 - a.Y, 0)];
     }
 
     private static readonly Vector2[] DoorCells = [new(10.5f, 0), new(21, 8), new(10.5f, 16), new(0, 8)];
@@ -568,7 +598,10 @@ public static class TroveGen {
         // keep every door's path to the middle open (and the middle itself), and no part of the room shut off
         Carve(solid, doors);
         SecretCrack(solid, type, SecretDoor(f, room));
-        var stuck = ConnectRegions(solid, type, []);
+        // some fight rooms get a pair of teleporters: tanks and shells that go in one come out the other
+        if (room.Kind is TroveRoomKind.Normal or TroveRoomKind.Challenge or TroveRoomKind.MiniBoss && rng.NextDouble() < TELEPORTER_CHANCE)
+            room.Teleporters = PlaceTeleporters(solid, doors, rng);
+        var stuck = ConnectRegions(solid, type, room.Teleporters);
 
         for (int x = 0; x < GW; x++)
             for (int y = 0; y < GH; y++)
@@ -597,7 +630,7 @@ public static class TroveGen {
         var free = new List<Point>();
         for (int x = 1; x < GW - 1; x++)
             for (int y = 1; y < GH - 1; y++)
-                if (solid[x, y] == 0 && !stuck.Contains(new Point(x, y)))
+                if (solid[x, y] == 0 && !stuck.Contains(new Point(x, y)) && !room.Teleporters.Any(t => Math.Abs(t.X - x) + Math.Abs(t.Y - y) <= 1))
                     free.Add(new Point(x, y));
         var doorCells = new[] { new Vector2(10.5f, 0), new Vector2(21, 8), new Vector2(10.5f, 16), new Vector2(0, 8) };
         float Far(Point p) => doorCells.Min(dc => Vector2.Distance(dc, new Vector2(p.X, p.Y)));
@@ -627,7 +660,7 @@ public static class TroveGen {
             // boss in the middle-ish, a couple of guards
             var bp = Pick(7) ?? Pick(4) ?? new Point(10, 8);
             room.BossIndex = 0;
-            room.Enemies.Add((bp.X, bp.Y, Bosses[f.Number - 1], rng.NextSingle() * MathHelper.TwoPi));
+            room.Enemies.Add((bp.X, bp.Y, f.BossTier, rng.NextSingle() * MathHelper.TwoPi));
             int guards = 1 + f.Number / 2;
             for (int i = 0; i < guards; i++)
                 if ((Pick(6) ?? Pick(3)) is { } gp)

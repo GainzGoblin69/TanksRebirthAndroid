@@ -175,9 +175,13 @@ public class Shell : IAITankDanger {
     public bool GrowsOnBounce;
     /// <summary>How many walls this shell can still pass through instead of bouncing (Ghost Shells).</summary>
     public int WallPasses;
+    /// <summary>Ticks before this shell can use a teleporter again (Tank Troves: shells go through teleporters).</summary>
+    public float TeleportCooldown;
     private float _ghostTicks;
     /// <summary>Set by Tank Troves: true if this shell should bounce back off this tank instead of hitting it (Mirror Shield).</summary>
     public static Func<Shell, Tank, bool>? Reflects;
+    /// <summary>Set by Tank Troves: true if this tank blocks this shell (it just breaks, no damage).</summary>
+    public static Func<Shell, Tank, bool>? Blocks;
     /// <summary>Set by Tank Troves: a shell was bounced back by a tank (its items may apply).</summary>
     public static Action<Shell, Tank>? OnReflected;
 
@@ -347,6 +351,8 @@ public class Shell : IAITankDanger {
 
         if (IsFrozen?.Invoke(this) == true)
             return;
+        if (TeleportCooldown > 0)
+            TeleportCooldown -= RuntimeData.DeltaTime;
         Rotation = Velocity.ToRotation() - MathHelper.PiOver2;
         Position += Velocity * 0.62f * RuntimeData.DeltaTime;
         World = Matrix.CreateScale(VisualScale) * Matrix.CreateFromYawPitchRoll(-Rotation, 0, 0)
@@ -676,6 +682,11 @@ public class Shell : IAITankDanger {
             if (ReferenceEquals(tank, _lastPierced)) continue;
             // a fresh shell can't hit the tank that fired it (Triple Shot's side shells start right next to it)
             if (ReferenceEquals(tank, Owner) && LifeTime < 12 && Systems.Troves.TroveRun.Active) continue;
+            // Tank Troves: a shield stops it dead (Shield Commander's front)
+            if (Blocks?.Invoke(this, tank) == true) {
+                Destroy(DestructionContext.WithObstacle);
+                return;
+            }
             // Mirror Shield: it bounces back instead
             if (Reflects?.Invoke(this, tank) == true) {
                 Reflect(tank);

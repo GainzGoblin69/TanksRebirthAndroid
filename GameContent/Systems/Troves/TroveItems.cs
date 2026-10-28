@@ -340,7 +340,7 @@ public static class TroveItems {
         Shell.IsFrozen = s => Frozen && s.Owner is AITank ai && IsEnemy(ai);
         AITank.TargetOverride = ai => TroveRun.Active && DecoyTank is { IsDestroyed: false } d && IsEnemy(ai) ? d : null;
         Tank.ExtraArmorDamage = (tank, ctx) => {
-            if (!TroveRun.Active || !ReferenceEquals(tank, TroveRun.BossTank))
+            if (!TroveRun.Active || !(ReferenceEquals(tank, TroveRun.BossTank) || TroveBosses.IsBoss(tank)))
                 return 0;
             if (ctx.Source is PlayerTank pt && P(pt.PlayerId).Has(TroveItemId.BossHunter))
                 return 1;
@@ -386,6 +386,9 @@ public static class TroveItems {
             if (TroveRun.Active && shell.IsSliderBomb && shell.Owner is PlayerTank pt && P(pt.PlayerId).Has(TroveItemId.ClusterMines))
                 ClusterBurst(pt, shell.Position, shell.SparesOwner);
         };
+        // bosses: Shield Commander's shield, and boss shells' special touches
+        Shell.Blocks = TroveBosses.ShieldBlocks;
+        Tank.OnShoot += TroveBosses.OnBossShoot;
         // EMP: enemies can't shoot
         Tank.ShootBlocked = t => TroveRun.Active && Now < EmpUntil && t is AITank && IsEnemy(t);
         // Second Wind: once a floor, a hit that would destroy you doesn't
@@ -649,7 +652,7 @@ public static class TroveItems {
                 break;
             case TroveItemId.Convert: {
                 if (tank is null) { SoundPlayer.SoundError(); return; }
-                var target = GameHandler.AllAITanks.Where(t => t is { IsDestroyed: false } && IsEnemy(t) && !ReferenceEquals(t, TroveRun.BossTank))
+                var target = GameHandler.AllAITanks.Where(t => t is { IsDestroyed: false } && IsEnemy(t) && !ReferenceEquals(t, TroveRun.BossTank) && !TroveBosses.IsBoss(t))
                     .OrderBy(t => Vector2.Distance(t!.Position, tank.Position)).FirstOrDefault();
                 if (target is null) { SoundPlayer.SoundError(); return; }
                 ConvertTank(target.WorldId * 4 + playerId);

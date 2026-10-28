@@ -27,7 +27,8 @@ public static class TroveRun {
     public const int EV_START = 1, EV_MOVE = 2, EV_RETRY = 3, EV_NEXT_FLOOR = 4, EV_RUN_OVER = 5, EV_VICTORY = 6, EV_MENU = 7, EV_ITEM = 8, EV_BLOCK_BUST = 9,
         EV_REROLL = 10, EV_SECRET = 11, EV_WAVE2 = 12, EV_STOPWATCH = 13, EV_NUKE = 14, EV_DECOY = 15, EV_INVINCIBLE = 16,
         EV_WALL = 17, EV_CONVERT = 18, EV_SHRINK = 19, EV_BLAST = 20,
-        EV_CLONE = 21, EV_EMP = 22, EV_TURRET = 23, EV_MIRROR = 24, EV_GIVE = 25;
+        EV_CLONE = 21, EV_EMP = 22, EV_TURRET = 23, EV_MIRROR = 24, EV_GIVE = 25,
+        EV_BOSS_SHOT = 26, EV_BOSS_MINE = 27, EV_BOSS_ACT = 28, EV_BOSS_EXTRA = 29;
     /// <summary>How close (game units) a tank has to get to an item to pick it up.</summary>
     public const float PICKUP_REACH = 26f;
     public static Vector2 PickupPoint => new Coordinates.BlockMapPosition(10, 8);
@@ -83,8 +84,9 @@ public static class TroveRun {
         _starting = true;
         Seed = seed;
         FloorNumber = 1;
+        bool testBoss = ReadTestBoss();
         Floor = TroveGen.Generate(seed, 1);
-        Current = Floor.Start;
+        Current = testBoss ? Floor.Boss : Floor.Start;
         SetFloorTint();
         Ended = EndKind.None;
         RoomsCleared = TanksDestroyed = 0;
@@ -114,7 +116,14 @@ public static class TroveRun {
         if (!_hooked) {
             _hooked = true;
             // a floor's first room is set up by the campaign's own sequence: give the players their items then
-            CampaignGlobals.OnMissionStart += () => { if (Active) { ApplyItems(); TroveItems.SpawnBuddies(); } };
+            CampaignGlobals.OnMissionStart += () => {
+                if (!Active)
+                    return;
+                ApplyItems();
+                TroveItems.SpawnBuddies();
+                if (Room is { Kind: TroveRoomKind.Boss or TroveRoomKind.MiniBoss, Cleared: false } br)
+                    BuffBoss(br); // (only happens when a floor starts in a boss room: testing)
+            };
             // the new floor's colour appears when its first room is set up (behind the floor banner), not when the boss falls
             Campaign.OnMissionLoad += (_, _) => { if (Active) SetFloorTint(); };
         }
@@ -152,6 +161,21 @@ public static class TroveRun {
     /// For automated testing only: if "troves_test.txt" is in the save folder, player 1 starts with the items it lists
     /// (one line: names separated by spaces) and the second line names an item to put on the floor of the first room.
     /// </summary>
+    /// <summary>Testing: a third line in troves_test.txt names a floor-1 boss to start the run fighting.</summary>
+    private static bool ReadTestBoss() {
+        TroveBosses.TestKind = null;
+        try {
+            var path = System.IO.Path.Combine(TankGame.SaveDirectory, "troves_test.txt");
+            if (System.IO.File.Exists(path) && System.IO.File.ReadAllLines(path).ElementAtOrDefault(2)?.Trim() is { Length: > 0 } name
+                && Enum.TryParse<BossKind>(name, out var kind)) {
+                TroveBosses.TestKind = kind;
+                return TroveBosses.Def(kind).Floor == 1;
+            }
+        }
+        catch { }
+        return false;
+    }
+
     private static bool _testHoldPickup;
     private static void TestSetup() {
         _testHoldPickup = false;
@@ -279,6 +303,8 @@ public static class TroveRun {
         }
 
         TroveItems.Update();
+        TroveBosses.Update();
+        TroveBosses.UpdateBossOrbiters();
         if (!CampaignGlobals.InMission || Ended != EndKind.None || GameUI.Paused || Room is not { } room)
             return;
         PlayTime += Dt;
@@ -455,6 +481,7 @@ public static class TroveRun {
     /// <summary>The boss: bigger, armored (a health bar at the top), and better armed than a normal tank of its type.</summary>
     private static void BuffBoss(TroveRoom room) {
         BossTank = null;
+        TroveBosses.Clear();
         if (TroveGen.BossPosition(room) is not { } pos)
             return;
         var boss = GameHandler.AllAITanks.Where(t => t is not null && !t.IsDestroyed && t.Team != TeamID.Red)
@@ -469,6 +496,7 @@ public static class TroveRun {
             BossMaxHits = 2 + FloorNumber + 1;
             boss.Properties.ShellLimit += 1;
             BossTitle = "Mini-boss";
+            TroveBosses.Setup(boss, FloorNumber, Seed, mini: true);
             return;
         }
         boss.Scaling = new Vector3(1.45f);
@@ -477,7 +505,10 @@ public static class TroveRun {
         BossMaxHits = 4 + FloorNumber * 2 + 1;
         boss.Properties.ShellLimit += 2;
         boss.Properties.MineLimit += 1;
-        BossTitle = BossNames[Math.Clamp(FloorNumber - 1, 0, BossNames.Length - 1)];
+        // this run's boss for the floor: its name and its own attacks
+        TroveBosses.Setup(boss, FloorNumber, Seed, mini: false);
+        BossTitle = TroveBosses.Current?.Name ?? BossNames[Math.Clamp(FloorNumber - 1, 0, BossNames.Length - 1)];
+        BossMaxHits = TroveBosses.MaxHits;
     }
 
     private static void NextFloor() {
@@ -624,6 +655,12 @@ public static class TroveRun {
                 break;
             case EV_GIVE:
                 if (Active) TroveItems.Give(a / 100, (TroveItemId)(a % 100));
+                break;
+            case EV_BOSS_SHOT:
+            case EV_BOSS_MINE:
+            case EV_BOSS_ACT:
+            case EV_BOSS_EXTRA:
+                if (Active && CampaignGlobals.InMission) TroveBosses.OnEvent(ev, a);
                 break;
             case EV_MENU:
                 if (Active) {

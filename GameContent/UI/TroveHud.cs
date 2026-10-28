@@ -82,6 +82,38 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, c, rr, new Color(200, 210, 230));
                 ToggleSwitch.DrawDisc(sb, c - new Vector2(rr * 0.25f), rr * 0.4f, Color.White);
             }
+        // boss warnings: red laser lines, artillery targets; the Shield Commander's shield; the Vault Keeper's orbiters
+        foreach (var (from, angle, fireAt) in TroveBosses.Lines) {
+            var a0 = ToScreen(from);
+            var a1 = ToScreen(from + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 600f);
+            float k = (float)Math.Clamp(1 - (fireAt - TroveRun.PlayTime), 0, 1);
+            ToggleSwitch.DrawLine(sb, a0, a1, (4 + 6 * k) * s, new Color(255, 40, 30) * (0.35f + 0.45f * k));
+        }
+        foreach (var (at, land) in TroveBosses.Targets) {
+            var c = ToScreen(at);
+            float rr = Math.Max(10f, Vector2.Distance(c, ToScreen(at + new Vector2(45f, 0))));
+            float k = (float)Math.Clamp(1 - (land - TroveRun.PlayTime) / 1.3, 0, 1);
+            ToggleSwitch.DrawDisc(sb, c, rr, new Color(255, 40, 30) * 0.18f);
+            ToggleSwitch.DrawDisc(sb, c, rr * k, new Color(255, 60, 40) * 0.35f);
+            ToggleSwitch.DrawLine(sb, c - new Vector2(rr * 0.4f, 0), c + new Vector2(rr * 0.4f, 0), 3 * s, new Color(255, 80, 60));
+            ToggleSwitch.DrawLine(sb, c - new Vector2(0, rr * 0.4f), c + new Vector2(0, rr * 0.4f), 3 * s, new Color(255, 80, 60));
+        }
+        if (TroveBosses.Current?.Kind == BossKind.ShieldCommander && TroveBosses.Boss is { IsDestroyed: false } sc) {
+            var fwd = Vector2.UnitY.Rotate(sc.ChassisRotation);
+            Vector2? prev = null;
+            for (int i = -6; i <= 6; i++) {
+                var pt = ToScreen(sc.Position + fwd.Rotate(i * 0.17f) * 30f * sc.Scaling.X);
+                if (prev is { } pv)
+                    ToggleSwitch.DrawLine(sb, pv, pt, 6 * s, new Color(120, 200, 255) * 0.85f);
+                prev = pt;
+            }
+        }
+        foreach (var o in TroveBosses.BossOrbiters()) {
+            var c = ToScreen(o);
+            float rr = Math.Max(4f, Vector2.Distance(c, ToScreen(o + new Vector2(6f, 0))));
+            ToggleSwitch.DrawDisc(sb, c, rr, new Color(190, 120, 255));
+        }
+
         // lightning
         foreach (var (from, to, _) in TroveItems.Bolts) {
             var a = ToScreen(from);
@@ -742,11 +774,11 @@ public static class TroveHud {
 
     // ---- the boss's health, across the top of the screen
     private static void DrawBossBar(SpriteBatch sb) {
-        if (TroveRun.BossTank is not { IsDestroyed: false } boss || TroveRun.FloorNumber < 1)
+        if (TroveBosses.Boss is null || TroveBosses.HitsLeft() <= 0 || TroveRun.FloorNumber < 1)
             return;
         float s = S;
-        int hits = (boss.Properties.Armor?.HitPoints ?? 0) + 1;
-        float frac = Math.Clamp(hits / (float)Math.Max(1, TroveRun.BossMaxHits), 0f, 1f);
+        int hits = TroveBosses.HitsLeft(); // (both twins together)
+        float frac = Math.Clamp(hits / (float)Math.Max(1, TroveBosses.MaxHits), 0f, 1f);
         float w = 760 * s, h = 26 * s;
         var at = new Vector2(WindowUtils.WindowWidth / 2f - w / 2f, 52 * s);
         Text(sb, TroveRun.BossTitle, new Vector2(WindowUtils.WindowWidth / 2f, at.Y - 22 * s), 0.75f * s, Color.White, border: true);
