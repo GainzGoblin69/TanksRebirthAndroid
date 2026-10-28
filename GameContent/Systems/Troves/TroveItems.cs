@@ -195,10 +195,55 @@ public static class TroveItems {
         TroveItemId.BouncyShells, TroveItemId.ExtraShell, TroveItemId.MinePack, TroveItemId.BlockBust, TroveItemId.RepairKit,
     ];
 
+    /// <summary>How many ITEM-button items one player can carry (switch between them with the swap button or X).</summary>
+    public const int MAX_ACTIVES = 3;
+
     public sealed class PlayerItems {
-        public TroveItemId? Active;
-        /// <summary>Rooms cleared since the active item was last used (it's ready at its Recharge).</summary>
-        public int Charge;
+        /// <summary>The ITEM-button items being carried, and which one the button uses.</summary>
+        public readonly List<TroveItemId> Actives = [];
+        public int Selected;
+        /// <summary>Rooms cleared since each carried item was last used (it's ready at its Recharge).</summary>
+        public readonly Dictionary<TroveItemId, int> Charges = [];
+        /// <summary>When the selection last changed (the description shows up bigger for a moment).</summary>
+        public double SelectedAt = -10;
+        public TroveItemId? Active => Actives.Count > 0 ? Actives[Math.Clamp(Selected, 0, Actives.Count - 1)] : null;
+        public int Charge {
+            get => Active is { } a && Charges.TryGetValue(a, out var c) ? c : 0;
+            set { if (Active is { } a) Charges[a] = value; }
+        }
+        public int ChargeOf(TroveItemId id) => Charges.TryGetValue(id, out var c) ? c : 0;
+        public bool IsReady(TroveItemId id) => ChargeOf(id) >= Def(id).Recharge && (Def(id).RechargeSeconds <= 0 || TroveRun.PlayTime >= ReadyAt);
+        /// <summary>Picks up an ITEM-button item: a free slot if there is one, otherwise it replaces the selected one.</summary>
+        public void AddActive(TroveItemId id) {
+            Charges[id] = Def(id).Recharge; // comes charged
+            int have = Actives.IndexOf(id);
+            if (have >= 0)
+                Selected = have; // already carrying it: just recharged
+            else if (Actives.Count < MAX_ACTIVES) {
+                Actives.Add(id);
+                Selected = Actives.Count - 1;
+            }
+            else
+                Actives[Selected] = id;
+            SelectedAt = TroveRun.PlayTime;
+        }
+        /// <summary>The selected item is used up.</summary>
+        public void RemoveActive() {
+            if (Active is not { } a)
+                return;
+            Actives.RemoveAt(Math.Clamp(Selected, 0, Actives.Count - 1));
+            Charges.Remove(a);
+            Selected = Actives.Count == 0 ? 0 : Math.Min(Selected, Actives.Count - 1);
+            SelectedAt = TroveRun.PlayTime;
+        }
+        /// <summary>Selects the next carried item.</summary>
+        public bool Cycle() {
+            if (Actives.Count < 2)
+                return false;
+            Selected = (Selected + 1) % Actives.Count;
+            SelectedAt = TroveRun.PlayTime;
+            return true;
+        }
         public bool HomingOn;        // until the floor ends
         public int SliderBombs;
         public int Shields;
@@ -215,12 +260,12 @@ public static class TroveItems {
         public int Count(TroveItemId id) => Passives.TryGetValue(id, out var n) ? n : 0;
         /// <summary>Has it: a whole-run item, or the item in the ITEM slot (so actives can be part of synergies).</summary>
         public int Id;
-        public bool Has(TroveItemId id) => Count(id) > 0 || Active == id
+        public bool Has(TroveItemId id) => Count(id) > 0 || Actives.Contains(id)
             // one-use items count while they're working
             || id == TroveItemId.Homing && HomingOn || id == TroveItemId.SliderBomb && SliderBombs > 0
             || id == TroveItemId.Rocket && MissileUpgrade.ShotsLeft(Id) > 0;
         public bool Has(TroveSynergy s) => Has(s.A) && Has(s.B);
-        public bool ActiveReady => Active is { } a && Charge >= Def(a).Recharge && (Def(a).RechargeSeconds <= 0 || TroveRun.PlayTime >= ReadyAt);
+        public bool ActiveReady => Active is { } a && IsReady(a);
     }
 
     public static readonly PlayerItems[] Players = [new() { Id = 0 }, new() { Id = 1 }, new() { Id = 2 }, new() { Id = 3 }];
@@ -415,8 +460,7 @@ public static class TroveItems {
         SoundPlayer.PlaySoundInstance("Assets/music/fanfares/life_get.ogg", SoundContext.Effect, 0.4f);
         switch (def.Kind) {
             case TroveItemKind.Active:
-                p.Active = id; // replaces whatever was in the slot
-                p.Charge = def.Recharge; // comes charged
+                p.AddActive(id);
                 break;
             case TroveItemKind.Instant:
                 if (id == TroveItemId.ExtraLife && local) {
@@ -456,12 +500,33 @@ public static class TroveItems {
     /// <summary>True when this player has an item in the ITEM slot (whether or not it's charged).</summary>
     public static bool HasActive(int playerId) => TroveRun.Active && playerId is >= 0 and < 4 && Players[playerId].Active is not null;
 
+    /// <summary>The swap button / X: the ITEM button now uses the next carried item.</summary>
+    public static void CycleActive(int playerId) {
+        if (!TroveRun.Active || playerId is < 0 or >= 4)
+            return;
+        if (Players[playerId].Cycle())
+            SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.8f);
+    }
+    /// <summary>Selects a carried item directly (tapping its icon).</summary>
+    public static void SelectActive(int playerId, int index) {
+        if (!TroveRun.Active || playerId is < 0 or >= 4)
+            return;
+        var p = Players[playerId];
+        if (index < 0 || index >= p.Actives.Count || index == p.Selected)
+            return;
+        p.Selected = index;
+        p.SelectedAt = Now;
+        SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.8f);
+    }
+
     /// <summary>A room was cleared: active items recharge.</summary>
     public static void OnRoomCleared() {
         for (int i = 0; i < 4; i++) {
             var p = Players[i];
-            if (p.Active is { } a && p.Charge < Def(a).Recharge)
-                p.Charge = Math.Min(Def(a).Recharge, p.Charge + (a == TroveItemId.Reroll && p.Has(Syn("Fortune Teller")) ? 2 : 1));
+            // every carried item recharges, not just the selected one
+            foreach (var a in p.Actives)
+                if (p.ChargeOf(a) < Def(a).Recharge)
+                    p.Charges[a] = Math.Min(Def(a).Recharge, p.ChargeOf(a) + (a == TroveItemId.Reroll && p.Has(Syn("Fortune Teller")) ? 2 : 1));
             // regen plating: a shield every few rooms
             int n = p.Count(TroveItemId.RegenPlating);
             if (n > 0 && IsLocal(i)) {
@@ -643,7 +708,7 @@ public static class TroveItems {
                 var pool = Has(playerId, Syn("Prospector")) ? SecretPool : PedestalPool;
                 var options = pool.Where(i => i != TroveItemId.SupplyDrop).ToArray();
                 var drop = options[Random.Shared.Next(options.Length)];
-                p.Active = null; // used up before the new item arrives (it may be another active)
+                p.RemoveActive(); // used up before the new item arrives (it may be another active)
                 if (TroveRun.Room is { PickupVisible: false }) {
                     TroveRun.SetPickup(drop);
                     SendAny(TroveRun.EV_REROLL, (int)drop);
@@ -677,7 +742,7 @@ public static class TroveItems {
         else if (Def(id).Recharge > 0)
             p.Charge = 0;
         else
-            p.Active = null;
+            p.RemoveActive();
         SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_shoot_rocket.ogg", SoundContext.Effect, 0.7f);
         if (tank is { IsDestroyed: false })
             ApplyTo(tank);

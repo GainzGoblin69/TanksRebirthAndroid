@@ -35,6 +35,12 @@ public static class TouchControls {
     /// <summary>The ITEM / MISSILE button next to MINE, while there's something to show (title, small text, tappable).</summary>
     public static (string Title, string Sub, bool Usable)? MissileButton { get; set; }
     public static bool MissileJustPressed { get; private set; }
+    /// <summary>Where the ITEM button is (Tank Troves draws the carried items under it).</summary>
+    public static Vector2 ItemButtonCenter => MissileButtonCenter;
+    public static float ItemButtonRadius => ButtonRadius;
+    /// <summary>Tappable carried-item icons (set by Tank Troves each frame), and which was tapped this frame (-1: none).</summary>
+    public static readonly List<(Rectangle Rect, int Index)> ItemSlots = [];
+    public static int ItemSlotTapped { get; private set; } = -1;
     /// <summary>Phone tilt (-1..1 each way, screen axes, +Y toward the bottom), from the Android launcher.</summary>
     public static Vector2 Tilt { get; set; }
     /// <summary>Whether a finger is on the screen right now.</summary>
@@ -142,6 +148,7 @@ public static class TouchControls {
     public static void Update() {
         MineJustPressed = _mineRequested && GameplayControlsActive;
         MissileJustPressed = false;
+        ItemSlotTapped = -1;
         PauseJustPressed = _pauseRequested;
         _mineRequested = _pauseRequested = false;
         _pointerRetap = false;
@@ -167,6 +174,11 @@ public static class TouchControls {
             if (touch.State == TouchLocationState.Pressed) {
                 if (gameplay && !SecondScreenActive && Vector2.Distance(pos, PauseButtonCenter) <= PauseButtonRadius * 1.3f) {
                     PauseJustPressed = true;
+                    _buttonTouches.Add(touch.Id);
+                    continue;
+                }
+                if (gameplay && ItemSlots.Count > 0 && ItemSlots.FindIndex(sl => sl.Rect.Contains(pos.ToPoint())) is int slot and >= 0) {
+                    ItemSlotTapped = ItemSlots[slot].Index;
                     _buttonTouches.Add(touch.Id);
                     continue;
                 }

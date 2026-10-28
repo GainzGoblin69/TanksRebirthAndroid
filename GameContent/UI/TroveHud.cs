@@ -30,6 +30,7 @@ public static class TroveHud {
         MatrixUtils.ConvertWorldToScreen(Vector3.Zero, Matrix.CreateTranslation(world.X, 0, world.Y), CameraGlobals.GameView, CameraGlobals.GameProjection);
 
     public static void Draw(SpriteBatch sb) {
+        Internals.Common.Framework.Input.TouchControls.ItemSlots.Clear(); // (re-added below while there are items to tap)
         if (!TroveRun.Active || MainMenu.MainMenuUI.IsActive)
             return;
         EnsureTextures(sb.GraphicsDevice);
@@ -38,6 +39,7 @@ public static class TroveHud {
         bool banner = IntermissionSystem.Alpha > 0.05f || IntermissionSystem.BlackAlpha > 0.05f;
         if (!banner && TroveRun.Floor is { } floor && TroveRun.Fade < 1f) {
             DrawInRoom(sb);
+            DrawItemStrip(sb);
             DrawMap(sb, floor);
             DrawBossBar(sb);
             DrawPickupBanner(sb);
@@ -110,6 +112,62 @@ public static class TroveHud {
             Text(sb, "DECOY", ToScreen(d.Position) - new Vector2(0, 52 * s), 0.5f * s, new Color(255, 220, 140), border: true);
         if (room.PickupVisible)
             DrawPedestal(sb, room);
+    }
+
+    // ---- the ITEM-button items you carry: a row of icons under the ITEM button (the one it uses is big and gold-ringed;
+    //      tap another to switch, or X on a controller), and what the selected one does, in small text under them
+    private static void DrawItemStrip(SpriteBatch sb) {
+        if (!CampaignGlobals.InMission || TroveRun.ShowingEnd)
+            return;
+        int me = Systems.LocalCoop.Active ? 0 : Net.NetPlay.GetMyClientId();
+        var p = TroveItems.Players[Math.Clamp(me, 0, 3)];
+        if (p.Actives.Count == 0)
+            return;
+        float s = S;
+        var tc = Internals.Common.Framework.Input.TouchControls.ItemButtonCenter;
+        float R = Internals.Common.Framework.Input.TouchControls.ItemButtonRadius;
+        float ir = R * 0.36f, gap = ir * 2.7f;
+        int n = p.Actives.Count;
+        var rowCenter = new Vector2(tc.X, tc.Y + R * 1.55f);
+        // keep it on screen
+        float half = (n - 1) * gap / 2f + ir * 1.4f;
+        rowCenter.X = Math.Clamp(rowCenter.X, half + 8, WindowUtils.WindowWidth - half - 8);
+        for (int i = 0; i < n; i++) {
+            var id = p.Actives[i];
+            bool sel = i == p.Selected;
+            var at = rowCenter + new Vector2((i - (n - 1) / 2f) * gap, 0);
+            float r = sel ? ir * 1.2f : ir * 0.9f;
+            if (sel) {
+                ToggleSwitch.DrawDisc(sb, at, r * 1.32f, new Color(255, 215, 80));
+                ToggleSwitch.DrawDisc(sb, at, r * 1.16f, new Color(40, 30, 20));
+            }
+            DrawItemIcon(sb, id, at, r);
+            bool ready = p.IsReady(id);
+            if (!ready) {
+                // dimmed while recharging, with how far along it is
+                ToggleSwitch.DrawDisc(sb, at, r * 1.02f, Color.Black * 0.55f);
+                var def = TroveItems.Def(id);
+                string c = def.RechargeSeconds > 0 ? $"{Math.Ceiling(p.ReadyAt - TroveRun.PlayTime)}s" : $"{p.ChargeOf(id)}/{def.Recharge}";
+                Text(sb, c, at, 0.38f * s, Color.White, border: true);
+            }
+            Internals.Common.Framework.Input.TouchControls.ItemSlots.Add((
+                new Rectangle((int)(at.X - gap / 2f), (int)(at.Y - gap / 2f), (int)gap, (int)gap), i));
+        }
+        // the selected item's name and what it does (bright for a few seconds after it changes, then softer)
+        if (p.Active is not { } a)
+            return;
+        var d = TroveItems.Def(a);
+        double since = TroveRun.PlayTime - p.SelectedAt;
+        float alpha = since < 4 ? 1f : 0.7f;
+        float y = rowCenter.Y + ir * 1.9f;
+        float lh = FontGlobals.RebirthFont.MeasureString("Ag").Y;
+        Text(sb, d.Name, new Vector2(rowCenter.X, y), 0.48f * s, Color.Lerp(d.Color, Color.White, 0.5f) * alpha, border: true);
+        foreach (var line in Wrap(d.Description, 0.4f * s, 520 * s)) {
+            y += lh * 0.4f * s * 1.05f;
+            Text(sb, line, new Vector2(rowCenter.X, y), 0.4f * s, Color.White * alpha, border: true);
+        }
+        if (n > 1 && since < 6)
+            Text(sb, "tap an icon or press X to switch", new Vector2(rowCenter.X, y + lh * 0.34f * s * 1.2f), 0.32f * s, new Color(220, 210, 190) * alpha, border: true);
     }
 
     /// <summary>Splits text into lines no wider than maxWidth at this scale.</summary>
@@ -653,15 +711,7 @@ public static class TroveHud {
             Text(sb, $"x{mine.Shields}", new Vector2(x + ir * 0.75f, y + ir * 0.8f), 0.5f * s, Color.White, border: true);
             x += ir * 2.4f;
         }
-        // the ITEM slot, with its charge
-        if (mine.Active is { } act) {
-            var at = new Vector2(x + ir * 0.3f, y);
-            ToggleSwitch.DrawDisc(sb, at, ir * 1.3f, mine.ActiveReady ? new Color(255, 230, 120) : new Color(70, 60, 50));
-            DrawItemIcon(sb, act, at, ir);
-            int max = TroveItems.Def(act).Recharge;
-            if (max > 0 && !mine.ActiveReady)
-                Text(sb, $"{mine.Charge}/{max}", at + new Vector2(0, ir * 1.1f), 0.45f * s, Color.White, border: true);
-        }
+        // (ITEM-button items are shown under the ITEM button: see DrawItemStrip)
         // synergies you have
         float sy = y + ir * 2.1f;
         foreach (var syn in TroveItems.Synergies)

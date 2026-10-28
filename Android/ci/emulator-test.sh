@@ -110,7 +110,7 @@ adb exec-out screencap -p > diag/run2-levelrun.png
 
 # Tank Troves: pause, Quit, then Play > Single Player > Tank Troves; the first room of floor 1
 # (test setup: start with a pile of items that make synergies, and an item on the floor of the first room)
-adb shell "printf 'GhostShells MagnetShells Afterburner LastStand SecondWind RicochetShield SplitShot EchoShot OrbitGuard TreasureMap MirrorShield\nClone\n' > '$EXT/troves_test.txt'"
+adb shell "printf 'GhostShells SplitShot OrbitGuard Stopwatch Decoy MirrorShield\nClone\n' > '$EXT/troves_test.txt'"
 adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 5
 tapy 314 4

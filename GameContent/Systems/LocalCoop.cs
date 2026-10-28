@@ -122,6 +122,11 @@ public static class LocalCoop {
     }
 
     /// <summary>Use a missile upgrade: Y on a controller, the MISSILE button for the touch player.</summary>
+    /// <summary>X on this player's controller: switch to the next carried Tank Troves item (touch players tap the icons).</summary>
+    public static bool CyclePressed(int playerId) {
+        var s = _slots[playerId];
+        return !s.Touch && Just(s, Buttons.X);
+    }
     public static bool MissilePressed(int playerId) {
         var s = _slots[playerId];
         return s.Touch ? TouchControls.MissileJustPressed : Just(s, Buttons.Y);

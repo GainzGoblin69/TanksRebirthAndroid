@@ -72,13 +72,23 @@ public static class MissileUpgrade {
             TouchControls.MissileButton = null;
         if (!CampaignGlobals.InMission)
             return;
+        // switching between carried Tank Troves items: tap an icon, or X on a controller
+        if (TouchControls.ItemSlotTapped >= 0)
+            Troves.TroveItems.SelectActive(me, TouchControls.ItemSlotTapped);
         if (LocalCoop.Active) {
-            for (int i = 0; i < LocalCoop.PlayerCount; i++)
+            for (int i = 0; i < LocalCoop.PlayerCount; i++) {
+                if (LocalCoop.CyclePressed(i))
+                    Troves.TroveItems.CycleActive(i);
                 if (LocalCoop.MissilePressed(i))
                     Use(i);
+            }
         }
-        else if (TouchControls.MissileJustPressed || PadJustPressedY())
-            Use(me);
+        else {
+            if (PadJustPressed(Microsoft.Xna.Framework.Input.Buttons.X))
+                Troves.TroveItems.CycleActive(me);
+            if (TouchControls.MissileJustPressed || PadJustPressedY())
+                Use(me);
+        }
     }
 
     private static void Use(int playerId) {
@@ -87,6 +97,9 @@ public static class MissileUpgrade {
         else
             Activate(playerId);
     }
+
+    private static bool PadJustPressed(Microsoft.Xna.Framework.Input.Buttons b) =>
+        Internals.Common.InputUtils.CurrentGamePadSnapshot.IsButtonDown(b) && !Internals.Common.InputUtils.OldGamePadSnapshot.IsButtonDown(b);
 
     private static bool PadJustPressedY() =>
         Internals.Common.InputUtils.CurrentGamePadSnapshot.IsButtonDown(Microsoft.Xna.Framework.Input.Buttons.Y)
