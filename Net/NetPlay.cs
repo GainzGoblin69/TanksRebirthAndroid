@@ -328,6 +328,10 @@ public class NetPlay {
                 if (shooter.LastShotShell is not null) {
                     if (shellType == ShellID.Missile)
                         shooter.LastShotShell!.Swap(shellType); // missile looks/behaves differently
+                    if (shellType == ShellID.Explosive && shooter is PlayerTank) {
+                        shooter.LastShotShell!.Swap(shellType); // a Tank Troves slider bomb
+                        shooter.LastShotShell.IsSliderBomb = true;
+                    }
                     shooter!.LastShotShell!.Type = shellType;
                     shooter.LastShotShell.Position = shellPos;
                     shooter.LastShotShell.Velocity = shellVel;

@@ -52,23 +52,40 @@ public static class MissileUpgrade {
             _shotsLeft[playerId]--;
     }
 
-    /// <summary>Checks the button / controller each update (for the players on this phone).</summary>
+    /// <summary>Rockets from a Tank Troves item: the next shots are missiles.</summary>
+    public static void StartShots(int playerId, int shots) {
+        if (playerId is >= 0 and < 4)
+            _shotsLeft[playerId] += shots;
+    }
+
+    /// <summary>The ITEM/MISSILE button and controller Y, each update (for the players on this phone).</summary>
     public static void Update() {
-        bool any = false;
-        for (int i = 0; i < 4; i++)
-            any |= _charges[i] > 0 || _shotsLeft[i] > 0;
-        int me = NetPlay.GetMyClientId();
-        TouchControls.MissileButton = any && !LocalCoop.HidesTouch
-            ? (_charges[LocalCoop.Active ? 0 : me], _shotsLeft[LocalCoop.Active ? 0 : me]) : null;
-        if (!any || !CampaignGlobals.InMission)
+        int me = LocalCoop.Active ? 0 : NetPlay.GetMyClientId();
+        // what the button shows: a Tank Troves item first, else Gears of War missile upgrades
+        if (Troves.TroveItems.ButtonFor(me) is { } tb)
+            TouchControls.MissileButton = tb;
+        else if (Charges(me) > 0 || ShotsLeft(me) > 0)
+            TouchControls.MissileButton = ("MISSILE", ShotsLeft(me) > 0 ? $"{ShotsLeft(me)} shots" : $"x{Charges(me)}", ShotsLeft(me) == 0);
+        else
+            TouchControls.MissileButton = null;
+        if (LocalCoop.HidesTouch)
+            TouchControls.MissileButton = null;
+        if (!CampaignGlobals.InMission)
             return;
         if (LocalCoop.Active) {
             for (int i = 0; i < LocalCoop.PlayerCount; i++)
                 if (LocalCoop.MissilePressed(i))
-                    Activate(i);
+                    Use(i);
         }
         else if (TouchControls.MissileJustPressed || PadJustPressedY())
-            Activate(me);
+            Use(me);
+    }
+
+    private static void Use(int playerId) {
+        if (Troves.TroveItems.HasActive(playerId))
+            Troves.TroveItems.UseActive(playerId);
+        else
+            Activate(playerId);
     }
 
     private static bool PadJustPressedY() =>

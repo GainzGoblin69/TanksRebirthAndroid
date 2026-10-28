@@ -229,7 +229,8 @@ public class GameHandler {
     internal static void RenderAll() {
         TankGame.Instance.GraphicsDevice.BlendState = BlendState.AlphaBlend;
 
-        if (!MainMenuUI.IsActive && !LevelEditorUI.IsEditing) {
+        // (phones: no experience bar during play)
+        if (!MainMenuUI.IsActive && !LevelEditorUI.IsEditing && !Internals.Common.Framework.Input.TouchControls.Enabled) {
             ExperienceBar.Position = new(WindowUtils.WindowWidth / 2 - ExperienceBar.Scale.X / 2, 50);
             ExperienceBar.Scale = new(600, 20);
             ExperienceBar.Alignment = Anchor.LeftCenter;

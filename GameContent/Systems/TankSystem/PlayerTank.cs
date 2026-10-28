@@ -190,9 +190,11 @@ public class PlayerTank : Tank {
 
         base.ApplyDefaults(ref properties);
 
-        // Kid Mode: player 2 can take two hits
-        if (Difficulties.Types["KidMode"] && PlayerId == PlayerID.Red)
-            properties.Armor = new(this, 1);
+        // Kid Mode: player 2 has a 5-hit shield and homing shots
+        if (Difficulties.Types["KidMode"] && PlayerId == PlayerID.Red) {
+            properties.Armor = new(this, 5);
+            properties.ShellHoming = new() { Radius = 200f, Speed = properties.ShellSpeed, Power = 0.1f * properties.ShellSpeed };
+        }
     }
     public override void Update() {
         /*if (Input.KeyJustPressed(Keys.P))
@@ -332,8 +334,23 @@ public class PlayerTank : Tank {
         base.Shoot(false);
     }
     public override void LayMine() {
+        // Tank Troves slider bombs replace mines while you have them
+        if (CurMineCooldown <= 0 && Systems.Troves.TroveItems.TryUseSliderBomb(this)) {
+            FireSliderBomb();
+            return;
+        }
         PlayerStatistics.MinesLaid++;
         base.LayMine();
+    }
+    /// <summary>A slow bomb that slides along the floor the way the turret points, and explodes when it hits something.</summary>
+    private void FireSliderBomb() {
+        CurMineCooldown = Properties.MineCooldown;
+        var dir = Vector2.UnitY.Rotate(TurretRotation);
+        var shell = new Shell(TurretPosition, new Vector2(-dir.X, dir.Y) * Properties.ShellSpeed * 0.7f, ShellID.Explosive, this, 0) {
+            IsSliderBomb = true
+        };
+        if (NetPlay.IsClientMatched(PlayerId))
+            Client.SyncShellFire(shell);
     }
     private void ControlHandle_ConsoleController() {
 

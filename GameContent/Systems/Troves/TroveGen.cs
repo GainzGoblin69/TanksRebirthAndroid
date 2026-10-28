@@ -7,7 +7,7 @@ using TanksRebirth.GameContent.Systems.Coordinates;
 
 namespace TanksRebirth.GameContent.Systems.Troves;
 
-public enum TroveRoomKind { Start, Normal, Boss }
+public enum TroveRoomKind { Start, Normal, Boss, Item }
 public enum TroveShape { Open, Pillars, Wide, Tall, Small, Cross, Corner }
 
 /// <summary>Directions between rooms. North is the board edge at the lowest Z (grid row 0).</summary>
@@ -23,6 +23,11 @@ public sealed class TroveRoom {
     public List<(int X, int Y, int Tier, float Rotation)> Enemies = [];
     /// <summary>Index into <see cref="Enemies"/> of the boss, or -1.</summary>
     public int BossIndex = -1;
+    /// <summary>An item in the middle of the room: on a pedestal in item rooms, or left behind once a fight room is cleared.</summary>
+    public TroveItemId? Pickup;
+    public bool PickupTaken;
+    /// <summary>Whether the pickup is showing (item rooms always; other rooms after they're cleared).</summary>
+    public bool PickupVisible => Pickup is not null && !PickupTaken && (Kind == TroveRoomKind.Item || Cleared);
 }
 
 public sealed class TroveFloor {
@@ -30,6 +35,7 @@ public sealed class TroveFloor {
     public string Name = "";
     public Dictionary<Point, TroveRoom> Rooms = [];
     public Point Start, Boss;
+    public Point? ItemRoom;
 
     public bool Has(Point p) => Rooms.ContainsKey(p);
 }
@@ -154,11 +160,17 @@ public static class TroveGen {
         if (dist[boss] < 2)
             return null;
 
-        var floorMap = new TroveFloor { Number = floor, Name = FloorNames[floor - 1], Start = start, Boss = boss };
+        // item room: another dead end if there is one (else a quiet room off to the side)
+        var itemOptions = deadEnds.Where(c => c != boss).OrderBy(c => c.X).ThenBy(c => c.Y).ToList();
+        if (itemOptions.Count == 0)
+            itemOptions = cells.Where(c => c != start && c != boss && Neighbors(cells, c) <= 2).OrderBy(c => c.X).ThenBy(c => c.Y).ToList();
+        Point? item = itemOptions.Count > 0 ? itemOptions[rng.Next(itemOptions.Count)] : null;
+
+        var floorMap = new TroveFloor { Number = floor, Name = FloorNames[floor - 1], Start = start, Boss = boss, ItemRoom = item };
         foreach (var c in cells.OrderBy(c => c.Y).ThenBy(c => c.X))
             floorMap.Rooms[c] = new TroveRoom {
                 Cell = c,
-                Kind = c == start ? TroveRoomKind.Start : c == boss ? TroveRoomKind.Boss : TroveRoomKind.Normal,
+                Kind = c == start ? TroveRoomKind.Start : c == boss ? TroveRoomKind.Boss : c == item ? TroveRoomKind.Item : TroveRoomKind.Normal,
             };
         return floorMap;
     }
@@ -202,7 +214,7 @@ public static class TroveGen {
         }
 
         room.Shape = room.Kind switch {
-            TroveRoomKind.Start => TroveShape.Open,
+            TroveRoomKind.Start or TroveRoomKind.Item => TroveShape.Open,
             TroveRoomKind.Boss => rng.Next(2) == 0 ? TroveShape.Open : TroveShape.Pillars,
             _ => (TroveShape)rng.Next(Enum.GetValues<TroveShape>().Length),
         };
@@ -242,7 +254,7 @@ public static class TroveGen {
         }
 
         // cover inside the open part: a few mirrored pieces, some breakable
-        int pieces = room.Kind == TroveRoomKind.Start ? 2 : rng.Next(2, 5);
+        int pieces = room.Kind is TroveRoomKind.Start or TroveRoomKind.Item ? 2 : rng.Next(2, 5);
         for (int i = 0; i < pieces; i++) {
             int x = rng.Next(2, 9), y = rng.Next(1, 7);
             int h = rng.Next(1, 3);
@@ -267,9 +279,18 @@ public static class TroveGen {
                 if (solid[x, y] > 0)
                     room.Blocks.Add((x, y, type[x, y], solid[x, y]));
 
+        // item room: an item on a pedestal and nothing to fight
+        if (room.Kind == TroveRoomKind.Item) {
+            room.Pickup = TroveItems.PedestalPool[rng.Next(TroveItems.PedestalPool.Length)];
+            room.Cleared = true;
+            return;
+        }
         // enemies
         if (room.Kind == TroveRoomKind.Start)
             return;
+        // some fight rooms leave a heart or a shield once they're cleared
+        if (room.Kind == TroveRoomKind.Normal && rng.NextDouble() < 0.3)
+            room.Pickup = TroveItems.DropPool[rng.Next(TroveItems.DropPool.Length)];
         var free = new List<Point>();
         for (int x = 1; x < GW - 1; x++)
             for (int y = 1; y < GH - 1; y++)

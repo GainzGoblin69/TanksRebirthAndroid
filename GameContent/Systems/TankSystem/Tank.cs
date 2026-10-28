@@ -164,7 +164,7 @@ public abstract class Tank {
     public float Speed { get; set; }
     public float CurShootStun { get; private set; } = 0;
     public float CurShootCooldown { get; private set; } = 0;
-    public float CurMineCooldown { get; private set; } = 0;
+    public float CurMineCooldown { get; protected set; } = 0;
     public float CurMineStun { get; private set; } = 0;
 
     public float TimeSinceLastAction = 15000;

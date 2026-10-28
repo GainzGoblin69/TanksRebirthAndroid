@@ -24,6 +24,7 @@ public class TankArmor {
     private readonly Particle _healthBarTotal;
     private readonly Particle _healthBarCurrent;
 
+    public int MaxHitPoints => _hitpointsMax;
     public TankArmor(Tank host, int hitPoints) {
         _model = ModelGlobals.Armor.Asset;
         Host = host;
@@ -55,7 +56,12 @@ public class TankArmor {
             _healthBarCurrent.Scale = new(xScl * (HitPoints + 1) / (_hitpointsMax + 1), yScl, 1f);
         }
 
-        if (canRenderHealthBar && _hitpointsMax > 3) {
+        if (Internals.Common.Framework.Input.TouchControls.Enabled) {
+            // phones: no floating bars (a boss shows its health at the top of the screen instead)
+            _healthBarTotal.Scale = Vector3.Zero;
+            _healthBarCurrent.Scale = Vector3.Zero;
+        }
+        else if (canRenderHealthBar && _hitpointsMax > 3) {
             setHealthBar(5, 2);
             _healthBarTotal.Position = Host.Position3D + new Vector3(0, 40, 0);
             _healthBarCurrent.Position = Host.Position3D + new Vector3(0, 40, 0);

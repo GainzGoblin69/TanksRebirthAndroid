@@ -32,8 +32,8 @@ public static class TouchControls {
     /// <summary>Joystick direction in screen space (-1..1 on each axis, +Y is down). Zero inside the dead zone.</summary>
     public static Vector2 MoveVector { get; private set; }
     public static bool MineJustPressed { get; private set; }
-    /// <summary>Missile upgrade button: (upgrades waiting, missile shots left) while there is one to show.</summary>
-    public static (int Charges, int Shots)? MissileButton { get; set; }
+    /// <summary>The ITEM / MISSILE button next to MINE, while there's something to show (title, small text, tappable).</summary>
+    public static (string Title, string Sub, bool Usable)? MissileButton { get; set; }
     public static bool MissileJustPressed { get; private set; }
     /// <summary>Phone tilt (-1..1 each way, screen axes, +Y toward the bottom), from the Android launcher.</summary>
     public static Vector2 Tilt { get; set; }
@@ -170,7 +170,7 @@ public static class TouchControls {
                     _buttonTouches.Add(touch.Id);
                     continue;
                 }
-                if (gameplay && MissileButton is { Charges: > 0 } && Vector2.Distance(pos, MissileButtonCenter) <= ButtonRadius * 1.1f) {
+                if (gameplay && MissileButton is { Usable: true } && Vector2.Distance(pos, MissileButtonCenter) <= ButtonRadius * 1.1f) {
                     MissileJustPressed = true;
                     _buttonTouches.Add(touch.Id);
                     continue;
@@ -345,11 +345,11 @@ public static class TouchControls {
 
         // missile upgrade (Gears of War): shows how many are waiting, or the missile shots left while one is on
         if (MissileButton is { } mb) {
-            bool on = mb.Shots > 0;
-            DrawCircle(sb, _disc!, MissileButtonCenter, ButtonRadius, (on ? Color.OrangeRed : mb.Charges > 0 ? Color.DarkOrange : Color.Black) * (on ? 0.55f : 0.4f));
+            // ready to use: orange; something already running: red; otherwise dim
+            DrawCircle(sb, _disc!, MissileButtonCenter, ButtonRadius, (mb.Usable ? Color.DarkOrange : Color.OrangeRed) * 0.5f);
             DrawCircle(sb, _ring!, MissileButtonCenter, ButtonRadius, Color.White * 0.6f);
-            DrawLabel(sb, "MISSILE", MissileButtonCenter - new Vector2(0, ButtonRadius * 0.18f), 0.45f);
-            DrawLabel(sb, on ? $"{mb.Shots} shots" : $"x{mb.Charges}", MissileButtonCenter + new Vector2(0, ButtonRadius * 0.28f), 0.45f);
+            DrawLabel(sb, mb.Title, MissileButtonCenter - new Vector2(0, ButtonRadius * 0.18f), mb.Title.Length > 7 ? 0.38f : 0.45f);
+            DrawLabel(sb, mb.Sub, MissileButtonCenter + new Vector2(0, ButtonRadius * 0.28f), 0.4f);
         }
 
         // pause button (two bars); lives on the second screen when there is one

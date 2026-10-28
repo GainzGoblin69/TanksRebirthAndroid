@@ -151,6 +151,8 @@ public class Shell : IAITankDanger {
         return 255;     //Could not generate.
     }
     public void SwapTexture(Texture2D texture) => _shellTexture = texture;
+    /// <summary>Tank Troves slider bomb: explodes wherever it stops.</summary>
+    public bool IsSliderBomb { get; set; }
     public void Swap(int type) {
         Type = type;
 
@@ -666,7 +668,9 @@ public class Shell : IAITankDanger {
         TrailSound = null;
 
         if (Owner is not null) {
-            if (Owner.Properties.ShellType == ShellID.Explosive)
+            if (IsSliderBomb)
+                new Explosion(Position, 9f, Owner, 0.25f); // Tank Troves slider bomb
+            else if (Owner.Properties.ShellType == ShellID.Explosive)
                 new Explosion(Position, 7f, Owner, 0.25f);
             if (Owner is PlayerTank)
                 // in case the player wants to destroy a mine that may be impeding progress- we don't want to penalize them.

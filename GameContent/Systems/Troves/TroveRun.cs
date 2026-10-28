@@ -24,7 +24,16 @@ public static class TroveRun {
 
     public enum EndKind { None, RunOver, Victory }
     // multiplayer events (host -> everyone)
-    public const int EV_START = 1, EV_MOVE = 2, EV_RETRY = 3, EV_NEXT_FLOOR = 4, EV_RUN_OVER = 5, EV_VICTORY = 6, EV_MENU = 7;
+    public const int EV_START = 1, EV_MOVE = 2, EV_RETRY = 3, EV_NEXT_FLOOR = 4, EV_RUN_OVER = 5, EV_VICTORY = 6, EV_MENU = 7, EV_ITEM = 8;
+    /// <summary>How close (game units) a tank has to get to an item to pick it up.</summary>
+    public const float PICKUP_REACH = 26f;
+    public static Vector2 PickupPoint => new Coordinates.BlockMapPosition(10, 8);
+
+    // the boss of the current room (for the health bar at the top)
+    public static AI.AITank? BossTank { get; private set; }
+    public static int BossMaxHits { get; private set; }
+    public static readonly string[] BossNames = ["Captain Marine", "The Violet Viper", "Green Goliath", "The Black Baron", "Obsidian Overlord"];
+    private static bool _hooked;
 
     public static bool Active { get; private set; }
     public static int Seed { get; private set; }
@@ -92,6 +101,13 @@ public static class TroveRun {
 
         LevelProgress.CurrentCampaignKey = "TankTroves";
         MissileUpgrade.Reset();
+        TroveItems.Reset();
+        BossTank = null;
+        if (!_hooked) {
+            _hooked = true;
+            // a floor's first room is set up by the campaign's own sequence: give the players their items then
+            CampaignGlobals.OnMissionStart += () => { if (Active) ApplyItems(); };
+        }
         ReviveSystem.Clear();
         PlayerTank.StartingLives = Difficulties.Types["GearsOfWar"] ? 1 : STARTING_LIVES;
         IntermissionSystem.BannerColor = new Color(92, 60, 140);
@@ -157,6 +173,7 @@ public static class TroveRun {
                 _fadeDir = 0;
         }
 
+        TroveItems.Update();
         if (!CampaignGlobals.InMission || Ended != EndKind.None || GameUI.Paused || Room is not { } room)
             return;
         PlayTime += Dt;
@@ -211,6 +228,17 @@ public static class TroveRun {
                 }
             }
             return;
+        }
+
+        // picking up an item
+        if (room.PickupVisible) {
+            foreach (var p in GameHandler.AllPlayerTanks) {
+                if (p is null || p.IsDestroyed || Vector2.Distance(p.Position, PickupPoint) > PICKUP_REACH)
+                    continue;
+                Send(EV_ITEM, p.PlayerId);
+                TakePickup(p.PlayerId);
+                break;
+            }
         }
 
         // through a door
@@ -269,6 +297,7 @@ public static class TroveRun {
         var mission = TroveGen.BuildMission(Floor, room, entry);
         CampaignGlobals.LoadedCampaign.LoadMission(mission);
         CampaignGlobals.LoadedCampaign.SetupLoadedMission(true);
+        ApplyItems();
         // what normally happens when a mission starts (invisible tanks vanish, free-for-all teams)
         foreach (var t in GameHandler.AllTanks)
             if (t is not null && !t.IsDestroyed)
@@ -276,8 +305,22 @@ public static class TroveRun {
         BuffBoss(room);
     }
 
-    /// <summary>The boss: bigger, armored (a health bar), and better armed than a normal tank of its type.</summary>
+    private static void ApplyItems() {
+        foreach (var p in GameHandler.AllPlayerTanks)
+            if (p is not null && !p.IsDestroyed && TroveItems.IsLocal(p.PlayerId))
+                TroveItems.ApplyTo(p);
+    }
+
+    private static void TakePickup(int playerId) {
+        if (Room is not { Pickup: { } item } room || room.PickupTaken)
+            return;
+        room.PickupTaken = true;
+        TroveItems.Give(playerId, item);
+    }
+
+    /// <summary>The boss: bigger, armored (a health bar at the top), and better armed than a normal tank of its type.</summary>
     private static void BuffBoss(TroveRoom room) {
+        BossTank = null;
         if (TroveGen.BossPosition(room) is not { } pos)
             return;
         var boss = GameHandler.AllAITanks.Where(t => t is not null && !t.IsDestroyed)
@@ -286,12 +329,16 @@ public static class TroveRun {
             return;
         boss.Scaling = new Vector3(1.45f);
         boss.Properties.Armor = new TankArmor(boss, 4 + FloorNumber * 2);
+        BossTank = boss;
+        BossMaxHits = 4 + FloorNumber * 2 + 1;
         boss.Properties.ShellLimit += 2;
         boss.Properties.MineLimit += 1;
     }
 
     private static void NextFloor() {
         FloorNumber++;
+        TroveItems.NewFloor();
+        BossTank = null;
         Floor = TroveGen.Generate(Seed, FloorNumber);
         Current = Floor.Start;
         _entry = null;
@@ -371,6 +418,9 @@ public static class TroveRun {
                 break;
             case EV_VICTORY:
                 if (Active) End(EndKind.Victory);
+                break;
+            case EV_ITEM:
+                if (Active) TakePickup(a);
                 break;
             case EV_MENU:
                 if (Active) {

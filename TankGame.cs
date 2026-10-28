@@ -890,6 +890,7 @@ public class TankGame : Game {
 
         var shouldSeeInfo = !MainMenuUI.IsActive && !LevelEditorUI.IsActive && !CampaignCompleteUI.IsViewingResults;
         if (shouldSeeInfo) {
+            TroveHud.DrawDoorsUnderHud(SpriteRenderer); // Tank Troves doors go under the mission strip and scores
             GameSceneUI.DrawScores();
             GameSceneUI.DrawMissionInfoBar();
         }
