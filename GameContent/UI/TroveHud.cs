@@ -159,15 +159,15 @@ public static class TroveHud {
         var d = TroveItems.Def(a);
         double since = TroveRun.PlayTime - p.SelectedAt;
         float alpha = since < 4 ? 1f : 0.7f;
-        float y = rowCenter.Y + ir * 1.9f;
+        float y = rowCenter.Y + ir * 2.1f;
         float lh = FontGlobals.RebirthFont.MeasureString("Ag").Y;
-        Text(sb, d.Name, new Vector2(rowCenter.X, y), 0.48f * s, Color.Lerp(d.Color, Color.White, 0.5f) * alpha, border: true);
-        foreach (var line in Wrap(d.Description, 0.4f * s, 520 * s)) {
-            y += lh * 0.4f * s * 1.05f;
-            Text(sb, line, new Vector2(rowCenter.X, y), 0.4f * s, Color.White * alpha, border: true);
+        Text(sb, d.Name, new Vector2(rowCenter.X, y), 0.6f * s, Color.Lerp(d.Color, Color.White, 0.5f) * alpha, border: true);
+        foreach (var line in Wrap(d.Description, 0.5f * s, 560 * s)) {
+            y += lh * 0.5f * s * 1.05f;
+            Text(sb, line, new Vector2(rowCenter.X, y), 0.5f * s, Color.White * alpha, border: true);
         }
         if (n > 1 && since < 6)
-            Text(sb, "tap an icon or press X to switch", new Vector2(rowCenter.X, y + lh * 0.34f * s * 1.2f), 0.32f * s, new Color(220, 210, 190) * alpha, border: true);
+            Text(sb, "tap an icon or press X to switch", new Vector2(rowCenter.X, y + lh * 0.42f * s * 1.2f), 0.4f * s, new Color(220, 210, 190) * alpha, border: true);
     }
 
     /// <summary>Splits text into lines no wider than maxWidth at this scale.</summary>
