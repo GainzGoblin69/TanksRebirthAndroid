@@ -52,6 +52,10 @@ public static class TroveRun {
 
     public static int RoomsCleared, TanksDestroyed;
     public static double PlayTime;
+    /// <summary>"Ready... Go!": a room with enemies waits this long before anyone can move or shoot.</summary>
+    public const double READY_SECONDS = 2.5;
+    public static double ReadyUntil = -1;
+    public static bool InReady => Active && CampaignGlobals.InMission && PlayTime < ReadyUntil;
 
     private static bool _starting;
     private static TroveDir? _entry;
@@ -91,6 +95,7 @@ public static class TroveRun {
         Ended = EndKind.None;
         RoomsCleared = TanksDestroyed = 0;
         PlayTime = 0;
+        ReadyUntil = -1;
         _entry = null;
         _fadeDir = 0;
         Fade = 0;
@@ -480,8 +485,13 @@ public static class TroveRun {
         _deadTimer = 0;
         MarkSeen();
         ReviveSystem.Clear();
-        if (!room.Cleared)
+        if (!room.Cleared) {
             room.Wave2Spawned = false; // a challenge starts over from wave 1
+            ReadyUntil = PlayTime + READY_SECONDS;
+            SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.8f, pitchOverride: -0.3f);
+        }
+        else
+            ReadyUntil = -1;
         var mission = TroveGen.BuildMission(Floor, room, entry);
         CampaignGlobals.LoadedCampaign.LoadMission(mission);
         CampaignGlobals.LoadedCampaign.SetupLoadedMission(true);
@@ -543,6 +553,7 @@ public static class TroveRun {
 
     private static void NextFloor() {
         FloorNumber++;
+        ReadyUntil = -1;
         TroveItems.NewFloor();
         BossTank = null;
         Floor = TroveGen.Generate(Seed, FloorNumber);

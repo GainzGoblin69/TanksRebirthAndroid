@@ -458,6 +458,11 @@ public abstract class Tank {
         KnockbackVelocity.X = MathUtils.RoughStep(KnockbackVelocity.X, 0, 0.1f * RuntimeData.DeltaTime);
         KnockbackVelocity.Y = MathUtils.RoughStep(KnockbackVelocity.Y, 0, 0.1f * RuntimeData.DeltaTime);
 
+        // Tank Troves "Ready... Go!": nobody moves yet
+        if (MovementLocked?.Invoke(this) == true) {
+            Velocity = Vector2.Zero;
+            KnockbackVelocity = Vector2.Zero;
+        }
         // magical multiplication number to maintain values like 1.8 max speed with the original game
         Physics.LinearVelocity = (Velocity * 0.55f + KnockbackVelocity) / UNITS_PER_METER;
 
@@ -604,6 +609,8 @@ public abstract class Tank {
     public static Func<Tank, bool>? PreventDestroy;
     /// <summary>Set by Tank Troves: true while a tank can't shoot (EMP).</summary>
     public static Func<Tank, bool>? ShootBlocked;
+    /// <summary>Set by Tank Troves: true while tanks can't move (the "Ready" pause when a room starts).</summary>
+    public static Func<Tank, bool>? MovementLocked;
     public void DoDamageTextPopup(Color color) {
         var part = GameHandler.Particles.MakeParticle(Position3D + new Vector3(0, 15, 0),
             TankGame.GameLanguage.Hit);

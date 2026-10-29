@@ -228,7 +228,7 @@ public static class TroveBosses {
             Boss.Properties.ShellLimit += 3;
         }
 
-        if (!Authority || Frozen)
+        if (!Authority || Frozen || TroveRun.InReady)
             return;
         if (_mini)
             MiniTrick();

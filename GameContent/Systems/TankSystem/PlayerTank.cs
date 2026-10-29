@@ -341,6 +341,8 @@ public class PlayerTank : Tank {
         base.Shoot(false);
     }
     public override void LayMine() {
+        if (Systems.Troves.TroveRun.InReady)
+            return; // "Ready...": not yet
         // Tank Troves slider bombs replace mines while you have them
         if (CurMineCooldown <= 0 && Systems.Troves.TroveItems.TryUseSliderBomb(this)) {
             FireSliderBomb();

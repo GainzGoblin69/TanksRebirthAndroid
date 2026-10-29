@@ -44,6 +44,7 @@ public static class TroveHud {
             DrawBossBar(sb);
             DrawPickupBanner(sb);
             DrawSynergyBanner(sb);
+            DrawReadyGo(sb);
         }
         if (TroveRun.Fade > 0)
             sb.Draw(TextureGlobals.Pixels[Color.White], new Rectangle(0, 0, WindowUtils.WindowWidth, WindowUtils.WindowHeight), Color.Black * TroveRun.Fade);
@@ -754,6 +755,29 @@ public static class TroveHud {
                 sb.DrawString(font, t, new Vector2(panel.X + 2, sy), new Color(255, 215, 80), new Vector2(0.42f * s), 0f, Vector2.Zero);
                 sy += font.MeasureString(t).Y * 0.42f * s * 1.1f;
             }
+    }
+
+    // ---- "READY" while a room with enemies waits to start, then "GO!" as it does
+    private static bool _saidGo = true;
+    private static void DrawReadyGo(SpriteBatch sb) {
+        if (!CampaignGlobals.InMission || TroveRun.ReadyUntil < 0)
+            return;
+        float s = S;
+        double left = TroveRun.ReadyUntil - TroveRun.PlayTime;
+        var at = new Vector2(WindowUtils.WindowWidth / 2f, WindowUtils.WindowHeight * 0.42f);
+        if (left > 0) {
+            _saidGo = false;
+            float pulse = 1f + 0.06f * MathF.Sin((float)TroveRun.PlayTime * 6f);
+            Text(sb, "READY", at, 2.2f * s * pulse, Color.White, border: true);
+        }
+        else if (left > -0.7) {
+            if (!_saidGo) {
+                _saidGo = true;
+                SoundPlayer.PlaySoundInstance("Assets/sounds/menu/client_join.ogg", SoundContext.Effect, 0.8f, pitchOverride: 0.3f);
+            }
+            float k = (float)(-left / 0.7);
+            Text(sb, "GO!", at, (2.4f + k) * s, new Color(255, 220, 80) * (1 - k), border: true);
+        }
     }
 
     // ---- "SYNERGY!" for a few seconds after two items click

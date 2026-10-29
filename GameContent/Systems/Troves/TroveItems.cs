@@ -336,7 +336,8 @@ public static class TroveItems {
         if (_hooked)
             return;
         _hooked = true;
-        AITank.IsFrozen = t => Frozen && IsEnemy(t);
+        AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady;
+        Tank.MovementLocked = _ => TroveRun.InReady;
         Shell.IsFrozen = s => Frozen && s.Owner is AITank ai && IsEnemy(ai);
         AITank.TargetOverride = ai => TroveRun.Active && DecoyTank is { IsDestroyed: false } d && IsEnemy(ai) ? d : null;
         Tank.ExtraArmorDamage = (tank, ctx) => {
@@ -390,7 +391,7 @@ public static class TroveItems {
         Shell.Blocks = TroveBosses.ShieldBlocks;
         Tank.OnShoot += TroveBosses.OnBossShoot;
         // EMP: enemies can't shoot
-        Tank.ShootBlocked = t => TroveRun.Active && Now < EmpUntil && t is AITank && IsEnemy(t);
+        Tank.ShootBlocked = t => TroveRun.Active && (Now < EmpUntil && t is AITank && IsEnemy(t) || TroveRun.InReady);
         // Second Wind: once a floor, a hit that would destroy you doesn't
         Tank.PreventDestroy = t => {
             if (!TroveRun.Active || t is not PlayerTank pt || pt.PlayerId is < 0 or >= 4)
