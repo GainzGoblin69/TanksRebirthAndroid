@@ -28,7 +28,8 @@ public static class TroveRun {
         EV_REROLL = 10, EV_SECRET = 11, EV_WAVE2 = 12, EV_STOPWATCH = 13, EV_NUKE = 14, EV_DECOY = 15, EV_INVINCIBLE = 16,
         EV_WALL = 17, EV_CONVERT = 18, EV_SHRINK = 19, EV_BLAST = 20,
         EV_CLONE = 21, EV_EMP = 22, EV_TURRET = 23, EV_MIRROR = 24, EV_GIVE = 25,
-        EV_BOSS_SHOT = 26, EV_BOSS_MINE = 27, EV_BOSS_ACT = 28, EV_BOSS_EXTRA = 29;
+        EV_BOSS_SHOT = 26, EV_BOSS_MINE = 27, EV_BOSS_ACT = 28, EV_BOSS_EXTRA = 29,
+        EV_WELL = 30, EV_SMOKE = 31, EV_FLAG = 32, EV_SHOCK = 33, EV_FREEZE_BOMB = 34;
     /// <summary>How close (game units) a tank has to get to an item to pick it up.</summary>
     public const float PICKUP_REACH = 26f;
     public static Vector2 PickupPoint => new Coordinates.BlockMapPosition(10, 8);
@@ -696,6 +697,21 @@ public static class TroveRun {
                 break;
             case EV_GIVE:
                 if (Active) TroveItems.Give(a / 100, (TroveItemId)(a % 100));
+                break;
+            case EV_WELL:
+                if (Active && CampaignGlobals.InMission) TroveItems.StartWell(TroveItems.DecodePos(a / 4), a % 4);
+                break;
+            case EV_SMOKE:
+                if (Active) TroveItems.StartSmoke(a);
+                break;
+            case EV_FLAG:
+                if (Active && CampaignGlobals.InMission) TroveItems.PlantFlag(TroveItems.DecodePos(a / 4), a % 4);
+                break;
+            case EV_SHOCK:
+                if (Active && CampaignGlobals.InMission) TroveItems.DoShockwave(a);
+                break;
+            case EV_FREEZE_BOMB:
+                if (Active && CampaignGlobals.InMission) TroveItems.DropFreezeBomb(TroveItems.DecodePos(a / 4), a % 4);
                 break;
             case EV_BOSS_SHOT:
             case EV_BOSS_MINE:

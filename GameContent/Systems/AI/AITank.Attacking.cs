@@ -276,6 +276,7 @@ public partial class AITank {
             if (tank is null || tank.IsDestroyed) continue;
             if (tank == this) continue; // don't target self
             if (tank.IsOnSameTeamAs(Team)) continue; // no friendly fire
+            if (IsHidden?.Invoke(tank) == true) continue; // Tank Troves Smoke Bomb
 
             // no need for WiiTanksUnits here since we are simply looking for the closest tank
             if (Vector2.Distance(tank.Position, Position) < Vector2.Distance(targetPosition, Position)) {
@@ -291,6 +292,8 @@ public partial class AITank {
     /// <summary>A method that simply changes an AI </summary>
     /// <summary>Set by Tank Troves: a tank this AI must aim at instead (a Decoy).</summary>
     public static Func<AITank, Tank?>? TargetOverride;
+    /// <summary>Set by Tank Troves: true for tanks AI can't see right now (Smoke Bomb).</summary>
+    public static Func<Tank, bool>? IsHidden;
     public Tank? TryOverrideTarget() {
         Tank? target = TargetTank;
         if (TargetOverride?.Invoke(this) is { } forced)

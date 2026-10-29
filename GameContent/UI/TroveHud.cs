@@ -45,6 +45,7 @@ public static class TroveHud {
             DrawPickupBanner(sb);
             DrawSynergyBanner(sb);
             DrawReadyGo(sb);
+            DrawBroken(sb);
         }
         if (TroveRun.Fade > 0)
             sb.Draw(TextureGlobals.Pixels[Color.White], new Rectangle(0, 0, WindowUtils.WindowWidth, WindowUtils.WindowHeight), Color.Black * TroveRun.Fade);
@@ -115,6 +116,39 @@ public static class TroveHud {
             ToggleSwitch.DrawDisc(sb, c, rr, new Color(190, 120, 255));
         }
 
+        // gravity wells, rally flags, freeze bombs, frozen enemies, shockwaves
+        foreach (var (wat, _, _) in TroveItems.Wells) {
+            var c = ToScreen(wat);
+            float rr = Math.Max(10f, Vector2.Distance(c, ToScreen(wat + new Vector2(30f, 0))));
+            for (int k = 0; k < 3; k++) {
+                float ph = (float)((TroveRun.PlayTime * 1.5 + k / 3.0) % 1.0);
+                ToggleSwitch.DrawDisc(sb, c, rr * (1.6f - ph * 1.4f), new Color(120, 60, 200) * (0.25f * ph));
+            }
+            ToggleSwitch.DrawDisc(sb, c, rr * 0.35f, new Color(30, 10, 50));
+        }
+        foreach (var (fat, _, reach, _) in TroveItems.Flags) {
+            var c = ToScreen(fat);
+            float rr = Math.Max(20f, Vector2.Distance(c, ToScreen(fat + new Vector2(reach, 0))));
+            ToggleSwitch.DrawDisc(sb, c, rr, new Color(220, 60, 60) * 0.08f);
+            ToggleSwitch.DrawLine(sb, c, c - new Vector2(0, 60 * s), 4 * s, new Color(90, 70, 50));
+            float wave = MathF.Sin((float)TroveRun.PlayTime * 6f) * 4 * s;
+            ToggleSwitch.DrawLine(sb, c - new Vector2(0, 58 * s), c + new Vector2(32 * s, -46 * s + wave), 14 * s, new Color(220, 50, 50));
+        }
+        foreach (var (bat, _, _) in TroveItems.FreezeBombs) {
+            var c = ToScreen(bat);
+            ToggleSwitch.DrawDisc(sb, c, 12 * s, new Color(30, 60, 90));
+            ToggleSwitch.DrawDisc(sb, c, 8 * s, new Color(150, 230, 255) * (0.6f + 0.4f * MathF.Sin((float)TroveRun.PlayTime * 8f)));
+        }
+        foreach (var (iced, until) in TroveItems.IcedUntil)
+            if (!iced.IsDestroyed && until > TroveRun.PlayTime)
+                ToggleSwitch.DrawDisc(sb, ToScreen(iced.Position), 30 * s, new Color(160, 230, 255) * 0.35f);
+        foreach (var (wat, wt) in TroveItems.Waves) {
+            float k = (float)Math.Clamp((TroveRun.PlayTime - wt) / 0.5, 0, 1);
+            var c = ToScreen(wat);
+            float rr = Math.Max(10f, Vector2.Distance(c, ToScreen(wat + new Vector2(130f * k, 0))));
+            ToggleSwitch.DrawDisc(sb, c, rr, new Color(170, 230, 255) * (0.3f * (1 - k)));
+        }
+
         // lightning
         foreach (var (from, to, _) in TroveItems.Bolts) {
             var a = ToScreen(from);
@@ -183,6 +217,10 @@ public static class TroveHud {
                 string c = def.RechargeSeconds > 0 ? $"{Math.Ceiling(p.ReadyAt - TroveRun.PlayTime)}s" : $"{p.ChargeOf(id)}/{def.Recharge}";
                 Text(sb, c, at, 0.38f * s, Color.White, border: true);
             }
+            // uses left before it breaks (red when it's the last one)
+            int uses = p.UsesOf(id);
+            if (TroveItems.Def(id).MaxUses > 1)
+                Text(sb, $"x{uses}", at + new Vector2(r * 0.85f, r * 0.85f), 0.36f * s, uses <= 1 ? new Color(255, 90, 80) : Color.White, border: true);
             Internals.Common.Framework.Input.TouchControls.ItemSlots.Add((
                 new Rectangle((int)(at.X - gap / 2f), (int)(at.Y - gap / 2f), (int)gap, (int)gap), i));
         }
@@ -194,7 +232,9 @@ public static class TroveHud {
         float alpha = since < 4 ? 1f : 0.7f;
         float y = rowCenter.Y + ir * 2.1f;
         float lh = FontGlobals.RebirthFont.MeasureString("Ag").Y;
-        Text(sb, d.Name, new Vector2(rowCenter.X, y), 0.6f * s, Color.Lerp(d.Color, Color.White, 0.5f) * alpha, border: true);
+        int usesLeft = p.UsesOf(a);
+        string usesText = d.MaxUses > 1 ? (usesLeft <= 1 ? "  (last use)" : $"  ({usesLeft} uses left)") : "";
+        Text(sb, d.Name + usesText, new Vector2(rowCenter.X, y), 0.6f * s, Color.Lerp(d.Color, Color.White, 0.5f) * alpha, border: true);
         foreach (var line in Wrap(d.Description, 0.5f * s, 560 * s)) {
             y += lh * 0.5f * s * 1.05f;
             Text(sb, line, new Vector2(rowCenter.X, y), 0.5f * s, Color.White * alpha, border: true);
@@ -243,7 +283,9 @@ public static class TroveHud {
         var def = TroveItems.Def(room.Pickup.Value);
         float s = S;
         string kind = def.Kind switch {
-            TroveItemKind.Active => def.Recharge > 0 ? $"ITEM button  -  recharges every {def.Recharge} room{(def.Recharge > 1 ? "s" : "")}" : "ITEM button  -  one use",
+            TroveItemKind.Active => def.MaxUses <= 1 ? "ITEM button  -  one use"
+                : def.RechargeSeconds > 0 ? $"ITEM button  -  {def.MaxUses} uses, ready again after {def.RechargeSeconds:0}s"
+                : $"ITEM button  -  {def.MaxUses} uses, recharges every {def.Recharge} room{(def.Recharge > 1 ? "s" : "")}",
             TroveItemKind.Passive => TroveItems.Stacks(def.Id) ? "Lasts the whole run  -  stacks" : "Lasts the whole run",
             _ => "Takes effect right away",
         };
@@ -645,6 +687,59 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, c, r * 0.4f, new Color(170, 200, 230));
                 ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.2f, -r * 0.2f), c + new Vector2(r * 0.05f, -r * 0.3f), t * 0.6f, w);
                 break;
+            case TroveItemId.BountyHunter:
+                ToggleSwitch.DrawDisc(sb, c, r * 0.5f, new Color(255, 220, 90));
+                Text(sb, "$", c, r * 0.022f, new Color(120, 80, 10));
+                break;
+            case TroveItemId.HotPotato:
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.08f), r * 0.42f, new Color(190, 130, 70));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.1f, -r * 0.35f), c + new Vector2(r * 0.25f, -r * 0.6f), t * 0.6f, new Color(255, 210, 60));
+                break;
+            case TroveItemId.Wingman:
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.55f, r * 0.1f), c + new Vector2(r * 0.55f, r * 0.1f), r * 0.16f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(0, -r * 0.45f), c + new Vector2(0, r * 0.45f), r * 0.16f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.25f, r * 0.42f), c + new Vector2(r * 0.25f, r * 0.42f), r * 0.12f, w);
+                break;
+            case TroveItemId.Momentum:
+                foreach (float dy in new[] { -0.25f, 0.05f, 0.35f })
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.55f, dy * r), c + new Vector2(-r * 0.1f, dy * r), t * 0.6f, w);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.2f, r * 0.05f), r * 0.25f, w);
+                break;
+            case TroveItemId.GravityWell:
+                ToggleSwitch.DrawDisc(sb, c, r * 0.55f, w);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.42f, def.Color);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.22f, new Color(20, 10, 30));
+                break;
+            case TroveItemId.SmokeBomb:
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.2f, r * 0.05f), r * 0.3f, new Color(230, 230, 235));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.22f, -r * 0.08f), r * 0.33f, new Color(220, 220, 228));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.25f), r * 0.28f, new Color(240, 240, 245));
+                break;
+            case TroveItemId.RallyFlag:
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.25f, r * 0.55f), c + new Vector2(-r * 0.25f, -r * 0.55f), t * 0.7f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.25f, -r * 0.35f), c + new Vector2(r * 0.45f, -r * 0.25f), r * 0.32f, w);
+                break;
+            case TroveItemId.Shockwave:
+                ToggleSwitch.DrawDisc(sb, c, r * 0.6f, w);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.48f, def.Color);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.32f, w);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.2f, def.Color);
+                break;
+            case TroveItemId.RocketBarrage:
+                for (int i = -1; i <= 1; i++) {
+                    var a0 = c + new Vector2(i * r * 0.3f - r * 0.15f, r * 0.4f);
+                    var a1 = a0 + new Vector2(r * 0.3f, -r * 0.75f);
+                    ToggleSwitch.DrawLine(sb, a0, a1, r * 0.13f, w);
+                    ToggleSwitch.DrawDisc(sb, a0, r * 0.08f, new Color(255, 220, 90));
+                }
+                break;
+            case TroveItemId.FreezeBomb:
+                ToggleSwitch.DrawDisc(sb, c, r * 0.4f, new Color(40, 70, 100));
+                for (int i = 0; i < 3; i++) {
+                    var dir = Vector2.UnitX.Rotate(i * MathHelper.Pi / 3f);
+                    ToggleSwitch.DrawLine(sb, c - dir * r * 0.32f, c + dir * r * 0.32f, t * 0.5f, new Color(200, 245, 255));
+                }
+                break;
             case TroveItemId.BlockBust: {
                 // a cracked block
                 var box = new Rectangle((int)(c.X - r * 0.45f), (int)(c.Y - r * 0.45f), (int)(r * 0.9f), (int)(r * 0.9f));
@@ -778,6 +873,21 @@ public static class TroveHud {
             float k = (float)(-left / 0.7);
             Text(sb, "GO!", at, (2.4f + k) * s, new Color(255, 220, 80) * (1 - k), border: true);
         }
+    }
+
+    // ---- "<item> broke!" for a moment after an ITEM-button item's last use
+    private static void DrawBroken(SpriteBatch sb) {
+        if (TroveItems.LastBroken is not { } lb)
+            return;
+        double age = TroveRun.PlayTime - lb.Time;
+        if (age < 0 || age > 2.5)
+            return;
+        float s = S;
+        float a = (float)Math.Clamp((2.5 - age) * 2, 0, 1);
+        var tc = Internals.Common.Framework.Input.TouchControls.ItemButtonCenter;
+        float R = Internals.Common.Framework.Input.TouchControls.ItemButtonRadius;
+        var at = new Vector2(Math.Clamp(tc.X, 200 * s, WindowUtils.WindowWidth - 200 * s), tc.Y + R * 1.6f);
+        Text(sb, $"{lb.Def.Name} broke!", at, 0.6f * s, new Color(255, 120, 100) * a, border: true);
     }
 
     // ---- "SYNERGY!" for a few seconds after two items click

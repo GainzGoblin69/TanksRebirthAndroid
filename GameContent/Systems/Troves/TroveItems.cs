@@ -22,6 +22,8 @@ public enum TroveItemId {
     Airstrike, WallBuilder, Dash, MineStorm, Convert, ShrinkRay, RepairKit, LightningStorm,
     GhostShells, LastStand, MagnetShells, Afterburner, RicochetShield, SecondWind,
     Clone, EMP, Teleport, TurretDrop, SupplyDrop, MirrorShield,
+    BountyHunter, HotPotato, Wingman, Momentum,
+    GravityWell, SmokeBomb, RallyFlag, Shockwave, RocketBarrage, FreezeBomb,
 }
 
 /// <summary>How an item works: used with the ITEM button, takes effect when picked up, or lasts the whole run.</summary>
@@ -29,7 +31,10 @@ public enum TroveItemKind { Active, Instant, Passive }
 
 /// <param name="Recharge">Active items: rooms to clear before it can be used again (0 = used up).</param>
 /// <param name="RechargeSeconds">Active items that recharge over time instead of by rooms.</param>
-public sealed record TroveItemDef(TroveItemId Id, string Name, string Description, TroveItemKind Kind, Color Color, int Recharge = 0, float RechargeSeconds = 0);
+public sealed record TroveItemDef(TroveItemId Id, string Name, string Description, TroveItemKind Kind, Color Color, int Recharge = 0, float RechargeSeconds = 0) {
+    /// <summary>ITEM-button items wear out: how many uses before it breaks (slower recharge = fewer uses).</summary>
+    public int MaxUses => Kind != TroveItemKind.Active ? 0 : RechargeSeconds > 0 ? 15 : Recharge switch { 0 => 1, 1 => 4, 2 => 3, _ => 2 };
+}
 
 /// <summary>Two items that do something extra together.</summary>
 public sealed record TroveSynergy(string Name, string Description, TroveItemId A, TroveItemId B);
@@ -103,6 +108,16 @@ public static class TroveItems {
         new(TroveItemId.TurretDrop, "Turret Drop", "Places a turret that shoots enemies for the rest of the room", TroveItemKind.Active, new Color(150, 150, 120), Recharge: 2),
         new(TroveItemId.SupplyDrop, "Supply Drop", "Drops a random item", TroveItemKind.Active, new Color(120, 170, 90)),
         new(TroveItemId.MirrorShield, "Mirror Shield", "For 4 seconds, enemy shells that hit you bounce back at them", TroveItemKind.Active, new Color(210, 230, 250), Recharge: 3),
+        new(TroveItemId.BountyHunter, "Bounty Hunter", "Clear a room without getting hit and it drops something extra", TroveItemKind.Passive, new Color(200, 160, 60)),
+        new(TroveItemId.HotPotato, "Hot Potato", "Enemy shells set your mines off at once, with a bigger blast", TroveItemKind.Passive, new Color(230, 110, 40)),
+        new(TroveItemId.Wingman, "Wingman", "A little guard that shoots enemy shells out of the air near you", TroveItemKind.Passive, new Color(140, 200, 240)),
+        new(TroveItemId.Momentum, "Momentum", "Shells fired while driving fast go through an enemy", TroveItemKind.Passive, new Color(240, 150, 90)),
+        new(TroveItemId.GravityWell, "Gravity Well", "A vortex in front of you pulls enemies and their shells in for 4 seconds", TroveItemKind.Active, new Color(110, 70, 180), Recharge: 3),
+        new(TroveItemId.SmokeBomb, "Smoke Bomb", "Enemies lose track of you for 5 seconds", TroveItemKind.Active, new Color(150, 150, 160), Recharge: 2),
+        new(TroveItemId.RallyFlag, "Rally Flag", "Plant a flag: you and your allies near it shoot twice as fast for 8 seconds", TroveItemKind.Active, new Color(220, 60, 60), Recharge: 3),
+        new(TroveItemId.Shockwave, "Shockwave", "Pushes nearby enemies and their shells away from you", TroveItemKind.Active, new Color(150, 220, 255), Recharge: 1),
+        new(TroveItemId.RocketBarrage, "Rocket Barrage", "Fires 6 rockets one after another at the nearest enemies", TroveItemKind.Active, new Color(230, 90, 40), Recharge: 2),
+        new(TroveItemId.FreezeBomb, "Freeze Bomb", "Drops a bomb that freezes enemies near it for 4 seconds", TroveItemKind.Active, new Color(150, 220, 250), Recharge: 2),
     ];
     public static TroveItemDef Def(TroveItemId id) => All[(int)id];
 
@@ -157,6 +172,16 @@ public static class TroveItems {
         new("Prospector", "Supply Drop drops a secret-room item", TroveItemId.SupplyDrop, TroveItemId.TreasureMap),
         new("Spiked Mirror", "Bounced-back shells get all your shell items", TroveItemId.MirrorShield, TroveItemId.HeavyShells),
         new("Inferno", "Afterburner fire explodes when it burns an enemy", TroveItemId.Afterburner, TroveItemId.ExplosiveShells),
+        new("Jackpot", "Bounty drops come from the item-room pool", TroveItemId.BountyHunter, TroveItemId.TreasureMap),
+        new("Powder Keg", "Hot Potato blasts are twice as big", TroveItemId.HotPotato, TroveItemId.BigMines),
+        new("Air Support", "Your wingman shoots twice as often", TroveItemId.Wingman, TroveItemId.BuddyTank),
+        new("Freight Train", "Momentum shells go through 2 more enemies", TroveItemId.Momentum, TroveItemId.SpeedTreads),
+        new("Singularity", "The gravity well collapses in a big explosion", TroveItemId.GravityWell, TroveItemId.ExplosiveShells),
+        new("Ninja", "Smoke lasts 8 seconds and you're faster in it", TroveItemId.SmokeBomb, TroveItemId.GhostTreads),
+        new("War Banner", "The flag reaches twice as far and lasts 12 seconds", TroveItemId.RallyFlag, TroveItemId.BuddyTank),
+        new("Sonic Boom", "Shockwave also damages the enemies it pushes", TroveItemId.Shockwave, TroveItemId.HeavyShells),
+        new("Heat Seekers", "Barrage rockets home in", TroveItemId.RocketBarrage, TroveItemId.Homing),
+        new("Cryo Cluster", "Freeze bombs freeze twice as far", TroveItemId.FreezeBomb, TroveItemId.ClusterMines),
     ];
 
     // item rooms draw from nearly everything; challenge and secret rooms have stronger pools; rooms mostly drop small stuff
@@ -171,19 +196,22 @@ public static class TroveItems {
         TroveItemId.EchoShot, TroveItemId.WallBuilder, TroveItemId.Dash, TroveItemId.MineStorm, TroveItemId.ShrinkRay, TroveItemId.RepairKit,
         TroveItemId.LightningStorm, TroveItemId.GhostShells, TroveItemId.LastStand, TroveItemId.MagnetShells, TroveItemId.Afterburner,
         TroveItemId.RicochetShield, TroveItemId.SecondWind, TroveItemId.Clone, TroveItemId.EMP, TroveItemId.Teleport, TroveItemId.TurretDrop,
-        TroveItemId.SupplyDrop, TroveItemId.MirrorShield,
+        TroveItemId.SupplyDrop, TroveItemId.MirrorShield, TroveItemId.BountyHunter, TroveItemId.HotPotato, TroveItemId.Wingman,
+        TroveItemId.Momentum, TroveItemId.GravityWell, TroveItemId.SmokeBomb, TroveItemId.RallyFlag, TroveItemId.Shockwave,
+        TroveItemId.RocketBarrage, TroveItemId.FreezeBomb,
     ];
     public static readonly TroveItemId[] ChallengePool = [
         TroveItemId.TripleShot, TroveItemId.QuickReload, TroveItemId.HeavyShells, TroveItemId.ExplosiveShells, TroveItemId.BigMines,
         TroveItemId.OrbitGuard, TroveItemId.ShellBurst, TroveItemId.Stopwatch, TroveItemId.BossHunter, TroveItemId.Invincibility, TroveItemId.Nuke,
         TroveItemId.ChainLightning, TroveItemId.EchoShot, TroveItemId.Airstrike, TroveItemId.Convert, TroveItemId.SplitShot, TroveItemId.RicochetMaster,
         TroveItemId.Clone, TroveItemId.MirrorShield, TroveItemId.TurretDrop, TroveItemId.SecondWind,
+        TroveItemId.RocketBarrage, TroveItemId.GravityWell, TroveItemId.Wingman,
     ];
     public static readonly TroveItemId[] SecretPool = [
         TroveItemId.Nuke, TroveItemId.Invincibility, TroveItemId.BuddyTank, TroveItemId.TripleShot, TroveItemId.OrbitGuard,
         TroveItemId.BossHunter, TroveItemId.TreasureMap, TroveItemId.ExplosiveShells, TroveItemId.HeavyShells,
         TroveItemId.Airstrike, TroveItemId.Convert, TroveItemId.EchoShot, TroveItemId.VampireTreads,
-        TroveItemId.SecondWind, TroveItemId.Clone, TroveItemId.GhostShells,
+        TroveItemId.SecondWind, TroveItemId.Clone, TroveItemId.GhostShells, TroveItemId.BountyHunter, TroveItemId.Wingman,
     ];
     /// <summary>Items that stack: every extra one adds more.</summary>
     public static bool Stacks(TroveItemId id) => id is TroveItemId.BouncyShells or TroveItemId.ExtraShell or TroveItemId.MinePack
@@ -216,6 +244,7 @@ public static class TroveItems {
         /// <summary>Picks up an ITEM-button item: a free slot if there is one, otherwise it replaces the selected one.</summary>
         public void AddActive(TroveItemId id) {
             Charges[id] = Def(id).Recharge; // comes charged
+            UsesLeft[id] = Def(id).MaxUses; // and new (picking up one you carry repairs it)
             int have = Actives.IndexOf(id);
             if (have >= 0)
                 Selected = have; // already carrying it: just recharged
@@ -233,6 +262,7 @@ public static class TroveItems {
                 return;
             Actives.RemoveAt(Math.Clamp(Selected, 0, Actives.Count - 1));
             Charges.Remove(a);
+            UsesLeft.Remove(a);
             Selected = Actives.Count == 0 ? 0 : Math.Min(Selected, Actives.Count - 1);
             SelectedAt = TroveRun.PlayTime;
         }
@@ -254,6 +284,12 @@ public static class TroveItems {
         public double MirrorUntil = -1, CloneUntil = -1, LastFireDrop;
         public bool SecondWindUsed, LastStandOn;
         public AITank? CloneTank;
+        public AITank? WingmanTank;
+        public double WingmanShotAt, SmokeUntil = -1;
+        public bool HitThisRoom, Rallied;
+        /// <summary>Uses left on each carried ITEM-button item (it breaks at 0).</summary>
+        public readonly Dictionary<TroveItemId, int> UsesLeft = [];
+        public int UsesOf(TroveItemId id) => UsesLeft.TryGetValue(id, out var u) ? u : Def(id).MaxUses;
         public readonly HashSet<Tank> Rammed = [];
         public bool WasInvincible;
         public readonly Dictionary<TroveItemId, int> Passives = [];
@@ -272,6 +308,8 @@ public static class TroveItems {
 
     /// <summary>The last pickup, for the banner (name, description, how many you have now, when).</summary>
     public static (TroveItemDef Def, double Time, int Stack)? LastPickup;
+    /// <summary>An ITEM-button item that just broke (its last use), for a little banner.</summary>
+    public static (TroveItemDef Def, double Time)? LastBroken;
     /// <summary>A synergy that just switched on, for its banner.</summary>
     public static (TroveSynergy Synergy, double Time)? LastSynergy;
 
@@ -294,6 +332,17 @@ public static class TroveItems {
     private static readonly Dictionary<Tank, double> _burnedAt = [];
     /// <summary>Turrets (Turret Drop) and whose they are.</summary>
     public static readonly List<(AITank Tank, int Player)> Turrets = [];
+    /// <summary>Gravity wells: where, until when, whose.</summary>
+    public static readonly List<(Vector2 At, double Until, int Player)> Wells = [];
+    /// <summary>Rally flags: where, until when, how far they reach, whose.</summary>
+    public static readonly List<(Vector2 At, double Until, float Reach, int Player)> Flags = [];
+    /// <summary>Freeze bombs waiting to go off: where, when they go off anyway, whose.</summary>
+    public static readonly List<(Vector2 At, double Fuse, int Player)> FreezeBombs = [];
+    /// <summary>Enemies frozen by a freeze bomb, and until when.</summary>
+    public static readonly Dictionary<Tank, double> IcedUntil = [];
+    /// <summary>Shockwave rings to draw: where, when.</summary>
+    public static readonly List<(Vector2 At, double Time)> Waves = [];
+    private static readonly List<(double At, int Player)> _barrage = [];
 
     private static bool _hooked;
     private static PlayerItems P(int id) => Players[Math.Clamp(id, 0, 3)];
@@ -316,6 +365,12 @@ public static class TroveItems {
         _airstrikes.Clear();
         Fires.Clear();
         Turrets.Clear();
+        Wells.Clear();
+        Flags.Clear();
+        FreezeBombs.Clear();
+        IcedUntil.Clear();
+        Waves.Clear();
+        _barrage.Clear();
         EmpUntil = -1;
         InstallHooks();
     }
@@ -336,7 +391,14 @@ public static class TroveItems {
         if (_hooked)
             return;
         _hooked = true;
-        AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady;
+        AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady || IcedUntil.TryGetValue(t, out var iu) && Now < iu;
+        // Smoke Bomb: enemies can't see you
+        AITank.IsHidden = t => TroveRun.Active && t is PlayerTank pt && pt.PlayerId is >= 0 and < 4 && Now < P(pt.PlayerId).SmokeUntil;
+        // Bounty Hunter: getting hit spoils this room's bounty
+        Tank.OnDamage += (victim, _, _) => {
+            if (TroveRun.Active && victim is PlayerTank pt && pt.PlayerId is >= 0 and < 4)
+                P(pt.PlayerId).HitThisRoom = true;
+        };
         Tank.MovementLocked = _ => TroveRun.InReady;
         Shell.IsFrozen = s => Frozen && s.Owner is AITank ai && IsEnemy(ai);
         AITank.TargetOverride = ai => TroveRun.Active && DecoyTank is { IsDestroyed: false } d && IsEnemy(ai) ? d : null;
@@ -525,6 +587,19 @@ public static class TroveItems {
 
     /// <summary>A room was cleared: active items recharge.</summary>
     public static void OnRoomCleared() {
+        // Bounty Hunter (the host decides, and tells the others what dropped)
+        if ((!Client.IsConnected() || Client.IsHost()) && TroveRun.Room is { } br && !br.PickupVisible)
+            for (int i = 0; i < 4; i++) {
+                var bp = Players[i];
+                if (!bp.Has(TroveItemId.BountyHunter) || bp.HitThisRoom || GameHandler.AllPlayerTanks[i] is not { IsDestroyed: false })
+                    continue;
+                var pool = bp.Has(Syn("Jackpot")) ? PedestalPool : DropPool;
+                var drop = pool[Random.Shared.Next(pool.Length)];
+                br.Pickup = null;
+                TroveRun.SetPickup(drop);
+                SendAny(TroveRun.EV_REROLL, (int)drop);
+                break;
+            }
         for (int i = 0; i < 4; i++) {
             var p = Players[i];
             // every carried item recharges, not just the selected one
@@ -724,6 +799,39 @@ public static class TroveItems {
                 SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_shoot_rocket.ogg", SoundContext.Effect, 0.7f);
                 return;
             }
+            case TroveItemId.GravityWell: {
+                if (tank is null || tank.IsDestroyed) { SoundPlayer.SoundError(); return; }
+                var aim = Vector2.UnitY.Rotate(tank.TurretRotation);
+                var at = tank.Position + new Vector2(-aim.X, aim.Y) * 110f;
+                at = new Vector2(Math.Clamp(at.X, Graphics.GameScene.TANKS_MIN_X + 20, Graphics.GameScene.TANKS_MAX_X - 20), Math.Clamp(at.Y, Graphics.GameScene.TANKS_MIN_Y + 20, Graphics.GameScene.TANKS_MAX_Y - 20));
+                StartWell(at, playerId);
+                SendAny(TroveRun.EV_WELL, EncodePos(at) * 4 + playerId);
+                break;
+            }
+            case TroveItemId.SmokeBomb:
+                StartSmoke(playerId);
+                SendAny(TroveRun.EV_SMOKE, playerId);
+                break;
+            case TroveItemId.RallyFlag:
+                if (tank is null || tank.IsDestroyed) { SoundPlayer.SoundError(); return; }
+                PlantFlag(tank.Position, playerId);
+                SendAny(TroveRun.EV_FLAG, EncodePos(tank.Position) * 4 + playerId);
+                break;
+            case TroveItemId.Shockwave:
+                if (tank is null || tank.IsDestroyed) { SoundPlayer.SoundError(); return; }
+                DoShockwave(playerId);
+                SendAny(TroveRun.EV_SHOCK, playerId);
+                break;
+            case TroveItemId.RocketBarrage:
+                if (tank is null || tank.IsDestroyed) { SoundPlayer.SoundError(); return; }
+                for (int i = 0; i < 6; i++)
+                    _barrage.Add((Now + i * 0.15, playerId));
+                break;
+            case TroveItemId.FreezeBomb:
+                if (tank is null || tank.IsDestroyed) { SoundPlayer.SoundError(); return; }
+                DropFreezeBomb(tank.Position, playerId);
+                SendAny(TroveRun.EV_FREEZE_BOMB, EncodePos(tank.Position) * 4 + playerId);
+                break;
             case TroveItemId.MirrorShield:
                 StartMirror(playerId);
                 SendAny(TroveRun.EV_MIRROR, playerId);
@@ -740,13 +848,20 @@ public static class TroveItems {
                 break;
             }
         }
-        // used up, or recharging
-        if (Def(id).RechargeSeconds > 0)
+        // used up (it breaks after its last use), or recharging
+        int usesLeft = p.UsesOf(id) - 1;
+        p.UsesLeft[id] = usesLeft;
+        if (usesLeft <= 0) {
+            p.RemoveActive();
+            if (Def(id).MaxUses > 1) {
+                LastBroken = (Def(id), Now);
+                SoundPlayer.PlaySoundInstance("Assets/sounds/bullet_destroy.ogg", SoundContext.Effect, 1f, pitchOverride: -0.5f);
+            }
+        }
+        else if (Def(id).RechargeSeconds > 0)
             p.ReadyAt = Now + Def(id).RechargeSeconds;
         else if (Def(id).Recharge > 0)
             p.Charge = 0;
-        else
-            p.RemoveActive();
         SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_shoot_rocket.ogg", SoundContext.Effect, 0.7f);
         if (tank is { IsDestroyed: false })
             ApplyTo(tank);
@@ -820,6 +935,60 @@ public static class TroveItems {
         DecoyTank = d;
         _decoyOwner = playerId;
         _decoyUntil = Now + 6;
+    }
+
+    public static void StartWell(Vector2 at, int playerId) {
+        Wells.Add((at, Now + 4, playerId));
+        SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 1f, pitchOverride: -0.9f);
+    }
+    public static void StartSmoke(int playerId) {
+        P(playerId).SmokeUntil = Now + (Has(playerId, Syn("Ninja")) ? 8 : 5);
+        if (GameHandler.AllPlayerTanks[playerId] is { } t)
+            GameHandler.Particles.MakeSmallExplosion(t.Position3D, 14, 0, 0.5f, 6);
+    }
+    public static void PlantFlag(Vector2 at, int playerId) {
+        bool banner = Has(playerId, Syn("War Banner"));
+        Flags.Add((at, Now + (banner ? 12 : 8), banner ? 200f : 100f, playerId));
+        SoundPlayer.PlaySoundInstance("Assets/music/fanfares/life_get.ogg", SoundContext.Effect, 0.4f, pitchOverride: -0.2f);
+    }
+    /// <summary>Shockwave: enemy shells nearby turn around, and the host shoves the enemy tanks (Sonic Boom: and hurts them).</summary>
+    public static void DoShockwave(int playerId) {
+        if (GameHandler.AllPlayerTanks[playerId] is not { IsDestroyed: false } t)
+            return;
+        Waves.Add((t.Position, Now));
+        foreach (var s in Shell.AllShells)
+            if (s is not null && s.Owner is not null && IsEnemy(s.Owner) && Vector2.Distance(s.Position, t.Position) < 130f) {
+                var away = s.Position - t.Position;
+                if (away.LengthSquared() > 0.01f)
+                    s.Velocity = Vector2.Normalize(away) * s.Velocity.Length();
+            }
+        if (Client.IsConnected() && !Client.IsHost())
+            return;
+        bool boom = Has(playerId, Syn("Sonic Boom"));
+        foreach (var e in GameHandler.AllAITanks)
+            if (e is { IsDestroyed: false } && IsEnemy(e) && Vector2.Distance(e.Position, t.Position) < 130f) {
+                var away = e.Position - t.Position;
+                if (away.LengthSquared() > 0.01f)
+                    e.KnockbackVelocity = Vector2.Normalize(away) * 6f;
+                if (boom)
+                    e.Damage(new TankHurtContextOther(t, TankHurtContextOther.HurtContext.FromIngame, "Sonic Boom"), true);
+            }
+        SoundPlayer.PlaySoundInstance("Assets/sounds/mine_explode.ogg", SoundContext.Effect, 0.5f, pitchOverride: 0.6f);
+    }
+    public static void DropFreezeBomb(Vector2 at, int playerId) => FreezeBombs.Add((at, Now + 4, playerId));
+
+    /// <summary>A freeze bomb goes off: enemies near it freeze for 4 seconds.</summary>
+    private static void FreezeBurst(Vector2 at, int playerId) {
+        float reach = Has(playerId, Syn("Cryo Cluster")) ? 150f : 75f;
+        foreach (var e in GameHandler.AllAITanks)
+            if (e is { IsDestroyed: false } && IsEnemy(e) && Vector2.Distance(e.Position, at) < reach && !TroveBosses.IsBoss(e))
+                IcedUntil[e] = Now + 4;
+            else if (e is { IsDestroyed: false } && TroveBosses.IsBoss(e) && Vector2.Distance(e.Position, at) < reach)
+                IcedUntil[e] = Now + 1.5; // bosses shake it off sooner
+        Waves.Add((at, Now));
+        for (int i = 0; i < 8; i++)
+            GameHandler.Particles.MakeShineSpot(new Vector3(at.X + MathF.Cos(i) * reach * 0.5f, 6, at.Y + MathF.Sin(i) * reach * 0.5f), Color.LightCyan, 0.8f);
+        SoundPlayer.PlaySoundInstance("Assets/sounds/bullet_ricochet.ogg", SoundContext.Effect, 1f, pitchOverride: 0.9f);
     }
 
     public static void StartMirror(int playerId) {
@@ -898,11 +1067,27 @@ public static class TroveItems {
         Turrets.Clear();
         Fires.Clear();
         _burnedAt.Clear();
-        foreach (var p in Players)
+        Wells.Clear();
+        Flags.Clear();
+        FreezeBombs.Clear();
+        IcedUntil.Clear();
+        _barrage.Clear();
+        foreach (var p in Players) {
             p.CloneTank = null;
-        for (int i = 0; i < 4; i++)
+            p.WingmanTank = null;
+            p.HitThisRoom = false;
+            p.Rallied = false;
+        }
+        for (int i = 0; i < 4; i++) {
             if (Players[i].Has(TroveItemId.BuddyTank))
                 SpawnBuddy(i);
+            if (Players[i].Has(TroveItemId.Wingman) && GameHandler.AllPlayerTanks[i] is { IsDestroyed: false } pt) {
+                var w = SpawnAlly(TankID.Silver, pt.Position + new Vector2(0, 26), 0.55f);
+                w.Properties.ShellLimit = 0;
+                w.Properties.MineLimit = 0;
+                Players[i].WingmanTank = w;
+            }
+        }
     }
 
     private static void SpawnBuddy(int playerId) {
@@ -1087,6 +1272,8 @@ public static class TroveItems {
             s.SplitsOnBounce = true;
             s.Shrapnel = p.Has(Syn("Shrapnel"));
         }
+        if (p.Has(TroveItemId.Momentum) && GameHandler.AllPlayerTanks[playerId] is { } mt && mt.Velocity.Length() > mt.Properties.MaxSpeed * 0.6f)
+            s.Pierce += p.Has(Syn("Freight Train")) ? 3 : 1;
         if (p.Has(TroveItemId.GhostShells))
             s.WallPasses = p.Has(Syn("Phase Rifle")) ? 2 : 1;
         if (p.Has(TroveItemId.RicochetMaster))
@@ -1158,6 +1345,8 @@ public static class TroveItems {
         float size = tiny && giant ? 1f : tiny ? 0.7f : giant ? 1.35f : 1f;
         tank.Scaling = new Vector3(size);
         props.MaxSpeed *= tiny && !giant ? (p.Has(Syn("Zippy")) ? 1.15f : 0.9f) : giant && !tiny ? 0.85f : 1f;
+        if (Now < p.SmokeUntil && p.Has(Syn("Ninja")))
+            props.MaxSpeed *= 1.2f;
         int sniper = p.Count(TroveItemId.SniperShells);
         props.ShellSpeed *= MathF.Pow(1.6f, Math.Min(sniper, 2));
         props.RicochetCount += (uint)sniper;
@@ -1176,6 +1365,8 @@ public static class TroveItems {
             props.ShellHoming = p.Has(Syn("Seeker Swarm"))
                 ? new() { Radius = 340f, Speed = props.ShellSpeed, Power = 0.14f * props.ShellSpeed }
                 : new() { Radius = 200f, Speed = props.ShellSpeed, Power = 0.1f * props.ShellSpeed };
+        if (p.Rallied)
+            props.ShellCooldown = (uint)Math.Max(1, props.ShellCooldown / 2);
         if (p.LastStandOn) {
             props.ShellCooldown = (uint)Math.Max(1, props.ShellCooldown / 2);
             props.ShellLimit += 1;
@@ -1313,6 +1504,48 @@ public static class TroveItems {
                 p.CloneTank = null;
             }
 
+            if (IsLocal(i)) {
+                // Hot Potato: an enemy shell touching your mine sets it off, bigger
+                if (p.Has(TroveItemId.HotPotato))
+                    foreach (var m in Mine.AllMines.ToArray()) {
+                        if (m is null || m.Detonated || !ReferenceEquals(m.Owner, t))
+                            continue;
+                        var hit = Shell.AllShells.FirstOrDefault(s => s is not null && s.Owner is not null && IsEnemy(s.Owner) && Vector2.Distance(s.Position, m.Position) < 16f);
+                        if (hit is null)
+                            continue;
+                        hit.Destroy(Shell.DestructionContext.WithMine);
+                        m.ExplosionRadius *= p.Has(Syn("Powder Keg")) ? 2f : 1.5f;
+                        m.Detonate();
+                    }
+                // Wingman: shoots enemy shells near you out of the air
+                if (p.WingmanTank is { IsDestroyed: false } wm) {
+                    // stays close by
+                    var want = t.Position + new Vector2(MathF.Cos((float)Now), MathF.Sin((float)Now)) * 34f;
+                    wm.Position = Vector2.Lerp(wm.Position, want, 0.12f);
+                    double every = p.Has(Syn("Air Support")) ? 0.4 : 0.8;
+                    if (Now - p.WingmanShotAt > every) {
+                        var target = Shell.AllShells.Where(s => s is not null && s.Owner is not null && IsEnemy(s.Owner) && Vector2.Distance(s.Position, t.Position) < 140f)
+                            .OrderBy(s => Vector2.Distance(s!.Position, t.Position)).FirstOrDefault();
+                        if (target is not null) {
+                            p.WingmanShotAt = Now;
+                            Bolts.Add((wm.Position, target.Position, Now));
+                            target.Destroy(Shell.DestructionContext.WithShell);
+                        }
+                    }
+                }
+                // Rally Flag: near one of your flags, you shoot twice as fast
+                bool rallied = Flags.Any(f => Now < f.Until && Vector2.Distance(f.At, t.Position) < f.Reach);
+                if (rallied != p.Rallied) {
+                    p.Rallied = rallied;
+                    ApplyTo(t);
+                }
+                // Ninja: faster in your smoke
+                if (Now < p.SmokeUntil && Has(i, Syn("Ninja")) && (int)(Now * 10) % 4 == 0)
+                    GameHandler.Particles.MakeSmokeCloud(t.Position3D, 2, 1);
+            }
+            if (Now < p.SmokeUntil && (int)(Now * 8) % 3 == 0)
+                GameHandler.Particles.MakeSmokeCloud(t.Position3D, 4, 1);
+
             // orbit guard: knock enemy shells out of the air (this phone's players)
             if (IsLocal(i) && p.Has(TroveItemId.OrbitGuard))
                 foreach (var (pos, r) in Orbiters(i).ToArray())
@@ -1338,6 +1571,55 @@ public static class TroveItems {
                             new Explosion(e.Position, 3f * BlastSize(pl), burner, 0.4f) { SparesOwner = true };
                     }
             }
+            // gravity wells pull enemy shells (everyone) and enemy tanks (the host moves those)
+            for (int w = Wells.Count - 1; w >= 0; w--) {
+                var (wat, wuntil, wpl) = Wells[w];
+                if (Now > wuntil) {
+                    Wells.RemoveAt(w);
+                    if (Has(wpl, Syn("Singularity")))
+                        new Explosion(wat, 10f * BlastSize(wpl), GameHandler.AllPlayerTanks[wpl], 0.8f, -0.4f) { SparesOwner = true };
+                    continue;
+                }
+                foreach (var s in Shell.AllShells)
+                    if (s is not null && s.Owner is not null && IsEnemy(s.Owner) && Vector2.Distance(s.Position, wat) < 160f) {
+                        float sp = s.Velocity.Length();
+                        var want = Vector2.Normalize(wat - s.Position + new Vector2(0.01f)) * sp;
+                        s.Velocity = Vector2.Normalize(Vector2.Lerp(s.Velocity, want, 0.12f * TanksRebirth.RuntimeData.DeltaTime)) * sp;
+                    }
+                if (!Client.IsConnected() || Client.IsHost())
+                    foreach (var e in GameHandler.AllAITanks)
+                        if (e is { IsDestroyed: false } && IsEnemy(e) && Vector2.Distance(e.Position, wat) is var d && d < 170f && d > 8f && !TroveBosses.IsBoss(e))
+                            e.Position += Vector2.Normalize(wat - e.Position) * 0.7f * TanksRebirth.RuntimeData.DeltaTime;
+            }
+            // freeze bombs: go off when an enemy comes close, or when the fuse runs out
+            for (int fb = FreezeBombs.Count - 1; fb >= 0; fb--) {
+                var (fat, fuse, fpl) = FreezeBombs[fb];
+                bool near = GameHandler.AllAITanks.Any(e => e is { IsDestroyed: false } && IsEnemy(e) && Vector2.Distance(e.Position, fat) < 40f);
+                if (near || Now > fuse) {
+                    FreezeBombs.RemoveAt(fb);
+                    FreezeBurst(fat, fpl);
+                }
+            }
+            // rocket barrage: one rocket at a time, each at the nearest enemy
+            for (int rb = _barrage.Count - 1; rb >= 0; rb--) {
+                if (Now < _barrage[rb].At)
+                    continue;
+                int bpl = _barrage[rb].Player;
+                _barrage.RemoveAt(rb);
+                if (GameHandler.AllPlayerTanks[bpl] is not { IsDestroyed: false } bt)
+                    continue;
+                var foe = GameHandler.AllAITanks.Where(e => e is { IsDestroyed: false } && IsEnemy(e)).OrderBy(e => Vector2.Distance(e!.Position, bt.Position)).FirstOrDefault();
+                var dir = foe is not null ? Vector2.Normalize(foe.Position - bt.Position) : new Vector2(-Vector2.UnitY.Rotate(bt.TurretRotation).X, Vector2.UnitY.Rotate(bt.TurretRotation).Y);
+                var homing = Has(bpl, Syn("Heat Seekers")) ? new Shell.HomingProperties { Radius = 260f, Speed = 5f, Power = 0.4f } : default;
+                var rk = new Shell(bt.Position + dir * 20f, dir * 5f, ShellID.Rocket, bt, 0, homing);
+                ModifyShell(bpl, rk);
+                if (Client.IsConnected())
+                    Client.SyncShellFire(rk);
+            }
+            Flags.RemoveAll(f => Now > f.Until);
+            foreach (var key in IcedUntil.Where(kv => Now > kv.Value).Select(kv => kv.Key).ToList())
+                IcedUntil.Remove(key);
+            Waves.RemoveAll(wv => Now - wv.Time > 0.5);
             for (int i = _echoes.Count - 1; i >= 0; i--)
                 if (Now >= _echoes[i].Due) {
                     var e = _echoes[i];
@@ -1423,6 +1705,12 @@ public static class TroveItems {
         TroveItemId.TurretDrop => "TURRET",
         TroveItemId.SupplyDrop => "SUPPLY",
         TroveItemId.MirrorShield => "MIRROR",
+        TroveItemId.GravityWell => "WELL",
+        TroveItemId.SmokeBomb => "SMOKE",
+        TroveItemId.RallyFlag => "FLAG",
+        TroveItemId.Shockwave => "SHOCK",
+        TroveItemId.RocketBarrage => "BARRAGE",
+        TroveItemId.FreezeBomb => "FREEZE",
         _ => Def(id).Name.ToUpperInvariant(),
     };
 
