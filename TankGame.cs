@@ -566,6 +566,10 @@ public class TankGame : Game {
 
         // it isnt really an autoupdater tho.
         Task.Run(() => {
+            // the phone version updates from its own releases: the PC game's version check doesn't apply (and its
+            // "outdated" message played an error sound off the main thread, which tripped the crash report)
+            if (OperatingSystem.IsAndroid())
+                return;
             ClientLog.Write("Checking for update...", LogType.Info);
             AutoUpdater = new("https://github.com/RighteousRyan1/TanksRebirth", RuntimeData.GameVersion);
 
