@@ -45,8 +45,8 @@ public static class Lighting
 
     public static readonly Vector3 AccurateLightingDirection = new(0.25f, 1, -0.5f);
 
-    private static Color LightColor = DefaultLightingColor;
-    private static float ColorBrightness = 1f;
+    internal static Color LightColor = DefaultLightingColor;
+    internal static float ColorBrightness = 1f;
 
     private static float LightPower = 0f;
     private static bool IsNight { get; set; }

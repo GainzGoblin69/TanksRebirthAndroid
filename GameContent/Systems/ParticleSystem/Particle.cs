@@ -203,6 +203,14 @@ public class Particle
                 EffectHandle.Alpha = Alpha;
 
                 EffectHandle.SetDefaultGameLighting_IngameEntities(LightPower);
+                if (OperatingSystem.IsAndroid()) {
+                    // these flat sprites have no normals; lit on phone GPUs they come out black (explosions, tracks,
+                    // floor details). Draw them unlit with about the brightness they get on PC (ambient + emissive).
+                    EffectHandle.LightingEnabled = false;
+                    var lit = Lighting.LightColor.ToVector3() * Lighting.ColorBrightness + EffectHandle.EmissiveColor;
+                    EffectHandle.DiffuseColor = Vector3.Clamp(lit, Vector3.Zero, Vector3.One);
+                    EffectHandle.EmissiveColor = Vector3.Zero;
+                }
 
                 TankGame.SpriteRenderer.End();
                 TankGame.SpriteRenderer.Begin(SpriteSortMode.FrontToBack, HasAdditiveBlending ? BlendState.Additive : BlendState.NonPremultiplied, SamplerState.PointWrap, DepthStencilState.DepthRead, RenderGlobals.DefaultRasterizer, EffectHandle); 
