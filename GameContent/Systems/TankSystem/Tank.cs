@@ -458,6 +458,9 @@ public abstract class Tank {
         KnockbackVelocity.X = MathUtils.RoughStep(KnockbackVelocity.X, 0, 0.1f * RuntimeData.DeltaTime);
         KnockbackVelocity.Y = MathUtils.RoughStep(KnockbackVelocity.Y, 0, 0.1f * RuntimeData.DeltaTime);
 
+        // Tank Troves floor themes: quicksand slows, ice slides
+        if (VelocityFilter?.Invoke(this, Velocity) is { } filtered)
+            Velocity = filtered;
         // Tank Troves "Ready... Go!": nobody moves yet
         if (MovementLocked?.Invoke(this) == true) {
             Velocity = Vector2.Zero;
@@ -611,6 +614,8 @@ public abstract class Tank {
     public static Func<Tank, bool>? ShootBlocked;
     /// <summary>Set by Tank Troves: true while tanks can't move (the "Ready" pause when a room starts).</summary>
     public static Func<Tank, bool>? MovementLocked;
+    /// <summary>Set by Tank Troves: changes a tank's movement each update (floor themes), or null to leave it.</summary>
+    public static Func<Tank, Vector2, Vector2?>? VelocityFilter;
     public void DoDamageTextPopup(Color color) {
         var part = GameHandler.Particles.MakeParticle(Position3D + new Vector3(0, 15, 0),
             TankGame.GameLanguage.Hit);

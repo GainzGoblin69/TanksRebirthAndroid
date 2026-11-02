@@ -337,6 +337,9 @@ public class Block : IGameObject
 
     public void OnPreRender() { }
 
+    /// <summary>Multiplies every block's colour (Tank Troves floor themes). White = normal.</summary>
+    public static Vector3 Tint = Vector3.One;
+
     public void OnRender() {
         if (!GameScene.ShouldRenderAll)
             return;
@@ -360,6 +363,10 @@ public class Block : IGameObject
                         effect.Texture = GameScene.Assets["snow"];
 
                     effect.SetDefaultGameLighting_IngameEntities(10f);
+                    if (Tint != Vector3.One) {
+                        effect.DiffuseColor *= Tint;
+                        effect.AmbientLightColor *= Tint;
+                    }
 
                     effect.DirectionalLight0.Direction *= 0.1f;
 

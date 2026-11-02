@@ -24,6 +24,8 @@ public enum TroveItemId {
     Clone, EMP, Teleport, TurretDrop, SupplyDrop, MirrorShield,
     BountyHunter, HotPotato, Wingman, Momentum,
     GravityWell, SmokeBomb, RallyFlag, Shockwave, RocketBarrage, FreezeBomb,
+    NitroTreads, RapidBarrel, ArmorPlating, HighCaliber, Steroids, LongBarrel, HeartyMeal, MagicMushroom,
+    GlassCannon, HeavyArmor, Featherweight,
 }
 
 /// <summary>How an item works: used with the ITEM button, takes effect when picked up, or lasts the whole run.</summary>
@@ -117,6 +119,18 @@ public static class TroveItems {
         new(TroveItemId.RallyFlag, "Rally Flag", "Plant a flag: you and your allies near it shoot twice as fast for 8 seconds", TroveItemKind.Active, new Color(220, 60, 60), Recharge: 3),
         new(TroveItemId.Shockwave, "Shockwave", "Pushes nearby enemies and their shells away from you", TroveItemKind.Active, new Color(150, 220, 255), Recharge: 1),
         new(TroveItemId.RocketBarrage, "Rocket Barrage", "Fires 6 rockets one after another at the nearest enemies", TroveItemKind.Active, new Color(230, 90, 40), Recharge: 2),
+        // stat upgrades (they stack, and colour your shells)
+        new(TroveItemId.NitroTreads, "Nitro Treads", "Speed up", TroveItemKind.Passive, new Color(250, 215, 40)),
+        new(TroveItemId.RapidBarrel, "Rapid Barrel", "Fire rate up, +1 shell on screen", TroveItemKind.Passive, new Color(60, 130, 255)),
+        new(TroveItemId.ArmorPlating, "Armor Plating", "Health up: +1 hit you can take, refilled every room", TroveItemKind.Passive, new Color(70, 200, 90)),
+        new(TroveItemId.HighCaliber, "High Caliber", "Damage up: armored enemies and bosses lose 2 hits per shot", TroveItemKind.Passive, new Color(230, 40, 40)),
+        new(TroveItemId.Steroids, "Steroids", "Damage up and speed up", TroveItemKind.Passive, new Color(255, 140, 30)),
+        new(TroveItemId.LongBarrel, "Long Barrel", "Shell speed up, +1 bounce", TroveItemKind.Passive, new Color(245, 245, 250)),
+        new(TroveItemId.HeartyMeal, "Hearty Meal", "Health up: +2 hits, refilled every floor; speed down", TroveItemKind.Passive, new Color(150, 90, 50)),
+        new(TroveItemId.MagicMushroom, "Magic Mushroom", "All stats up: speed, fire rate, health and damage", TroveItemKind.Passive, new Color(230, 60, 60)),
+        new(TroveItemId.GlassCannon, "Glass Cannon", "Double damage, but you can't keep shields", TroveItemKind.Passive, new Color(200, 240, 255)),
+        new(TroveItemId.HeavyArmor, "Heavy Armor", "Health up: +3 hits refilled every room; much slower", TroveItemKind.Passive, new Color(110, 115, 125)),
+        new(TroveItemId.Featherweight, "Featherweight", "Much faster, but -1 life", TroveItemKind.Passive, new Color(170, 230, 230)),
         new(TroveItemId.FreezeBomb, "Freeze Bomb", "Drops a bomb that freezes enemies near it for 4 seconds", TroveItemKind.Active, new Color(150, 220, 250), Recharge: 2),
     ];
     public static TroveItemDef Def(TroveItemId id) => All[(int)id];
@@ -182,6 +196,12 @@ public static class TroveItems {
         new("Sonic Boom", "Shockwave also damages the enemies it pushes", TroveItemId.Shockwave, TroveItemId.HeavyShells),
         new("Heat Seekers", "Barrage rockets home in", TroveItemId.RocketBarrage, TroveItemId.Homing),
         new("Cryo Cluster", "Freeze bombs freeze twice as far", TroveItemId.FreezeBomb, TroveItemId.ClusterMines),
+        new("Tank Mode", "+2 more health", TroveItemId.HeavyArmor, TroveItemId.GiantTank),
+        new("Speed Demon", "Your shells go faster too", TroveItemId.Featherweight, TroveItemId.NitroTreads),
+        new("Lucky Break", "Second Wind works every room", TroveItemId.GlassCannon, TroveItemId.SecondWind),
+        new("Big Guns", "Heavy shells go through one more enemy", TroveItemId.HighCaliber, TroveItemId.HeavyShells),
+        new("Overclock", "+2 more shells on screen", TroveItemId.RapidBarrel, TroveItemId.QuickReload),
+        new("Full Belly", "Hearty Meal refills every room", TroveItemId.HeartyMeal, TroveItemId.RegenPlating),
     ];
 
     // item rooms draw from nearly everything; challenge and secret rooms have stronger pools; rooms mostly drop small stuff
@@ -199,6 +219,9 @@ public static class TroveItems {
         TroveItemId.SupplyDrop, TroveItemId.MirrorShield, TroveItemId.BountyHunter, TroveItemId.HotPotato, TroveItemId.Wingman,
         TroveItemId.Momentum, TroveItemId.GravityWell, TroveItemId.SmokeBomb, TroveItemId.RallyFlag, TroveItemId.Shockwave,
         TroveItemId.RocketBarrage, TroveItemId.FreezeBomb,
+        TroveItemId.NitroTreads, TroveItemId.NitroTreads, TroveItemId.RapidBarrel, TroveItemId.RapidBarrel, TroveItemId.ArmorPlating,
+        TroveItemId.ArmorPlating, TroveItemId.HighCaliber, TroveItemId.HighCaliber, TroveItemId.Steroids, TroveItemId.LongBarrel,
+        TroveItemId.HeartyMeal, TroveItemId.GlassCannon, TroveItemId.HeavyArmor, TroveItemId.Featherweight,
     ];
     public static readonly TroveItemId[] ChallengePool = [
         TroveItemId.TripleShot, TroveItemId.QuickReload, TroveItemId.HeavyShells, TroveItemId.ExplosiveShells, TroveItemId.BigMines,
@@ -212,11 +235,13 @@ public static class TroveItems {
         TroveItemId.BossHunter, TroveItemId.TreasureMap, TroveItemId.ExplosiveShells, TroveItemId.HeavyShells,
         TroveItemId.Airstrike, TroveItemId.Convert, TroveItemId.EchoShot, TroveItemId.VampireTreads,
         TroveItemId.SecondWind, TroveItemId.Clone, TroveItemId.GhostShells, TroveItemId.BountyHunter, TroveItemId.Wingman,
+        TroveItemId.MagicMushroom, TroveItemId.MagicMushroom,
     ];
     /// <summary>Items that stack: every extra one adds more.</summary>
     public static bool Stacks(TroveItemId id) => id is TroveItemId.BouncyShells or TroveItemId.ExtraShell or TroveItemId.MinePack
         or TroveItemId.SpeedTreads or TroveItemId.QuickReload or TroveItemId.OrbitGuard or TroveItemId.HeavyShells or TroveItemId.TripleShot
-        or TroveItemId.SniperShells or TroveItemId.RegenPlating or TroveItemId.VampireTreads;
+        or TroveItemId.SniperShells or TroveItemId.RegenPlating or TroveItemId.VampireTreads
+        or (>= TroveItemId.NitroTreads and <= TroveItemId.Featherweight);
     // cleared rooms mostly leave hearts and shields, sometimes a stacking item or a Block Bust
     public static readonly TroveItemId[] DropPool = [
         TroveItemId.ExtraLife, TroveItemId.ExtraLife, TroveItemId.Shield, TroveItemId.Shield, TroveItemId.Shield,
@@ -287,6 +312,13 @@ public static class TroveItems {
         public AITank? WingmanTank;
         public double WingmanShotAt, SmokeUntil = -1;
         public bool HitThisRoom, Rallied;
+        /// <summary>Health from stat items: refilled each room / each floor (lost after shields).</summary>
+        public int RoomHp, FloorHp;
+        public int RoomHpMax => Count(TroveItemId.ArmorPlating) + 3 * Count(TroveItemId.HeavyArmor) + Count(TroveItemId.MagicMushroom)
+            + (Has(TroveItemId.HeavyArmor) && Has(TroveItemId.GiantTank) ? 2 : 0) + (Has(TroveItemId.HeartyMeal) && Has(TroveItemId.RegenPlating) ? 2 * Count(TroveItemId.HeartyMeal) : 0);
+        public int FloorHpMax => Has(TroveItemId.HeartyMeal) && Has(TroveItemId.RegenPlating) ? 0 : 2 * Count(TroveItemId.HeartyMeal);
+        /// <summary>The colour your shells are (the last stat item you picked up).</summary>
+        public TroveItemId? ShellColorFrom;
         /// <summary>Uses left on each carried ITEM-button item (it breaks at 0).</summary>
         public readonly Dictionary<TroveItemId, int> UsesLeft = [];
         public int UsesOf(TroveItemId id) => UsesLeft.TryGetValue(id, out var u) ? u : Def(id).MaxUses;
@@ -393,7 +425,10 @@ public static class TroveItems {
         _hooked = true;
         AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady || IcedUntil.TryGetValue(t, out var iu) && Now < iu;
         // Smoke Bomb: enemies can't see you
-        AITank.IsHidden = t => TroveRun.Active && t is PlayerTank pt && pt.PlayerId is >= 0 and < 4 && Now < P(pt.PlayerId).SmokeUntil;
+        AITank.IsHidden = t => TroveRun.Active && t is PlayerTank pt && pt.PlayerId is >= 0 and < 4
+            && (Now < P(pt.PlayerId).SmokeUntil || TroveThemes.HiddenInBush(t));
+        // floor themes: quicksand slows, ice slides
+        Tank.VelocityFilter = (t, v) => TroveRun.Active ? TroveThemes.FilterVelocity(t, v) : null;
         // Bounty Hunter: getting hit spoils this room's bounty
         Tank.OnDamage += (victim, _, _) => {
             if (TroveRun.Active && victim is PlayerTank pt && pt.PlayerId is >= 0 and < 4)
@@ -403,13 +438,24 @@ public static class TroveItems {
         Shell.IsFrozen = s => Frozen && s.Owner is AITank ai && IsEnemy(ai);
         AITank.TargetOverride = ai => TroveRun.Active && DecoyTank is { IsDestroyed: false } d && IsEnemy(ai) ? d : null;
         Tank.ExtraArmorDamage = (tank, ctx) => {
-            if (!TroveRun.Active || !(ReferenceEquals(tank, TroveRun.BossTank) || TroveBosses.IsBoss(tank)))
+            if (!TroveRun.Active || tank is PlayerTank || tank.Team == TeamID.Red)
                 return 0;
-            if (ctx.Source is PlayerTank pt && P(pt.PlayerId).Has(TroveItemId.BossHunter))
-                return 1;
-            if (ctx.Source is AITank ai && OwnerOf(ai) is int owner and >= 0 && Has(owner, Syn("Pack Hunter")))
-                return 1;
-            return 0;
+            // whose hit: a player's, or one of their helpers'
+            int pid = ctx.Source is PlayerTank pt ? pt.PlayerId : ctx.Source is AITank ai ? OwnerOf(ai) : -1;
+            if (pid is < 0 or >= 4)
+                return 0;
+            var p = P(pid);
+            bool boss = ReferenceEquals(tank, TroveRun.BossTank) || TroveBosses.IsBoss(tank);
+            int extra = 0;
+            if (boss && (ctx.Source is PlayerTank && p.Has(TroveItemId.BossHunter) || ctx.Source is AITank && Has(pid, Syn("Pack Hunter"))))
+                extra++;
+            // damage ups (stat items) count for the player's own hits
+            if (ctx.Source is PlayerTank) {
+                extra += p.Count(TroveItemId.HighCaliber) + p.Count(TroveItemId.Steroids) + p.Count(TroveItemId.MagicMushroom);
+                if (p.Has(TroveItemId.GlassCannon))
+                    extra = extra * 2 + 1;
+            }
+            return extra;
         };
         // chain lightning: a hit zaps the nearest other enemy
         Shell.OnHitTank = (shell, hit) => {
@@ -549,6 +595,17 @@ public static class TroveItems {
             TroveRun.RevealMap();
         if (id == TroveItemId.GiantTank && local)
             p.Shields++;
+        if (id is >= TroveItemId.NitroTreads and <= TroveItemId.Featherweight)
+            p.ShellColorFrom = id;
+        if (id is TroveItemId.ArmorPlating or TroveItemId.HeavyArmor or TroveItemId.MagicMushroom)
+            p.RoomHp = p.RoomHpMax;
+        if (id == TroveItemId.HeartyMeal)
+            p.FloorHp = p.FloorHpMax;
+        if (id == TroveItemId.Featherweight && local && PlayerTank.Lives[playerId] > 1) {
+            PlayerTank.Lives[playerId]--;
+            if (Client.IsConnected())
+                Client.SendLives();
+        }
         if (id == TroveItemId.BuddyTank && Buddies[playerId] is null && CampaignGlobals.InMission)
             SpawnBuddy(playerId);
         if (local && GameHandler.AllPlayerTanks[playerId] is { IsDestroyed: false } tank)
@@ -625,6 +682,7 @@ public static class TroveItems {
     public static void OnNewFloor() {
         for (int i = 0; i < 4; i++) {
             Players[i].SecondWindUsed = false;
+            Players[i].FloorHp = Players[i].FloorHpMax;
             if (IsLocal(i) && Players[i].Has(TroveItemId.GiantTank))
                 Players[i].Shields += Players[i].Count(TroveItemId.GiantTank);
         }
@@ -1077,6 +1135,10 @@ public static class TroveItems {
             p.WingmanTank = null;
             p.HitThisRoom = false;
             p.Rallied = false;
+            // health ups refill every room (Lucky Break: so does Second Wind)
+            p.RoomHp = p.RoomHpMax;
+            if (p.Has(Syn("Lucky Break")))
+                p.SecondWindUsed = false;
         }
         for (int i = 0; i < 4; i++) {
             if (Players[i].Has(TroveItemId.BuddyTank))
@@ -1272,6 +1334,14 @@ public static class TroveItems {
             s.SplitsOnBounce = true;
             s.Shrapnel = p.Has(Syn("Shrapnel"));
         }
+        if (p.ShellColorFrom is { } colorFrom) {
+            if (colorFrom == TroveItemId.MagicMushroom)
+                s.Rainbow = true;
+            else
+                s.Tint = Def(colorFrom).Color;
+        }
+        if (p.Has(Syn("Big Guns")) && p.Has(TroveItemId.HeavyShells))
+            s.Pierce++;
         if (p.Has(TroveItemId.Momentum) && GameHandler.AllPlayerTanks[playerId] is { } mt && mt.Velocity.Length() > mt.Properties.MaxSpeed * 0.6f)
             s.Pierce += p.Has(Syn("Freight Train")) ? 3 : 1;
         if (p.Has(TroveItemId.GhostShells))
@@ -1347,6 +1417,16 @@ public static class TroveItems {
         props.MaxSpeed *= tiny && !giant ? (p.Has(Syn("Zippy")) ? 1.15f : 0.9f) : giant && !tiny ? 0.85f : 1f;
         if (Now < p.SmokeUntil && p.Has(Syn("Ninja")))
             props.MaxSpeed *= 1.2f;
+        // stat upgrades
+        props.MaxSpeed *= MathF.Pow(1.15f, p.Count(TroveItemId.NitroTreads)) * MathF.Pow(1.1f, p.Count(TroveItemId.Steroids))
+            * MathF.Pow(1.1f, p.Count(TroveItemId.MagicMushroom)) * MathF.Pow(1.35f, p.Count(TroveItemId.Featherweight))
+            * MathF.Pow(0.9f, p.Count(TroveItemId.HeartyMeal)) * MathF.Pow(0.72f, p.Count(TroveItemId.HeavyArmor));
+        props.ShellCooldown = (uint)Math.Max(1, MathF.Round(props.ShellCooldown * MathF.Pow(0.75f, p.Count(TroveItemId.RapidBarrel)) * MathF.Pow(0.85f, p.Count(TroveItemId.MagicMushroom))));
+        props.ShellLimit += p.Count(TroveItemId.RapidBarrel) + p.Count(TroveItemId.MagicMushroom) + (p.Has(Syn("Overclock")) ? 2 : 0);
+        props.ShellSpeed *= MathF.Pow(1.25f, Math.Min(p.Count(TroveItemId.LongBarrel), 3)) * (p.Has(Syn("Speed Demon")) ? 1.25f : 1f);
+        props.RicochetCount += (uint)p.Count(TroveItemId.LongBarrel);
+        if (p.Has(TroveItemId.MagicMushroom))
+            tank.Scaling *= 1.15f;
         int sniper = p.Count(TroveItemId.SniperShells);
         props.ShellSpeed *= MathF.Pow(1.6f, Math.Min(sniper, 2));
         props.RicochetCount += (uint)sniper;
@@ -1372,8 +1452,13 @@ public static class TroveItems {
             props.ShellLimit += 1;
         }
         int kidArmor = props.Armor?.HitPoints ?? 0; // Kid Mode's own armor (player 2)
-        if (p.Shields > 0)
-            props.Armor = new TankArmor(tank, kidArmor + p.Shields);
+        if (p.Has(TroveItemId.GlassCannon))
+            p.Shields = 0; // glass cannons can't keep shields
+        p.RoomHp = Math.Min(p.RoomHp, p.RoomHpMax);
+        p.FloorHp = Math.Min(p.FloorHp, p.FloorHpMax);
+        int extraHits = p.Shields + p.RoomHp + p.FloorHp;
+        if (extraHits > 0)
+            props.Armor = new TankArmor(tank, kidArmor + extraHits);
         _shieldBase[tank.PlayerId] = kidArmor;
         bool inv = Now < p.InvincibleUntil;
         props.Immortal = inv;
@@ -1411,8 +1496,15 @@ public static class TroveItems {
             if (IsLocal(i)) {
                 if (t.IsDestroyed)
                     p.Shields = 0;
-                else if (p.Shields > 0)
-                    p.Shields = Math.Max(0, (t.Properties.Armor?.HitPoints ?? 0) - _shieldBase[i]);
+                else if (p.Shields + p.RoomHp + p.FloorHp > 0) {
+                    int have = Math.Max(0, (t.Properties.Armor?.HitPoints ?? 0) - _shieldBase[i]);
+                    int lost = p.Shields + p.RoomHp + p.FloorHp - have;
+                    for (; lost > 0; lost--) {
+                        if (p.Shields > 0) p.Shields--;
+                        else if (p.RoomHp > 0) p.RoomHp--;
+                        else if (p.FloorHp > 0) p.FloorHp--;
+                    }
+                }
             }
             if (t.IsDestroyed || !CampaignGlobals.InMission)
                 continue;

@@ -50,6 +50,8 @@ public sealed class TroveFloor {
     public bool SecretFound;
     /// <summary>The tank this floor's boss is built on (it depends on which boss this run has).</summary>
     public int BossTier = TankID.Marine;
+    /// <summary>A special look (and small twist) for this floor in this run, if it got one.</summary>
+    public FloorTheme Theme;
 
     public bool Has(Point p) => Rooms.ContainsKey(p);
 }
@@ -283,6 +285,9 @@ public static class TroveGen {
 
     private static void BuildRooms(TroveFloor f, int seed) {
         f.BossTier = TroveBosses.PickFor(f.Number, seed).Tier;
+        f.Theme = TroveThemes.PickFor(f.Number, seed);
+        if (TroveThemes.Def(f.Theme) is { } theme)
+            f.Name = theme.Name;
         bool campaign = SeedUsesCampaign(seed) && CampaignAvailable;
         foreach (var room in f.Rooms.Values) {
             var rng = new Random(unchecked(seed * 131 + f.Number * 977 + room.Cell.X * 61 + room.Cell.Y * 13));

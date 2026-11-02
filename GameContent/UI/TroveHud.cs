@@ -38,6 +38,7 @@ public static class TroveHud {
         // not while the floor banner (intermission) is up
         bool banner = IntermissionSystem.Alpha > 0.05f || IntermissionSystem.BlackAlpha > 0.05f;
         if (!banner && TroveRun.Floor is { } floor && TroveRun.Fade < 1f) {
+            DrawFog(sb);
             DrawInRoom(sb);
             DrawItemStrip(sb);
             DrawMap(sb, floor);
@@ -65,6 +66,40 @@ public static class TroveHud {
             return;
         EnsureTextures(sb.GraphicsDevice);
         DrawDoors(sb, floor, room);
+    }
+
+    // ---- the Haunted Vault's fog: dark everywhere except a circle around you
+    private static Texture2D? _fogHole;
+    private static void DrawFog(SpriteBatch sb) {
+        if (TroveThemes.Current != FloorTheme.Haunted || !CampaignGlobals.InMission)
+            return;
+        int me = Systems.LocalCoop.Active ? 0 : Net.NetPlay.GetMyClientId();
+        if (GameHandler.AllPlayerTanks[Math.Clamp(me, 0, 3)] is not { IsDestroyed: false } tank)
+            return;
+        if (_fogHole is null || _fogHole.IsDisposed) {
+            const int N = 256;
+            var px = new Color[N * N];
+            for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++) {
+                    float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(N / 2f)) / (N / 2f);
+                    float a = Math.Clamp((d - 0.55f) / 0.45f, 0, 1);
+                    px[y * N + x] = new Color(0, 0, 0, (int)(a * 255));
+                }
+            _fogHole = new Texture2D(sb.GraphicsDevice, N, N);
+            _fogHole.SetData(px);
+        }
+        float s = S;
+        var c = ToScreen(tank.Position);
+        float r = 330 * s * (1f + 0.03f * MathF.Sin((float)TroveRun.PlayTime * 2f));
+        var dark = new Color(10, 5, 20) * 0.88f;
+        var hole = new Rectangle((int)(c.X - r), (int)(c.Y - r), (int)(r * 2), (int)(r * 2));
+        sb.Draw(_fogHole, hole, new Color(10, 5, 20) * 0.88f);
+        var px1 = TextureGlobals.Pixels[Color.White];
+        int W = WindowUtils.WindowWidth, H = WindowUtils.WindowHeight;
+        sb.Draw(px1, new Rectangle(0, 0, W, Math.Max(0, hole.Top)), dark);
+        sb.Draw(px1, new Rectangle(0, hole.Bottom, W, Math.Max(0, H - hole.Bottom)), dark);
+        sb.Draw(px1, new Rectangle(0, hole.Top, Math.Max(0, hole.Left), hole.Height), dark);
+        sb.Draw(px1, new Rectangle(hole.Right, hole.Top, Math.Max(0, W - hole.Right), hole.Height), dark);
     }
 
     // ---- things in the room: the item on the floor, orbiters, buddy/decoy tags, the Stopwatch freeze
@@ -740,6 +775,63 @@ public static class TroveHud {
                     ToggleSwitch.DrawLine(sb, c - dir * r * 0.32f, c + dir * r * 0.32f, t * 0.5f, new Color(200, 245, 255));
                 }
                 break;
+            case TroveItemId.NitroTreads:
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.4f, r * 0.35f), c + new Vector2(r * 0.1f, -r * 0.1f), t, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.1f, -r * 0.1f), c + new Vector2(-r * 0.05f, r * 0.05f), t, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.05f, r * 0.05f), c + new Vector2(r * 0.4f, -r * 0.45f), t, w);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.42f, r * 0.38f), r * 0.14f, new Color(255, 140, 40));
+                break;
+            case TroveItemId.RapidBarrel:
+                foreach (float dy in new[] { -0.3f, 0f, 0.3f }) {
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.45f, dy * r), c + new Vector2(r * 0.25f, dy * r), r * 0.14f, w);
+                    ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.32f, dy * r), r * 0.09f, w);
+                }
+                break;
+            case TroveItemId.ArmorPlating:
+            case TroveItemId.HeavyArmor:
+                ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(c.X - r * 0.45f), (int)(c.Y - r * 0.45f), (int)(r * 0.9f), (int)(r * 0.9f)), r * 0.1f, w);
+                ToggleSwitch.DrawLine(sb, c - new Vector2(r * 0.25f, 0), c + new Vector2(r * 0.25f, 0), r * 0.16f, def.Color);
+                ToggleSwitch.DrawLine(sb, c - new Vector2(0, r * 0.25f), c + new Vector2(0, r * 0.25f), r * 0.16f, def.Color);
+                if (id == TroveItemId.HeavyArmor)
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.45f, r * 0.55f), c + new Vector2(r * 0.45f, r * 0.55f), r * 0.12f, w);
+                break;
+            case TroveItemId.HighCaliber:
+                ToggleSwitch.DrawLine(sb, c + new Vector2(0, r * 0.5f), c + new Vector2(0, -r * 0.15f), r * 0.42f, new Color(220, 190, 90));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, -r * 0.2f), r * 0.21f, new Color(220, 190, 90));
+                break;
+            case TroveItemId.Steroids:
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.45f, r * 0.45f), c + new Vector2(r * 0.25f, -r * 0.25f), r * 0.22f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.25f, -r * 0.25f), c + new Vector2(r * 0.5f, -r * 0.5f), t * 0.4f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.55f, r * 0.25f), c + new Vector2(-r * 0.25f, r * 0.55f), t * 0.6f, w);
+                break;
+            case TroveItemId.LongBarrel:
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.6f, r * 0.2f), c + new Vector2(r * 0.6f, -r * 0.2f), r * 0.16f, new Color(60, 60, 70));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.45f, r * 0.15f), r * 0.2f, new Color(60, 60, 70));
+                break;
+            case TroveItemId.HeartyMeal:
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.12f, -r * 0.08f), r * 0.36f, new Color(170, 100, 50));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.1f, r * 0.15f), c + new Vector2(r * 0.45f, r * 0.5f), r * 0.14f, w);
+                break;
+            case TroveItemId.MagicMushroom:
+                ToggleSwitch.DrawLine(sb, c + new Vector2(0, r * 0.1f), c + new Vector2(0, r * 0.5f), r * 0.3f, new Color(245, 235, 210));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, -r * 0.05f), r * 0.48f, new Color(220, 40, 40));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.2f, -r * 0.15f), r * 0.1f, w);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.18f, -r * 0.22f), r * 0.08f, w);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.05f, r * 0.05f), r * 0.07f, w);
+                break;
+            case TroveItemId.GlassCannon:
+                ToggleSwitch.DrawDisc(sb, c, r * 0.48f, new Color(255, 255, 255, 170));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.1f, -r * 0.45f), c + new Vector2(r * 0.05f, -r * 0.05f), t * 0.5f, new Color(40, 80, 120));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.05f, -r * 0.05f), c + new Vector2(-r * 0.15f, r * 0.4f), t * 0.5f, new Color(40, 80, 120));
+                break;
+            case TroveItemId.Featherweight:
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.45f, r * 0.45f), c + new Vector2(r * 0.4f, -r * 0.4f), t * 0.5f, w);
+                for (int i = 1; i < 5; i++) {
+                    var along = c + new Vector2(-r * 0.45f, r * 0.45f) + new Vector2(r * 0.85f, -r * 0.85f) * (i / 5f);
+                    ToggleSwitch.DrawLine(sb, along, along + new Vector2(-r * 0.25f, -r * 0.05f), t * 0.4f, w);
+                    ToggleSwitch.DrawLine(sb, along, along + new Vector2(r * 0.05f, r * 0.25f), t * 0.4f, w);
+                }
+                break;
             case TroveItemId.BlockBust: {
                 // a cracked block
                 var box = new Rectangle((int)(c.X - r * 0.45f), (int)(c.Y - r * 0.45f), (int)(r * 0.9f), (int)(r * 0.9f));
@@ -837,6 +929,13 @@ public static class TroveHud {
         if (mine.Shields > 0) {
             DrawItemIcon(sb, TroveItemId.Shield, new Vector2(x, y), ir);
             Text(sb, $"x{mine.Shields}", new Vector2(x + ir * 0.75f, y + ir * 0.8f), 0.5f * s, Color.White, border: true);
+            x += ir * 2.4f;
+        }
+        // health from stat items (refills each room / floor)
+        if (mine.RoomHp + mine.FloorHp > 0) {
+            ToggleSwitch.DrawDisc(sb, new Vector2(x, y), ir, new Color(60, 170, 80));
+            Text(sb, "+", new Vector2(x, y), 0.7f * s, Color.White, border: true);
+            Text(sb, $"x{mine.RoomHp + mine.FloorHp}", new Vector2(x + ir * 0.75f, y + ir * 0.8f), 0.5f * s, Color.White, border: true);
             x += ir * 2.4f;
         }
         // (ITEM-button items are shown under the ITEM button: see DrawItemStrip)

@@ -177,6 +177,9 @@ public class Shell : IAITankDanger {
     public int WallPasses;
     /// <summary>Ticks before this shell can use a teleporter again (Tank Troves: shells go through teleporters).</summary>
     public float TeleportCooldown;
+    /// <summary>Tank Troves stat items colour your shells (null: the normal look); Rainbow cycles through colours.</summary>
+    public Color? Tint;
+    public bool Rainbow;
     private float _ghostTicks;
     /// <summary>Set by Tank Troves: true if this shell should bounce back off this tank instead of hitting it (Mirror Shield).</summary>
     public static Func<Shell, Tank, bool>? Reflects;
@@ -851,6 +854,13 @@ public class Shell : IAITankDanger {
                 effect.Texture = _shellTexture;
 
                 effect.SetDefaultGameLighting_IngameEntities();
+                if (i == 0 && (Tint is not null || Rainbow)) {
+                    var c = Rainbow ? ColorFromHue((float)(Systems.Troves.TroveRun.PlayTime * 0.8 + Id * 0.13) % 1f) : Tint!.Value;
+                    effect.DiffuseColor = c.ToVector3();
+                    effect.EmissiveColor = c.ToVector3() * 0.45f;
+                }
+                else
+                    effect.EmissiveColor = Vector3.Zero;
             }
         }
 
@@ -859,6 +869,10 @@ public class Shell : IAITankDanger {
             RenderMeshEffects(currentIteration, mesh);
             mesh.Draw();
         }
+    }
+    private static Color ColorFromHue(float h) {
+        float r = Math.Clamp(MathF.Abs(h * 6 - 3) - 1, 0, 1), g = Math.Clamp(2 - MathF.Abs(h * 6 - 2), 0, 1), b = Math.Clamp(2 - MathF.Abs(h * 6 - 4), 0, 1);
+        return new Color(r, g, b);
     }
     /// <summary>Check if this <see cref="Shell"/> is heading towards <paramref name="targetPosition"/>, based on <paramref name="arc"/>.</summary>
     /// <param name="targetPosition">The position to check whether or not this <see cref="Shell"/> is on a collision path with.</param>

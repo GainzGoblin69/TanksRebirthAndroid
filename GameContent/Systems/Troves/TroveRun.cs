@@ -125,17 +125,24 @@ public static class TroveRun {
             CampaignGlobals.OnMissionStart += () => {
                 if (!Active)
                     return;
+                TroveItems.SpawnBuddies(); // (also refills health ups)
                 ApplyItems();
-                TroveItems.SpawnBuddies();
                 if (Room is { Kind: TroveRoomKind.Boss or TroveRoomKind.MiniBoss, Cleared: false } br)
                     BuffBoss(br); // (only happens when a floor starts in a boss room: testing)
             };
             // the new floor's colour appears when its first room is set up (behind the floor banner), not when the boss falls
-            Campaign.OnMissionLoad += (_, _) => { if (Active) SetFloorTint(); };
+            Campaign.OnMissionLoad += (_, _) => {
+                if (!Active)
+                    return;
+                SetFloorTint();
+                // the floor theme's details for this room (bushes, quicksand, lava...)
+                if (Floor is { } f && Room is { } r)
+                    TroveThemes.SetupRoom(f, r, Seed);
+            };
         }
         ReviveSystem.Clear();
         PlayerTank.StartingLives = Difficulties.Types["GearsOfWar"] ? 1 : STARTING_LIVES;
-        IntermissionSystem.BannerColor = new Color(92, 60, 140);
+        IntermissionSystem.BannerColor = TroveThemes.Def(Floor.Theme)?.Banner ?? new Color(92, 60, 140);
         IntermissionSystem.BackgroundColor = new Color(222, 210, 182);
 
         MainMenuUI.LaunchCustomGame();
@@ -151,11 +158,16 @@ public static class TroveRun {
         new(0.82f, 0.52f, 0.48f), // The Armory: rusty red
         new(0.55f, 0.44f, 0.72f), // The Vault: deep violet
     ];
-    private static void SetFloorTint() =>
-        Graphics.GameScene.FloorTint = FloorTints[Math.Clamp(FloorNumber - 1, 0, FloorTints.Length - 1)];
+    private static void SetFloorTint() {
+        var theme = Floor is { } f ? TroveThemes.Def(f.Theme) : null;
+        Graphics.GameScene.FloorTint = theme?.FloorTint ?? FloorTints[Math.Clamp(FloorNumber - 1, 0, FloorTints.Length - 1)];
+        Block.Tint = theme?.BlockTint ?? Vector3.One;
+    }
 
     public static void Stop() {
         Graphics.GameScene.FloorTint = Vector3.One;
+        Block.Tint = Vector3.One;
+        TroveThemes.ClearRoom();
         Active = false;
         _starting = false;
         Ended = EndKind.None;
@@ -170,6 +182,13 @@ public static class TroveRun {
     /// <summary>Testing: a third line in troves_test.txt names a floor-1 boss to start the run fighting.</summary>
     private static bool ReadTestBoss() {
         TroveBosses.TestKind = null;
+        TroveThemes.TestTheme = null;
+        try {
+            var tp = System.IO.Path.Combine(TankGame.SaveDirectory, "troves_test.txt");
+            if (System.IO.File.Exists(tp) && Enum.TryParse<FloorTheme>(System.IO.File.ReadAllLines(tp).ElementAtOrDefault(4)?.Trim(), out var th))
+                TroveThemes.TestTheme = th; // 5th line: a floor theme to always show up
+        }
+        catch { }
         try {
             var path = System.IO.Path.Combine(TankGame.SaveDirectory, "troves_test.txt");
             if (System.IO.File.Exists(path) && System.IO.File.ReadAllLines(path).ElementAtOrDefault(2)?.Trim() is { Length: > 0 } name
@@ -341,6 +360,7 @@ public static class TroveRun {
             TourStep();
         TroveBosses.Update();
         TroveBosses.UpdateBossOrbiters();
+        TroveThemes.Update();
         if (!CampaignGlobals.InMission || Ended != EndKind.None || GameUI.Paused || Room is not { } room)
             return;
         PlayTime += Dt;
@@ -496,8 +516,8 @@ public static class TroveRun {
         var mission = TroveGen.BuildMission(Floor, room, entry);
         CampaignGlobals.LoadedCampaign.LoadMission(mission);
         CampaignGlobals.LoadedCampaign.SetupLoadedMission(true);
+        TroveItems.SpawnBuddies(); // (also refills health ups)
         ApplyItems();
-        TroveItems.SpawnBuddies();
         RestartMusic();
         // what normally happens when a mission starts (invisible tanks vanish, free-for-all teams)
         foreach (var t in GameHandler.AllTanks)
@@ -567,6 +587,7 @@ public static class TroveRun {
         ReviveSystem.Clear();
         // the campaign's own "next mission" sequence shows the floor banner and sets the new room up
         CampaignGlobals.LoadedCampaign.CachedMissions[FloorNumber - 1] = TroveGen.BuildMission(Floor, Room!, null);
+        IntermissionSystem.BannerColor = TroveThemes.Def(Floor.Theme)?.Banner ?? new Color(92, 60, 140);
         IntermissionHandler.PrepareIntermission(true);
     }
 
