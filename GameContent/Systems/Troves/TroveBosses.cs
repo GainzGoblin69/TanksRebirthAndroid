@@ -94,6 +94,7 @@ public static class TroveBosses {
         Boss = Twin = null;
         _mini = false;
         _timers.Clear();
+        _magnetReadyAt = 0;
         _minions.Clear();
         _scheduledShots.Clear();
         Lines.Clear();
@@ -525,6 +526,9 @@ public static class TroveBosses {
     }
 
     /// <summary>Magnet Master: players' shells curve toward it, and the ones that get close are caught (and the host fires one back).</summary>
+    private static double _magnetReadyAt;
+    /// <summary>Magnet Master can catch a shell right now (the HUD shows a glow).</summary>
+    public static bool MagnetCharged => Current?.Kind == BossKind.MagnetMaster && Now >= _magnetReadyAt;
     private static void PullShells() {
         var b = Boss!;
         if (b.IsDestroyed)
@@ -535,12 +539,17 @@ public static class TroveBosses {
             float d = Vector2.Distance(s.Position, b.Position);
             if (d > 170f)
                 continue;
-            if (d < 34f) {
+            // it catches one shell, then has to recharge: shells that arrive in between hit it
+            // (it used to catch every shell that got close, which made it impossible to damage)
+            if (d < 34f && Now >= _magnetReadyAt) {
+                _magnetReadyAt = Now + (Fraction <= 0.5f ? 1.2 : 2.0);
                 s.Destroy(Shell.DestructionContext.WithShell);
                 if (Authority && NearestPlayer(b.Position) is { } p)
                     Fire(b, AngleTo(b.Position, p.Position), 8);
                 continue;
             }
+            if (d < 40f)
+                continue; // close in: let it fly straight into the hull
             float speed = s.Velocity.Length();
             var want = Vector2.Normalize(b.Position - s.Position) * speed;
             s.Velocity = Vector2.Normalize(Vector2.Lerp(s.Velocity, want, 0.045f * Dt)) * speed;

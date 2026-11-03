@@ -151,6 +151,14 @@ public static class TroveHud {
             ToggleSwitch.DrawDisc(sb, c, rr, new Color(190, 120, 255));
         }
 
+        // Magnet Master: a pulsing purple field while it's ready to catch a shell (shoot when it fades)
+        if (TroveBosses.MagnetCharged && TroveRun.BossTank is { IsDestroyed: false } mag) {
+            var c = ToScreen(mag.Position);
+            float rr = Math.Max(14f, Vector2.Distance(c, ToScreen(mag.Position + new Vector2(34f, 0))));
+            float pulse = 0.5f + 0.5f * MathF.Sin((float)TroveRun.PlayTime * 7f);
+            ToggleSwitch.DrawDisc(sb, c, rr * (1.05f + 0.1f * pulse), new Color(200, 80, 255) * (0.14f + 0.1f * pulse));
+        }
+
         // gravity wells, rally flags, freeze bombs, frozen enemies, shockwaves
         foreach (var (wat, _, _) in TroveItems.Wells) {
             var c = ToScreen(wat);
@@ -214,6 +222,18 @@ public static class TroveHud {
             Text(sb, "DECOY", ToScreen(d.Position) - new Vector2(0, 52 * s), 0.5f * s, new Color(255, 220, 140), border: true);
         if (room.PickupVisible)
             DrawPedestal(sb, room);
+        // items found in broken cork: a small bobbing icon with a gold glow and its name
+        foreach (var g in room.GroundDrops) {
+            if (g.Taken) continue;
+            var c = ToScreen(g.At);
+            float r = Math.Max(10f, Vector2.Distance(c, ToScreen(g.At + new Vector2(Block.SIDE_LENGTH * 0.5f, 0))));
+            float bob = MathF.Sin((float)TroveRun.PlayTime * 3f + g.At.X) * r * 0.15f;
+            ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.2f), r * 0.75f, Color.Black * 0.3f);
+            var at = c - new Vector2(0, r * 0.6f + bob);
+            ToggleSwitch.DrawDisc(sb, at, r * 1.1f, new Color(255, 220, 120) * 0.35f);
+            DrawItemIcon(sb, g.Item, at, r * 0.8f);
+            Text(sb, TroveItems.Def(g.Item).Name, at - new Vector2(0, r * 1.5f), 0.38f * s, Color.White, border: true);
+        }
     }
 
     // ---- the ITEM-button items you carry: a row of icons under the ITEM button (the one it uses is big and gold-ringed;

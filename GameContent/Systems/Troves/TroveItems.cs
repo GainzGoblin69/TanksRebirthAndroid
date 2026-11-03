@@ -423,6 +423,7 @@ public static class TroveItems {
         if (_hooked)
             return;
         _hooked = true;
+        Block.OnDestroy += TroveRun.OnBlockBroken; // items hidden in cork
         AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady || IcedUntil.TryGetValue(t, out var iu) && Now < iu;
         // Smoke Bomb: enemies can't see you
         AITank.IsHidden = t => TroveRun.Active && t is PlayerTank pt && pt.PlayerId is >= 0 and < 4

@@ -36,7 +36,17 @@ public sealed class TroveRoom {
     /// <summary>The campaign mission this room's layout came from, or null for a made-up room.</summary>
     public string? CampaignMap;
     /// <summary>Whether the pickup is showing (item rooms always; other rooms after they're cleared).</summary>
+    /// <summary>Items found inside broken cork, lying where the block was.</summary>
+    public List<TroveGroundDrop> GroundDrops = [];
+    /// <summary>Cork blocks (grid x, y) that already had their chance at an item this run.</summary>
+    public HashSet<Point> CorkRolled = [];
     public bool PickupVisible => Pickup is not null && !PickupTaken && (Kind is TroveRoomKind.Item or TroveRoomKind.Secret || Cleared || ForcePickup);
+}
+
+public sealed class TroveGroundDrop {
+    public Vector2 At;
+    public TroveItemId Item;
+    public bool Taken;
 }
 
 public sealed class TroveFloor {
@@ -111,7 +121,7 @@ public static class TroveGen {
     /// <summary>A new run's seed (its lowest bit: campaign rooms on, if this phone has the campaign).</summary>
     public static int NewSeed() => (Random.Shared.Next(1, int.MaxValue) & ~1) | (CampaignAvailable ? 1 : 0);
 
-    private static Point ToGrid(Vector2 world) {
+    internal static Point ToGrid(Vector2 world) {
         Vector2 origin = new BlockMapPosition(0, 0);
         return new Point((int)MathF.Round((world.X - origin.X) / Block.SIDE_LENGTH), (int)MathF.Round((world.Y - origin.Y) / Block.SIDE_LENGTH));
     }

@@ -29,7 +29,7 @@ public static class TroveRun {
         EV_WALL = 17, EV_CONVERT = 18, EV_SHRINK = 19, EV_BLAST = 20,
         EV_CLONE = 21, EV_EMP = 22, EV_TURRET = 23, EV_MIRROR = 24, EV_GIVE = 25,
         EV_BOSS_SHOT = 26, EV_BOSS_MINE = 27, EV_BOSS_ACT = 28, EV_BOSS_EXTRA = 29,
-        EV_WELL = 30, EV_SMOKE = 31, EV_FLAG = 32, EV_SHOCK = 33, EV_FREEZE_BOMB = 34;
+        EV_WELL = 30, EV_SMOKE = 31, EV_FLAG = 32, EV_SHOCK = 33, EV_FREEZE_BOMB = 34, EV_GROUND_ITEM = 35;
     /// <summary>How close (game units) a tank has to get to an item to pick it up.</summary>
     public const float PICKUP_REACH = 26f;
     public static Vector2 PickupPoint => new Coordinates.BlockMapPosition(10, 8);
@@ -426,6 +426,19 @@ public static class TroveRun {
         }
         _deadTimer = 0;
 
+        // items found in broken cork: whoever drives over one gets it
+        for (int i = 0; i < room.GroundDrops.Count; i++) {
+            var g = room.GroundDrops[i];
+            if (g.Taken) continue;
+            foreach (var p in GameHandler.AllPlayerTanks) {
+                if (p is null || p.IsDestroyed || p.PlayerId is < 0 or > 3 || Vector2.Distance(p.Position, g.At) > PICKUP_REACH)
+                    continue;
+                Send(EV_GROUND_ITEM, i * 4 + p.PlayerId);
+                TakeGroundDrop(i, p.PlayerId);
+                break;
+            }
+        }
+
         // the boss is down: on to the next floor (or the run is won)
         if (room.Kind == TroveRoomKind.Boss && room.Cleared && _bossTimer > 0) {
             _bossTimer -= Dt;
@@ -530,6 +543,42 @@ public static class TroveRun {
         foreach (var p in GameHandler.AllPlayerTanks)
             if (p is not null && !p.IsDestroyed && TroveItems.IsLocal(p.PlayerId))
                 TroveItems.ApplyTo(p);
+    }
+
+    /// <summary>Broken cork: 5% a Shield, 3% an Extra Life, 2% Bouncy Shells or Extra Shell.
+    /// Rolled from the run's seed and the block's spot, so every phone gets the same result without sending anything,
+    /// and each cork block only gets one chance per run (coming back to the room can't farm it).</summary>
+    internal static void OnBlockBroken(Block block) {
+        if (!Active || !CampaignGlobals.InMission || Room is not { } room || block.Type != BlockID.Cork || _fadeDir != 0)
+            return;
+        var g = TroveGen.ToGrid(block.Position);
+        if (!room.Blocks.Any(b => b.X == g.X && b.Y == g.Y && b.Type == BlockID.Cork)) // only the room's own cork (not Wall Builder's)
+            return;
+        if (!room.CorkRolled.Add(g))
+            return;
+        uint h = (uint)Seed * 2654435761u ^ (uint)FloorNumber * 40503u ^ (uint)(room.Cell.X * 73856093) ^ (uint)(room.Cell.Y * 19349663)
+            ^ (uint)(g.X * 83492791) ^ (uint)(g.Y * 2971215073u);
+        h ^= h >> 15; h *= 2246822519u; h ^= h >> 13; h *= 3266489917u; h ^= h >> 16;
+        int roll = (int)(h % 100);
+        TroveItemId? item = roll switch {
+            < 5 => TroveItemId.Shield,
+            < 8 => TroveItemId.ExtraLife,
+            8 => TroveItemId.BouncyShells,
+            9 => TroveItemId.ExtraShell,
+            _ => null,
+        };
+        if (item is not { } id)
+            return;
+        room.GroundDrops.Add(new TroveGroundDrop { At = block.Position, Item = id });
+        GameHandler.Particles.MakeShineSpot(new Vector3(block.Position.X, 12, block.Position.Y), Color.Gold, 1.2f);
+        SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.8f, pitchOverride: 0.5f);
+    }
+
+    private static void TakeGroundDrop(int index, int playerId) {
+        if (Room is not { } room || index < 0 || index >= room.GroundDrops.Count || room.GroundDrops[index].Taken)
+            return;
+        room.GroundDrops[index].Taken = true;
+        TroveItems.Give(playerId, room.GroundDrops[index].Item);
     }
 
     private static void TakePickup(int playerId) {
@@ -730,6 +779,9 @@ public static class TroveRun {
                 break;
             case EV_SHOCK:
                 if (Active && CampaignGlobals.InMission) TroveItems.DoShockwave(a);
+                break;
+            case EV_GROUND_ITEM:
+                if (Active) TakeGroundDrop(a / 4, a % 4);
                 break;
             case EV_FREEZE_BOMB:
                 if (Active && CampaignGlobals.InMission) TroveItems.DropFreezeBomb(TroveItems.DecodePos(a / 4), a % 4);
