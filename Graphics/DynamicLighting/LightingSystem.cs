@@ -1276,7 +1276,8 @@ public static class LightingSystem {
     /// </summary>
     static void RenderLocalShadows(ref FrameStats stats) {
         _frameIndex++;
-        var interval = Math.Max(1, Quality.StaticLightShadowInterval);
+        // phones: every frame (their GPUs don't keep the shadow atlas between frames, so reused tiles would be blank)
+        var interval = LightManager.PhoneGpu ? 1 : Math.Max(1, Quality.StaticLightShadowInterval);
         _boundShadowTarget = null;
 
         // atlas 0 first, so all of its lights share one render target switch

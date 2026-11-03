@@ -76,6 +76,7 @@ public static class LightManager {
             var cur = DynLightSettings.Current;
             cur.Enabled = TankGame.Settings?.DynamicLighting == true;
             cur.SetQualityLevel(QualityFromSettings);
+            cur.RoomShadows = !PhoneGpu;
             DynLightSettings.Current = cur;
         }
 
@@ -94,6 +95,14 @@ public static class LightManager {
     /// <summary>Set once lighting has loaded: <see cref="GameResources"/> hands it every newly loaded model.</summary>
     public static bool InstrumentNewModels;
 
+    /// <summary>
+    /// Phones: the room's sun shadows (walls and windows blocking the sun) are off. That shadow map is drawn once and
+    /// reused for several frames, and phone GPUs don't keep a texture's contents between frames: the reused copy read
+    /// as "all in shadow", which drew the table and everything around the board black. The board's own shadows are
+    /// drawn every frame and unaffected.
+    /// </summary>
+    public static bool PhoneGpu => OperatingSystem.IsAndroid();
+
     static LightingQualityLevel QualityFromSettings =>
         (LightingQualityLevel)Math.Clamp(TankGame.Settings?.LightingQuality ?? 0, 0, (int)LightingQualityLevel.Ultra);
 
@@ -106,6 +115,7 @@ public static class LightManager {
         var cur = DynLightSettings.Current;
         cur.Enabled = on;
         cur.SetQualityLevel(QualityFromSettings);
+        cur.RoomShadows = !PhoneGpu;
         DynLightSettings.Current = cur;
         cur.Apply();
     }
