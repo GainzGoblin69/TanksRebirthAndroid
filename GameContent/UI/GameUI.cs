@@ -290,7 +290,8 @@ public static class GameUI
             GraphicsUI.FullScreenButton,
             GraphicsUI.ResolutionButton,
             GraphicsUI.TeamColoursButton,
-            GraphicsUI.LightingButton
+            GraphicsUI.LightingButton,
+            GraphicsUI.LitSurroundingsButton
         ];
         foreach (UIElement button in graphicsElements)
         {

@@ -112,7 +112,7 @@ adb exec-out screencap -p > diag/run2-levelrun.png
 # (test setup: start with a pile of items that make synergies, and an item on the floor of the first room)
 adb shell "printf 'MagicMushroom HighCaliber RapidBarrel NitroTreads ArmorPlating TripleShot\nGlassCannon\nnone\ntour\nForest\ncork\n' > '$EXT/troves_test.txt'"
 # and dynamic lighting on for the run (1.9's lighting system)
-adb shell "echo 3 > '$EXT/lighting_test.txt'"  # 3 = Ultra
+adb shell "printf '3\n3\n' > '$EXT/lighting_test.txt'"  # Ultra, everything lit (+ Window Sun)
 adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 5
 tapy 314 4

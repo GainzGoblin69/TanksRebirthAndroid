@@ -34,6 +34,9 @@ public static class GraphicsUI {
 
     /// <summary>Dynamic lighting on/off (from 1.9).</summary>
     public static UITextButton LightingButton;
+
+    /// <summary>Phones: how much around the board gets dynamic lighting.</summary>
+    public static UITextButton LitSurroundingsButton;
     private static bool _initialized;
 
     private static int _idxPair;
@@ -241,15 +244,33 @@ public static class GraphicsUI {
                 : "Dynamic Lighting";
         };
 
+        // phones: how much around the board gets lighting, least risky first (each step adds to the last)
+        LitSurroundingsButton = new("Lit: Play Area", FontGlobals.RebirthFont, Color.WhiteSmoke) {
+            IsVisible = false,
+            Tooltip = "How much around the board gets dynamic lighting: the play area, + the room, + the board's border, + sun through the windows.",
+            HoverColor = Color.White,
+        };
+        LitSurroundingsButton.SetDimensions(() => new Vector2(1240, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
+        LitSurroundingsButton.OnLeftClick = (_) => {
+            TankGame.Settings.LitSurroundings = (TankGame.Settings.LitSurroundings + 1) % 4;
+            try { TanksRebirth.Graphics.DynamicLighting.LightManager.ApplySurroundings(); }
+            catch (Exception e) { TankGame.ClientLog.Write($"[Lighting] couldn't change what's lit: {e.Message}", Internals.LogType.Warn); }
+            PlayerColors.SaveSettings();
+        };
+        LitSurroundingsButton.UniqueDraw = (elem, sb) => {
+            ((UITextButton)elem).Text = "Lit: " + (TankGame.Settings.LitSurroundings switch { 0 => "Play Area", 1 => "+ Room", 2 => "+ Border", _ => "+ Window Sun" });
+            ((UITextButton)elem).Color = TankGame.Settings.DynamicLighting ? Color.WhiteSmoke : Color.Gray;
+        };
+
         if (Internals.Common.Framework.Input.TouchControls.Enabled) {
-            // phones: two columns (the bottom slot sits under the Back button)
-            PerPixelLightingToggle.SetDimensions(() => new Vector2(415, 95).ToResolution(), () => new Vector2(510, 160).ToResolution());
-            PerPixelLightingButton.SetDimensions(() => new Vector2(420, 100).ToResolution(), () => new Vector2(500, 150).ToResolution());
-            VsyncButton.SetDimensions(() => new Vector2(420, 350).ToResolution(), () => new Vector2(500, 150).ToResolution());
-            FullScreenButton.SetDimensions(() => new Vector2(420, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
-            ResolutionButton.SetDimensions(() => new Vector2(1000, 100).ToResolution(), () => new Vector2(500, 150).ToResolution());
-            TeamColoursButton.SetDimensions(() => new Vector2(1000, 350).ToResolution(), () => new Vector2(500, 150).ToResolution());
-            LightingButton.SetDimensions(() => new Vector2(1000, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
+            // phones: three columns (the bottom slot sits under the Back button)
+            PerPixelLightingToggle.SetDimensions(() => new Vector2(155, 95).ToResolution(), () => new Vector2(510, 160).ToResolution());
+            PerPixelLightingButton.SetDimensions(() => new Vector2(160, 100).ToResolution(), () => new Vector2(500, 150).ToResolution());
+            VsyncButton.SetDimensions(() => new Vector2(160, 350).ToResolution(), () => new Vector2(500, 150).ToResolution());
+            FullScreenButton.SetDimensions(() => new Vector2(160, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
+            ResolutionButton.SetDimensions(() => new Vector2(700, 100).ToResolution(), () => new Vector2(500, 150).ToResolution());
+            TeamColoursButton.SetDimensions(() => new Vector2(700, 350).ToResolution(), () => new Vector2(500, 150).ToResolution());
+            LightingButton.SetDimensions(() => new Vector2(700, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
             // phones run at native resolution, so this slot becomes the multi-core AI setting
             ResolutionButton.Text = "Multi-Core AI";
             ResolutionButton.Tooltip = "Spread enemy thinking across your phone's CPU cores for smoother big fights.";
@@ -275,6 +296,7 @@ public static class GraphicsUI {
         ResolutionButton.IsVisible = false;
         TeamColoursButton.IsVisible = false;
         LightingButton.IsVisible = false;
+        LitSurroundingsButton.IsVisible = false;
         PerPixelLightingToggle.IsVisible = false;
         VsyncToggle.IsVisible = false;
         FullScreenButton.IsVisible = false;
@@ -291,6 +313,7 @@ public static class GraphicsUI {
         ResolutionButton.IsVisible = true; // phones: the multi-core AI switch
         TeamColoursButton.IsVisible = true;
         LightingButton.IsVisible = true;
+        LitSurroundingsButton.IsVisible = Internals.Common.Framework.Input.TouchControls.Enabled;
         PerPixelLightingToggle.IsVisible = true;
         VsyncToggle.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled;
         FullScreenButton.IsVisible = true;

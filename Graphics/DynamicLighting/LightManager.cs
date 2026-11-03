@@ -63,11 +63,7 @@ public static class LightManager {
         // phones: the room and the board's frame (the table and the wooden border around the board) are left
         // completely alone, so they draw exactly as with lighting off. On phone GPUs lighting turned a band
         // around the board black; lighting the play area (floor, blocks, tanks, shells) is what matters.
-        if (PhoneGpu) {
-            LightingSystem.NeverInstrument.Add(RoomScene.RoomSkyboxScene);
-            foreach (var m in new[] { GameScene.BoundsRenderer.BoundaryModel, TanksRebirth.GameContent.Globals.Assets.ModelGlobals.GameBoundary.Asset })
-                if (m is not null) LightingSystem.NeverInstrument.Add(m);
-        }
+        UpdateExcludedModels();
 
         // the sky dome around the room should neither block nor receive light
         var room = RoomScene.RoomSkyboxScene;
@@ -85,7 +81,7 @@ public static class LightManager {
             var cur = DynLightSettings.Current;
             cur.Enabled = TankGame.Settings?.DynamicLighting == true;
             cur.SetQualityLevel(QualityFromSettings);
-            cur.RoomShadows = !PhoneGpu;
+            cur.RoomShadows = AllowRoomCascade;
             DynLightSettings.Current = cur;
         }
 
@@ -112,6 +108,41 @@ public static class LightManager {
     /// </summary>
     public static bool PhoneGpu => OperatingSystem.IsAndroid();
 
+    /// <summary>
+    /// Phones: how much of the scene around the board gets lighting (Options > Graphics > "Lit:"), least risky first.
+    /// 0 = only the play area (known good), 1 = + the room and table, 2 = + the board's wooden border,
+    /// 3 = + sun through the windows (the room shadow map, reused between frames). PCs always get everything.
+    /// </summary>
+    public static int Surroundings => PhoneGpu ? Math.Clamp(TankGame.Settings?.LitSurroundings ?? 0, 0, 3) : 3;
+    public static bool AllowRoomCascade => Surroundings >= 3;
+
+    static void UpdateExcludedModels() {
+        LightingSystem.NeverInstrument.Clear();
+        if (Surroundings < 1 && RoomScene.RoomSkyboxScene is { } room)
+            LightingSystem.NeverInstrument.Add(room);
+        if (Surroundings < 2)
+            foreach (var m in new[] { GameScene.BoundsRenderer.BoundaryModel, TanksRebirth.GameContent.Globals.Assets.ModelGlobals.GameBoundary.Asset })
+                if (m is not null) LightingSystem.NeverInstrument.Add(m);
+    }
+
+    /// <summary>Applies a new "Lit:" level right away: models are put back to their own effects and handed to lighting again.</summary>
+    public static void ApplySurroundings() {
+        if (!_initialized)
+            return;
+        UpdateExcludedModels();
+        bool on = DynLightSettings.Current.Enabled;
+        LightingSystem.UninstrumentAll();
+        if (on) {
+            foreach (var m in GameResources.CachedModels())
+                LightingSystem.Instrument(m);
+            LightingSystem.Instrument(RoomScene.RoomSkyboxScene);
+        }
+        var cur = DynLightSettings.Current;
+        cur.RoomShadows = AllowRoomCascade;
+        DynLightSettings.Current = cur;
+        cur.Apply(force: true);
+    }
+
     static LightingQualityLevel QualityFromSettings =>
         (LightingQualityLevel)Math.Clamp(TankGame.Settings?.LightingQuality ?? 0, 0, (int)LightingQualityLevel.Ultra);
 
@@ -136,7 +167,7 @@ public static class LightManager {
         var cur = DynLightSettings.Current;
         cur.Enabled = on;
         cur.SetQualityLevel(QualityFromSettings);
-        cur.RoomShadows = !PhoneGpu;
+        cur.RoomShadows = AllowRoomCascade;
         DynLightSettings.Current = cur;
         cur.Apply();
     }

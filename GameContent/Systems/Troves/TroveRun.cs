@@ -188,10 +188,13 @@ public static class TroveRun {
             var lt = System.IO.Path.Combine(TankGame.SaveDirectory, "lighting_test.txt");
             if (System.IO.File.Exists(lt)) {
                 // the file holds a quality: 0 Low .. 3 Ultra
-                if (int.TryParse(System.IO.File.ReadAllText(lt).Trim(), out var lq))
+                var ll = System.IO.File.ReadAllLines(lt);
+                if (int.TryParse(ll.ElementAtOrDefault(0)?.Trim(), out var lq))
                     TankGame.Settings.LightingQuality = Math.Clamp(lq, 0, 3);
+                if (int.TryParse(ll.ElementAtOrDefault(1)?.Trim(), out var ls)) // second line: what's lit around the board
+                    TankGame.Settings.LitSurroundings = Math.Clamp(ls, 0, 3);
                 Graphics.DynamicLighting.LightManager.SetEnabled(true);
-                TankGame.ClientLog.Write($"[Lighting] test: quality={TankGame.Settings.LightingQuality} available={Graphics.DynamicLighting.LightingSystem.IsAvailable} active={Graphics.DynamicLighting.LightingSystem.IsActive}", Internals.LogType.Info);
+                TankGame.ClientLog.Write($"[Lighting] test: quality={TankGame.Settings.LightingQuality} lit={TankGame.Settings.LitSurroundings} available={Graphics.DynamicLighting.LightingSystem.IsAvailable} active={Graphics.DynamicLighting.LightingSystem.IsActive}", Internals.LogType.Info);
             }
         }
         catch (Exception e) { TankGame.ClientLog.Write($"[Lighting] test failed: {e}", Internals.LogType.Warn); }

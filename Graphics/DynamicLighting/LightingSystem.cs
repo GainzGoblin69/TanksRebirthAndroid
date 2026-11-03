@@ -956,7 +956,7 @@ public static class LightingSystem {
         // phones: no room cascade. It's drawn once and reused for several frames, and phone GPUs don't keep a
         // render target's contents between frames; the reused copy read as all-shadow and everything outside
         // the board went black. (Outside the board then counts as lit.)
-        var roomWanted = sunWanted && q.RoomShadows && Sun.RoomShadows && !LightManager.PhoneGpu;
+        var roomWanted = sunWanted && q.RoomShadows && Sun.RoomShadows && LightManager.AllowRoomCascade;
         var roomSize = Math.Clamp(q.RoomShadowMapSize, 256, maxSize);
         if (!roomWanted) {
             Release(ref _roomShadowMap);
@@ -1081,7 +1081,7 @@ public static class LightingSystem {
             new Vector4(1f / size, size, Sun.ShadowBias / depth, texelWorld * 1.5f));
 
         // the cascade that covers the whole room
-        if (Sun.RoomShadows && Quality.RoomShadows && !LightManager.PhoneGpu && _roomShadowMap is not null && _roomShadowDilated is not null) {
+        if (Sun.RoomShadows && Quality.RoomShadows && LightManager.AllowRoomCascade && _roomShadowMap is not null && _roomShadowDilated is not null) {
             _roomShadowsActive = true;
             // attempts to reduce redraws when the room doesn't need lighting drawn again
             _roomCacheAge++;

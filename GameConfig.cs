@@ -33,6 +33,8 @@ public class GameConfig
     public bool DynamicLighting { get; set; } = false;
     /// <summary>Dynamic lighting quality: 0 Low, 1 Medium, 2 High, 3 Ultra.</summary>
     public int LightingQuality { get; set; } = 0;
+    /// <summary>Phones: how much around the board gets dynamic lighting (0 play area .. 3 everything).</summary>
+    public int LitSurroundings { get; set; } = 0;
     public int TankColorP1 { get; set; } = -1;
     public int TankColorP2 { get; set; } = -1;
     /// <summary>Name shown to others in Wi-Fi games.</summary>
