@@ -56,6 +56,7 @@ public static class LightManager {
             TankGame.ClientLog.Write($"[Lighting] lighting.fx could not be loaded, dynamic lighting is off: {e.Message}", LogType.Warn);
             return;
         }
+        ForceHighPrecision(effect);
         if (!LightingSystem.Initialize(device, effect))
             return;
 
@@ -107,6 +108,35 @@ public static class LightManager {
         cur.SetQualityLevel(QualityFromSettings);
         DynLightSettings.Current = cur;
         cur.Apply();
+    }
+
+    /// <summary>
+    /// Phones: MonoGame compiles every pixel shader at "mediump" (half) precision. The lighting shader keeps shadow depths
+    /// and world positions in its math, which half precision can't hold, so on real phone GPUs shadows came out as
+    /// blocky black patches (emulators run everything at full precision, so they looked fine). This switches the
+    /// lighting shader to full precision wherever the GPU supports it, before it's first used.
+    /// </summary>
+    static void ForceHighPrecision(Effect effect) {
+        const System.Reflection.BindingFlags F = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        int patched = 0;
+        try {
+            if (typeof(Effect).GetField("_shaders", F)?.GetValue(effect) is not Array shaders)
+                return;
+            foreach (var sh in shaders) {
+                var code = sh?.GetType().GetField("_glslCode", F);
+                if (code?.GetValue(sh) is not string glsl || !glsl.Contains("precision mediump float;"))
+                    continue;
+                glsl = glsl.Replace("precision mediump float;",
+                    "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n");
+                glsl = glsl.Replace("precision mediump int;", "\n#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp int;\n#else\nprecision mediump int;\n#endif\n");
+                code.SetValue(sh, glsl);
+                patched++;
+            }
+        }
+        catch (Exception e) {
+            TankGame.ClientLog.Write($"[Lighting] couldn't raise shader precision: {e.Message}", LogType.Warn);
+        }
+        TankGame.ClientLog.Write($"[Lighting] full precision for {patched} shader(s).", LogType.Info);
     }
 
     public static void Apply(Preset preset) {
