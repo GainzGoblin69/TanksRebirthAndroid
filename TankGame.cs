@@ -783,7 +783,13 @@ public class TankGame : Game {
         if (GameFrameBuffer == null || GameFrameBuffer.IsDisposed || GameFrameBuffer.Size() != WindowUtils.WindowBounds) {
             GameFrameBuffer?.Dispose();
             var presentationParams = GraphicsDevice.PresentationParameters;
-            GameFrameBuffer = new RenderTarget2D(GraphicsDevice, presentationParams.BackBufferWidth, presentationParams.BackBufferHeight, false, presentationParams.BackBufferFormat, presentationParams.DepthStencilFormat, 0, RenderTargetUsage.PreserveContents);
+            // the game's frame always gets a real depth buffer: copying the screen's format gave some phones
+            // (they report no or a 16-bit depth buffer) a frame where hidden room geometry drew over the table
+            var depth = presentationParams.DepthStencilFormat is DepthFormat.Depth24 or DepthFormat.Depth24Stencil8
+                ? presentationParams.DepthStencilFormat : DepthFormat.Depth24Stencil8;
+            GameFrameBuffer = new RenderTarget2D(GraphicsDevice, presentationParams.BackBufferWidth, presentationParams.BackBufferHeight, false, presentationParams.BackBufferFormat, depth, 0, RenderTargetUsage.PreserveContents);
+            ClientLog.Write($"Game frame: {presentationParams.BackBufferWidth}x{presentationParams.BackBufferHeight} {presentationParams.BackBufferFormat}, " +
+                $"screen depth {presentationParams.DepthStencilFormat} -> frame depth {depth}, profile {GraphicsDevice.GraphicsProfile}, adapter {GraphicsAdapter.DefaultAdapter?.Description}", LogType.Info);
 
             OnResolutionChanged?.Invoke(WindowUtils.WindowWidth, WindowUtils.WindowHeight);
         }
