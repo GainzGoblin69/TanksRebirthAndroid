@@ -242,14 +242,25 @@ public static partial class MainMenuUI
 
         device.SetRenderTarget(null);
     }
+    /// <summary>Phones: "Build 123" (the APK's version number), shown in the main menu's bottom-left corner.</summary>
+    public static string? BuildLabel;
     public static void RenderGeneralUI(SpriteBatch spriteBatch) {
         if (SteamworksUtils.IsInitialized)
             TankGame.SpriteRenderer.DrawString(FontGlobals.RebirthFont, $"STEAM LAUNCH!\nLogged in as '{SteamworksUtils.MyUsername}'\n" +
                 $"You have {SteamworksUtils.FriendsCount} friends.", Vector2.One * 8, Color.White, Vector2.One.ToResolution(), 0f, Vector2.Zero);
 
         // phones: keep the menu clean, just the logo and buttons over a still of the battlefield
-        if (Internals.Common.Framework.Input.TouchControls.Enabled)
+        // (and the build number, small, in the bottom-left corner, so it's easy to check you have the newest one)
+        if (Internals.Common.Framework.Input.TouchControls.Enabled) {
+            if (BuildLabel is { } label && MenuState == UIState.PrimaryMenu) {
+                float s = WindowUtils.WindowHeight / 1080f;
+                var font = FontGlobals.RebirthFont;
+                var size = font.MeasureString(label) * 0.5f * s;
+                DrawUtils.DrawStringWithBorder(spriteBatch, font, label, new Vector2(24 * s + size.X / 2, WindowUtils.WindowHeight - 20 * s - size.Y / 2),
+                    Color.White * 0.85f, Color.Black * 0.85f, new Vector2(0.5f * s), 0f, borderThickness: 1.5f * s);
+            }
             return;
+        }
 
         spriteBatch.End();
 

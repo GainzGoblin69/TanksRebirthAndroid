@@ -60,6 +60,13 @@ public class MainActivity : AndroidGameActivity {
     protected override void OnCreate(Bundle? bundle) {
         base.OnCreate(bundle);
         HideSystemUi();
+        // the build number shown in the corner of the main menu (it goes up with every build)
+        try {
+            var info = PackageManager!.GetPackageInfo(PackageName!, 0)!;
+            long code = Build.VERSION.SdkInt >= BuildVersionCodes.P ? info.LongVersionCode : info.VersionCode;
+            TanksRebirth.GameContent.UI.MainMenu.MainMenuUI.BuildLabel = $"Build {code}";
+        }
+        catch { }
 
         var internalDir = FilesDir!.AbsolutePath;
         _gameDir = Path.Combine(internalDir, "game");
