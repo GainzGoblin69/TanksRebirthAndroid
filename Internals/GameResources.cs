@@ -48,6 +48,10 @@ public static class GameResources {
 
         var loaded = manager.Load<T>(name);
 
+        // lets the dynamic lighting system see this model's draws (only once lighting has been switched on)
+        if (loaded is Model lm && Graphics.DynamicLighting.LightManager.InstrumentNewModels)
+            Graphics.DynamicLighting.LightingSystem.Instrument(lm);
+
         ResourceCache[name] = loaded;
         return loaded;
     }
@@ -131,6 +135,14 @@ public static class GameResources {
     public static void LoadQueuedAssets() {
         Task.Run(() => { }); // rndunfsdauif fd saoidf s
         foreach (var resource in QueuedResources) { }
+    }
+
+    /// <summary>Every model loaded so far (for dynamic lighting, when it's switched on mid-game).</summary>
+    public static List<Model> CachedModels() {
+        var list = new List<Model>();
+        foreach (var v in ResourceCache.Values)
+            if (v is Model m) list.Add(m);
+        return list;
     }
 
     public static T GetRawAsset<T>(this ContentManager manager, string assetName) where T : class {

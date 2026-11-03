@@ -183,6 +183,14 @@ public static class TroveRun {
     private static bool ReadTestBoss() {
         TroveBosses.TestKind = null;
         TroveThemes.TestTheme = null;
+        // testing: "lighting_test.txt" in the save folder switches dynamic lighting on for the run
+        try {
+            if (System.IO.File.Exists(System.IO.Path.Combine(TankGame.SaveDirectory, "lighting_test.txt"))) {
+                Graphics.DynamicLighting.LightManager.SetEnabled(true);
+                TankGame.ClientLog.Write($"[Lighting] test: available={Graphics.DynamicLighting.LightingSystem.IsAvailable} active={Graphics.DynamicLighting.LightingSystem.IsActive}", Internals.LogType.Info);
+            }
+        }
+        catch (Exception e) { TankGame.ClientLog.Write($"[Lighting] test failed: {e}", Internals.LogType.Warn); }
         try {
             var tp = System.IO.Path.Combine(TankGame.SaveDirectory, "troves_test.txt");
             if (System.IO.File.Exists(tp) && Enum.TryParse<FloorTheme>(System.IO.File.ReadAllLines(tp).ElementAtOrDefault(4)?.Trim(), out var th))

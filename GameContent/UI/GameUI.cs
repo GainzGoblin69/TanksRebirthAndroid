@@ -289,7 +289,8 @@ public static class GameUI
             GraphicsUI.PerPixelLightingToggle,
             GraphicsUI.FullScreenButton,
             GraphicsUI.ResolutionButton,
-            GraphicsUI.TeamColoursButton
+            GraphicsUI.TeamColoursButton,
+            GraphicsUI.LightingButton
         ];
         foreach (UIElement button in graphicsElements)
         {

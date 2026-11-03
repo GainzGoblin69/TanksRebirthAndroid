@@ -519,6 +519,11 @@ public class TankGame : Game {
         GameResources.EnsurePreloadedAssetsArePreloaded();
         ClientLog.Write("Setting up graphics and UI...", LogType.Info);
         GameHandler.SetupGraphics();
+        // (from 1.9) dynamic lighting, if it's switched on in Options > Graphics
+        if (Settings.DynamicLighting) {
+            try { TanksRebirth.Graphics.DynamicLighting.LightManager.Initialize(GraphicsDevice); }
+            catch (Exception e) { ClientLog.Write($"[Lighting] couldn't start: {e.Message}", LogType.Warn); }
+        }
         ClientLog.Write("LoadContent: GameUI.Initialize();", LogType.Debug);
         GameUI.Initialize();
         ClientLog.Write("LoadContent: MainMenuUI.InitializeUI();", LogType.Debug);
@@ -734,6 +739,7 @@ public class TankGame : Game {
         RuntimeData.UpdateCount++;
 
         GameShaders.UpdateShaders();
+        TanksRebirth.Graphics.DynamicLighting.LightManager.Update();
 
         InputUtils.PollEvents();
 
@@ -785,6 +791,8 @@ public class TankGame : Game {
         // TankFootprint.DecalHandler.UpdateRenderTarget();
         GraphicsDevice.SetRenderTarget(GameFrameBuffer);
         GraphicsDevice.Clear(RenderGlobals.BackBufferColor);
+
+        TanksRebirth.Graphics.DynamicLighting.LightingSystem.BeginFrame(CameraGlobals.GameView, CameraGlobals.GameProjection);
 
         spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, rasterizerState: RenderGlobals.DefaultRasterizer);
 
@@ -913,7 +921,7 @@ public class TankGame : Game {
     }
 
     public static void DrawGameElements() {
-        var shader = Difficulties.Types["LanternMode"] && !MainMenuUI.IsActive ? GameShaders.LanternShader : (MainMenuUI.IsActive && !TouchControls.Enabled ? GameShaders.GaussianBlurShader : null);
+        var shader = Difficulties.Types["LanternMode"] && !MainMenuUI.IsActive && !TanksRebirth.Graphics.DynamicLighting.LightingSystem.IsActive ? GameShaders.LanternShader : (MainMenuUI.IsActive && !TouchControls.Enabled ? GameShaders.GaussianBlurShader : null);
         if (!GameScene.ShouldRenderAll) shader = null;
 
         SpriteRenderer.Begin(effect: shader);

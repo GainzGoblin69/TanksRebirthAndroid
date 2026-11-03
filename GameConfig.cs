@@ -29,6 +29,8 @@ public class GameConfig
     public bool MultiCoreAI { get; set; } = true;
     /// <summary>Tint tanks with their team's colour (from 1.9).</summary>
     public bool TeamColours { get; set; } = false;
+    /// <summary>1.9's dynamic lighting (sun, shadows, lamps, glowing shells and explosions). Off by default: heavy on phones.</summary>
+    public bool DynamicLighting { get; set; } = false;
     public int TankColorP1 { get; set; } = -1;
     public int TankColorP2 { get; set; } = -1;
     /// <summary>Name shown to others in Wi-Fi games.</summary>

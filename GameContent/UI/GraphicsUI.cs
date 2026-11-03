@@ -31,6 +31,9 @@ public static class GraphicsUI {
 
     /// <summary>Team colours on/off (from 1.9).</summary>
     public static UITextButton TeamColoursButton;
+
+    /// <summary>Dynamic lighting on/off (from 1.9).</summary>
+    public static UITextButton LightingButton;
     private static bool _initialized;
 
     private static int _idxPair;
@@ -202,6 +205,31 @@ public static class GraphicsUI {
             ToggleSwitch.Draw(sb, sw, TankGame.Settings.TeamColours);
         };
 
+        LightingButton = new("Dynamic Lighting", FontGlobals.RebirthFont, Color.WhiteSmoke) {
+            IsVisible = false,
+            Tooltip = "Sunlight, shadows and glowing shells and explosions. Looks great, but is heavy on phones.",
+            HoverColor = Color.White,
+        };
+        LightingButton.SetDimensions(() => new Vector2(1250, 350).ToResolution(), () => new Vector2(500, 150).ToResolution());
+        LightingButton.OnLeftClick = (_) => {
+            TankGame.Settings.DynamicLighting = !TankGame.Settings.DynamicLighting;
+            try { TanksRebirth.Graphics.DynamicLighting.LightManager.SetEnabled(TankGame.Settings.DynamicLighting); }
+            catch (Exception e) {
+                TankGame.Settings.DynamicLighting = false;
+                TankGame.ClientLog.Write($"[Lighting] couldn't turn on: {e.Message}", Internals.LogType.Warn);
+            }
+            if (TankGame.Settings.DynamicLighting && !TanksRebirth.Graphics.DynamicLighting.LightingSystem.IsAvailable) {
+                TankGame.Settings.DynamicLighting = false; // this phone can't run it
+                ChatSystem.SendMessage("Dynamic lighting isn't available on this device.", Color.Orange);
+            }
+            PlayerColors.SaveSettings();
+        };
+        LightingButton.UniqueDraw = (elem, sb) => {
+            var sw = ToggleSwitch.RightOf(elem.Hitbox, 0.45f);
+            ((UITextButton)elem).TextOffset = new Vector2(-(sw.Width + elem.Hitbox.Right - sw.Right) / 2f, 0);
+            ToggleSwitch.Draw(sb, sw, TankGame.Settings.DynamicLighting);
+        };
+
         if (Internals.Common.Framework.Input.TouchControls.Enabled) {
             // phones: two columns (the bottom slot sits under the Back button)
             PerPixelLightingToggle.SetDimensions(() => new Vector2(415, 95).ToResolution(), () => new Vector2(510, 160).ToResolution());
@@ -210,6 +238,7 @@ public static class GraphicsUI {
             FullScreenButton.SetDimensions(() => new Vector2(420, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
             ResolutionButton.SetDimensions(() => new Vector2(1000, 100).ToResolution(), () => new Vector2(500, 150).ToResolution());
             TeamColoursButton.SetDimensions(() => new Vector2(1000, 350).ToResolution(), () => new Vector2(500, 150).ToResolution());
+            LightingButton.SetDimensions(() => new Vector2(1000, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
             // phones run at native resolution, so this slot becomes the multi-core AI setting
             ResolutionButton.Text = "Multi-Core AI";
             ResolutionButton.Tooltip = "Spread enemy thinking across your phone's CPU cores for smoother big fights.";
@@ -234,6 +263,7 @@ public static class GraphicsUI {
         FullScreenButton.IsVisible = false;
         ResolutionButton.IsVisible = false;
         TeamColoursButton.IsVisible = false;
+        LightingButton.IsVisible = false;
         PerPixelLightingToggle.IsVisible = false;
         VsyncToggle.IsVisible = false;
         FullScreenButton.IsVisible = false;
@@ -249,6 +279,7 @@ public static class GraphicsUI {
         FullScreenButton.IsVisible = true;
         ResolutionButton.IsVisible = true; // phones: the multi-core AI switch
         TeamColoursButton.IsVisible = true;
+        LightingButton.IsVisible = true;
         PerPixelLightingToggle.IsVisible = true;
         VsyncToggle.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled;
         FullScreenButton.IsVisible = true;

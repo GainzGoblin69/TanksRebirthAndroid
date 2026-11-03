@@ -46,6 +46,16 @@ jobs:
           Pop-Location
           Get-ChildItem Android/ContentBuilt -Recurse -Filter *.xnb | Measure-Object | ForEach-Object { "Compiled $($_.Count) content files" }
 
+      - name: Compile the dynamic lighting shader (optional; the game runs without it)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Push-Location Content
+          mgcb /@:Content.Lighting.mgcb /platform:Android /outputDir:../Android/ContentBuilt /intermediateDir:../Android/obj/content-lighting /workingDir:.
+          $code = $LASTEXITCODE
+          Pop-Location
+          if (Test-Path Android/ContentBuilt/Assets/shaders/lighting/lighting.xnb) { "Lighting shader compiled" } else { "Lighting shader NOT compiled (exit $code)"; exit 1 }
+
       - name: Bundle the official campaign (playable offline)
         shell: pwsh
         continue-on-error: true

@@ -284,6 +284,9 @@ public class GameHandler {
 
         Particles.RenderParticles();
 
+        // (1.9) shadows + lights, multiplied onto the world drawn so far. Everything after this stays unlit.
+        Graphics.DynamicLighting.LightingSystem.EndFrame(TankGame.GameFrameBuffer);
+
         // only render the level editor if it's active
         // change depth stencil...?
         if (LevelEditorUI.IsActive) {
