@@ -945,7 +945,8 @@ public static class AIManager {
     /// is spread over the phone's CPU cores. Movement, shooting and mine laying stay on the main thread in the same
     /// order as before, so gameplay and online sync behave the same.</summary>
     public static bool MultiCoreEnabled => TankGame.Settings.MultiCoreAI && Environment.ProcessorCount > 1;
-    static readonly ParallelOptions _parallel = new() { MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 4) // the main thread waits during this phase, so every core can help };
+    // the main thread waits during this phase, so every core can help
+    static readonly ParallelOptions _parallel = new() { MaxDegreeOfParallelism = Math.Clamp(Environment.ProcessorCount, 1, 4) };
     static AITank[] _work = new AITank[16];
     static bool[] _think = new bool[16];
     /// <summary>Milliseconds the AI took last frame (for the debug readout).</summary>
