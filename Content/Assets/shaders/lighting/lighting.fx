@@ -143,16 +143,23 @@ float Hash(float3 p)
 }
 
 // direction from the surface towards the viewer
+// normalize that never returns NaN: phone GPUs give NaN for a zero-length vector (it draws as pure black)
+float3 SafeNormalize(float3 v, float3 fallback)
+{
+    float l2 = dot(v, v);
+    return l2 > 1e-12 ? v * rsqrt(max(l2, 1e-12)) : fallback;
+}
+
 float3 ViewVector(float3 worldPos)
 {
-    float3 toCamPersp = normalize(CameraPosition - worldPos);
+    float3 toCamPersp = SafeNormalize(CameraPosition - worldPos, -CameraForward);
     return lerp(toCamPersp, -CameraForward, CameraIsOrtho);
 }
 
 // flip normals that are behind the camera to prevent the stupid shadow stuff
 float3 FaceNormal(float3 normal, float3 worldPos, float3 v)
 {
-    float3 n = normalize(normal);
+    float3 n = SafeNormalize(normal, float3(0.0, 1.0, 0.0));
     float3 face = cross(ddx(worldPos), ddy(worldPos));
     // the cross product's sign depends on the screen orientation, so it is compared against v as well
     return n * (step(0.0, dot(n, face) * dot(face, v)) * 2.0 - 1.0);
@@ -517,7 +524,7 @@ float4 SunShaftsPS(ShadowPSInput input) : COLOR0
     // brighter when looking towards the sun
     float g = ShaftParams.z;
     float cosTheta = dot(-v, SunDirection);
-    float phase = (1.0 - g * g) / pow(abs(1.0 + g * g - 2.0 * g * cosTheta), 1.5);
+    float phase = (1.0 - g * g) / pow(max(abs(1.0 + g * g - 2.0 * g * cosTheta), 1e-4), 1.5);
 
     // HG peaks at (1 + g) / (1 - g)^2 (10x for g = 0.6), which blows out to white when looking into the beams
     phase = min(phase, ShaftMaxGlow);

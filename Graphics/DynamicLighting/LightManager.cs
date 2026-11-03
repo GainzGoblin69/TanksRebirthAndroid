@@ -167,6 +167,7 @@ public static class LightManager {
 
     public static void Cycle() => Apply(LightingPresets.Next(Current));
 
+    static float _reportIn = 120;
     static float temp = 1f;
     static sbyte sw = 1;
 
@@ -187,6 +188,15 @@ public static class LightManager {
         }
 
         UpdateModifierLooks();
+
+        // a short report every ~10 s while lighting is on (shows in the debug readout)
+        if (LightingSystem.IsActive && (_reportIn -= RuntimeData.DeltaTime) <= 0) {
+            _reportIn = 600;
+            var a = LightingSystem.Ambient;
+            var sun = LightingSystem.Sun;
+            TankGame.ClientLog.Write($"[Lighting] {LightingPresets.Current} q={DynLightSettings.Current.QualityLevel} " +
+                $"ambient {a.Intensity:0.00} sky {a.Sky} ground {a.Ground} sun {sun.Intensity:0.00} bg {LightingSystem.BackgroundLight:0.00} | {LightingSystem.Stats}", LogType.Info);
+        }
 
         LightingPresets.UpdateDayCycle(RuntimeData.DeltaTime, RoomScene.RoomSkyboxScene);
     }
