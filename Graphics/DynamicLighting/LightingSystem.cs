@@ -461,8 +461,11 @@ public static class LightingSystem {
     /// Swaps the model's <see cref="BasicEffect"/>s for <see cref="LightCaptureEffect"/>s so its draws are seen by
     /// the lighting system. Safe to call more than once, and safe to call before <see cref="Initialize"/>.
     /// </summary>
+    /// <summary>Models lighting never touches (phones: the room and the board's frame draw exactly as with lighting off).</summary>
+    public static readonly HashSet<Model> NeverInstrument = [];
+
     public static void Instrument(Model? model) {
-        if (model is null)
+        if (model is null || NeverInstrument.Contains(model))
             return;
 
         lock (_instrumented) {

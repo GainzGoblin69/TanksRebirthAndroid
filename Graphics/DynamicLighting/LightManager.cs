@@ -60,6 +60,15 @@ public static class LightManager {
         if (!LightingSystem.Initialize(device, effect))
             return;
 
+        // phones: the room and the board's frame (the table and the wooden border around the board) are left
+        // completely alone, so they draw exactly as with lighting off. On phone GPUs lighting turned a band
+        // around the board black; lighting the play area (floor, blocks, tanks, shells) is what matters.
+        if (PhoneGpu) {
+            LightingSystem.NeverInstrument.Add(RoomScene.RoomSkyboxScene);
+            foreach (var m in new[] { GameScene.BoundsRenderer.BoundaryModel, TanksRebirth.GameContent.Globals.Assets.ModelGlobals.GameBoundary.Asset })
+                if (m is not null) LightingSystem.NeverInstrument.Add(m);
+        }
+
         // the sky dome around the room should neither block nor receive light
         var room = RoomScene.RoomSkyboxScene;
         LightingSystem.Instrument(room);
