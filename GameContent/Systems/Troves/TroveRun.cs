@@ -185,9 +185,13 @@ public static class TroveRun {
         TroveThemes.TestTheme = null;
         // testing: "lighting_test.txt" in the save folder switches dynamic lighting on for the run
         try {
-            if (System.IO.File.Exists(System.IO.Path.Combine(TankGame.SaveDirectory, "lighting_test.txt"))) {
+            var lt = System.IO.Path.Combine(TankGame.SaveDirectory, "lighting_test.txt");
+            if (System.IO.File.Exists(lt)) {
+                // the file holds a quality: 0 Low .. 3 Ultra
+                if (int.TryParse(System.IO.File.ReadAllText(lt).Trim(), out var lq))
+                    TankGame.Settings.LightingQuality = Math.Clamp(lq, 0, 3);
                 Graphics.DynamicLighting.LightManager.SetEnabled(true);
-                TankGame.ClientLog.Write($"[Lighting] test: available={Graphics.DynamicLighting.LightingSystem.IsAvailable} active={Graphics.DynamicLighting.LightingSystem.IsActive}", Internals.LogType.Info);
+                TankGame.ClientLog.Write($"[Lighting] test: quality={TankGame.Settings.LightingQuality} available={Graphics.DynamicLighting.LightingSystem.IsAvailable} active={Graphics.DynamicLighting.LightingSystem.IsActive}", Internals.LogType.Info);
             }
         }
         catch (Exception e) { TankGame.ClientLog.Write($"[Lighting] test failed: {e}", Internals.LogType.Warn); }
@@ -195,6 +199,7 @@ public static class TroveRun {
             var tp = System.IO.Path.Combine(TankGame.SaveDirectory, "troves_test.txt");
             if (System.IO.File.Exists(tp) && Enum.TryParse<FloorTheme>(System.IO.File.ReadAllLines(tp).ElementAtOrDefault(4)?.Trim(), out var th))
                 TroveThemes.TestTheme = th; // 5th line: a floor theme to always show up
+            TroveGen.TestCorkFloor = System.IO.File.Exists(tp) && System.IO.File.ReadAllLines(tp).ElementAtOrDefault(5)?.Trim() == "cork"; // 6th: "cork"
         }
         catch { }
         try {
@@ -560,9 +565,15 @@ public static class TroveRun {
         if (!Active || !CampaignGlobals.InMission || Room is not { } room || block.Type != BlockID.Cork || _fadeDir != 0)
             return;
         var g = TroveGen.ToGrid(block.Position);
-        if (!room.Blocks.Any(b => b.X == g.X && b.Y == g.Y && b.Type == BlockID.Cork)) // only the room's own cork (not Wall Builder's)
+        int bi = room.Blocks.FindIndex(b => b.X == g.X && b.Y == g.Y && b.Type == BlockID.Cork);
+        if (bi < 0) // only the room's own cork (not Wall Builder's)
             return;
+        // broken cork stays broken: it's gone from the room's layout, so it isn't there when you come back
+        room.Blocks.RemoveAt(bi);
         if (!room.CorkRolled.Add(g))
+            return;
+        // cork rooms and floors are full of it: at most 3 items from one of those rooms
+        if (room.CorkStyle && room.GroundDrops.Count >= 3)
             return;
         uint h = (uint)Seed * 2654435761u ^ (uint)FloorNumber * 40503u ^ (uint)(room.Cell.X * 73856093) ^ (uint)(room.Cell.Y * 19349663)
             ^ (uint)(g.X * 83492791) ^ (uint)(g.Y * 2971215073u);

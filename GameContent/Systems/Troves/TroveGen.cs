@@ -40,6 +40,8 @@ public sealed class TroveRoom {
     public List<TroveGroundDrop> GroundDrops = [];
     /// <summary>Cork blocks (grid x, y) that already had their chance at an item this run.</summary>
     public HashSet<Point> CorkRolled = [];
+    /// <summary>A cork room: every wall and piece of cover is breakable cork, with extra cork about.</summary>
+    public bool CorkStyle;
     public bool PickupVisible => Pickup is not null && !PickupTaken && (Kind is TroveRoomKind.Item or TroveRoomKind.Secret || Cleared || ForcePickup);
 }
 
@@ -62,6 +64,8 @@ public sealed class TroveFloor {
     public int BossTier = TankID.Marine;
     /// <summary>A special look (and small twist) for this floor in this run, if it got one.</summary>
     public FloorTheme Theme;
+    /// <summary>A cork floor: every room on it is a cork room.</summary>
+    public bool CorkFloor;
 
     public bool Has(Point p) => Rooms.ContainsKey(p);
 }
@@ -293,13 +297,48 @@ public static class TroveGen {
 
     // ------------------------------------------------------------------ inside each room
 
+    public const double CORK_FLOOR_CHANCE = 0.06, CORK_ROOM_CHANCE = 0.12;
+    /// <summary>Testing: every floor is a cork floor.</summary>
+    public static bool TestCorkFloor;
+
+    /// <summary>Cork rooms: walls and cover become cork, plus extra cork clusters (before the paths are carved,
+    /// so doors and the middle stay open and no part of the room is shut off).</summary>
+    private static void Corkify(TroveRoom room, int[,] solid, int[,] type) {
+        if (!room.CorkStyle)
+            return;
+        var r = new Random(unchecked(room.Cell.X * 92821 + room.Cell.Y * 68917 + solid.Length));
+        int clusters = 4 + r.Next(4);
+        for (int i = 0; i < clusters; i++) {
+            int x = r.Next(1, GW / 2), y = r.Next(1, GH / 2), w = r.Next(1, 4), h = r.Next(1, 3);
+            for (int dx = 0; dx < w; dx++)
+                for (int dy = 0; dy < h; dy++)
+                    foreach (var (px, py) in new[] { (x + dx, y + dy), (GW - 1 - x - dx, y + dy), (x + dx, GH - 1 - y - dy), (GW - 1 - x - dx, GH - 1 - y - dy) })
+                        if (px is >= 0 and < GW && py is >= 0 and < GH && solid[px, py] == 0) {
+                            solid[px, py] = 1 + r.Next(2);
+                            type[px, py] = BlockID.Cork;
+                        }
+        }
+        for (int x = 0; x < GW; x++)
+            for (int y = 0; y < GH; y++)
+                if (solid[x, y] > 0 && type[x, y] == BlockID.Wood)
+                    type[x, y] = BlockID.Cork;
+    }
+
     private static void BuildRooms(TroveFloor f, int seed) {
         f.BossTier = TroveBosses.PickFor(f.Number, seed).Tier;
         f.Theme = TroveThemes.PickFor(f.Number, seed);
         if (TroveThemes.Def(f.Theme) is { } theme)
             f.Name = theme.Name;
         bool campaign = SeedUsesCampaign(seed) && CampaignAvailable;
+        // level styles (rolled separately, so they don't change the rest of the layout):
+        // a whole floor of cork (6%, not floor 1), or single cork rooms (12% of fight rooms)
+        var style = new Random(unchecked(seed * 7919 + f.Number * 104729));
+        f.CorkFloor = TestCorkFloor || f.Number > 1 && style.NextDouble() < CORK_FLOOR_CHANCE;
+        if (f.CorkFloor)
+            f.Name = string.IsNullOrEmpty(f.Name) ? "The Cork Works" : f.Name + " of Cork";
         foreach (var room in f.Rooms.Values) {
+            var crng = new Random(unchecked(seed * 31 + f.Number * 7 + room.Cell.X * 1009 + room.Cell.Y * 3001));
+            room.CorkStyle = f.CorkFloor || room.Kind is TroveRoomKind.Normal or TroveRoomKind.Challenge && crng.NextDouble() < CORK_ROOM_CHANCE;
             var rng = new Random(unchecked(seed * 131 + f.Number * 977 + room.Cell.X * 61 + room.Cell.Y * 13));
             if (room.Kind == TroveRoomKind.Normal && campaign && rng.NextDouble() < CAMPAIGN_ROOM_CHANCE && BuildCampaignRoom(f, room, rng))
                 continue;
@@ -490,6 +529,7 @@ public static class TroveGen {
             solid[g.X, g.Y] = Math.Max(1, (int)b.Stack);
             type[g.X, g.Y] = b.Type;
         }
+        Corkify(room, solid, type);
         Carve(solid, doors);
         SecretCrack(solid, type, SecretDoor(f, room));
         // teleporters work in pairs: keep only complete pairs, on open floor
@@ -610,6 +650,7 @@ public static class TroveGen {
             else Mirror(x, y + 1, h, t);
         }
 
+        Corkify(room, solid, type);
         // keep every door's path to the middle open (and the middle itself), and no part of the room shut off
         Carve(solid, doors);
         SecretCrack(solid, type, SecretDoor(f, room));

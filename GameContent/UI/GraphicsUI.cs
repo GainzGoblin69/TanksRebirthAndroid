@@ -207,12 +207,20 @@ public static class GraphicsUI {
 
         LightingButton = new("Dynamic Lighting", FontGlobals.RebirthFont, Color.WhiteSmoke) {
             IsVisible = false,
-            Tooltip = "Sunlight, shadows and glowing shells and explosions. Looks great, but is heavy on phones.",
+            Tooltip = "Sunlight, shadows and glowing shells and explosions. Tap to step through Low, Medium, High and Ultra, then off. Higher looks better but is heavier.",
             HoverColor = Color.White,
         };
         LightingButton.SetDimensions(() => new Vector2(1250, 350).ToResolution(), () => new Vector2(500, 150).ToResolution());
+        // each tap: Off -> Low -> Medium -> High -> Ultra -> Off
         LightingButton.OnLeftClick = (_) => {
-            TankGame.Settings.DynamicLighting = !TankGame.Settings.DynamicLighting;
+            if (!TankGame.Settings.DynamicLighting) {
+                TankGame.Settings.DynamicLighting = true;
+                TankGame.Settings.LightingQuality = 0;
+            }
+            else if (TankGame.Settings.LightingQuality < 3)
+                TankGame.Settings.LightingQuality++;
+            else
+                TankGame.Settings.DynamicLighting = false;
             try { TanksRebirth.Graphics.DynamicLighting.LightManager.SetEnabled(TankGame.Settings.DynamicLighting); }
             catch (Exception e) {
                 TankGame.Settings.DynamicLighting = false;
@@ -228,6 +236,9 @@ public static class GraphicsUI {
             var sw = ToggleSwitch.RightOf(elem.Hitbox, 0.45f);
             ((UITextButton)elem).TextOffset = new Vector2(-(sw.Width + elem.Hitbox.Right - sw.Right) / 2f, 0);
             ToggleSwitch.Draw(sb, sw, TankGame.Settings.DynamicLighting);
+            ((UITextButton)elem).Text = TankGame.Settings.DynamicLighting
+                ? "Lighting: " + (TankGame.Settings.LightingQuality switch { 0 => "Low", 1 => "Medium", 2 => "High", _ => "Ultra" })
+                : "Dynamic Lighting";
         };
 
         if (Internals.Common.Framework.Input.TouchControls.Enabled) {

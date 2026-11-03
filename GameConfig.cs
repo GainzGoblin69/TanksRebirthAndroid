@@ -31,6 +31,8 @@ public class GameConfig
     public bool TeamColours { get; set; } = false;
     /// <summary>1.9's dynamic lighting (sun, shadows, lamps, glowing shells and explosions). Off by default: heavy on phones.</summary>
     public bool DynamicLighting { get; set; } = false;
+    /// <summary>Dynamic lighting quality: 0 Low, 1 Medium, 2 High, 3 Ultra.</summary>
+    public int LightingQuality { get; set; } = 0;
     public int TankColorP1 { get; set; } = -1;
     public int TankColorP2 { get; set; } = -1;
     /// <summary>Name shown to others in Wi-Fi games.</summary>

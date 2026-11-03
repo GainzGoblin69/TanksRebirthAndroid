@@ -74,8 +74,7 @@ public static class LightManager {
         {
             var cur = DynLightSettings.Current;
             cur.Enabled = TankGame.Settings?.DynamicLighting == true;
-            if (Internals.Common.Framework.Input.TouchControls.Enabled)
-                cur.SetQualityLevel(LightingQualityLevel.Low);
+            cur.SetQualityLevel(QualityFromSettings);
             DynLightSettings.Current = cur;
         }
 
@@ -94,7 +93,10 @@ public static class LightManager {
     /// <summary>Set once lighting has loaded: <see cref="GameResources"/> hands it every newly loaded model.</summary>
     public static bool InstrumentNewModels;
 
-    /// <summary>The Graphics switch: turns dynamic lighting on (loading it the first time) or off.</summary>
+    static LightingQualityLevel QualityFromSettings =>
+        (LightingQualityLevel)Math.Clamp(TankGame.Settings?.LightingQuality ?? 0, 0, (int)LightingQualityLevel.Ultra);
+
+    /// <summary>The Graphics switch: turns dynamic lighting on (loading it the first time) or off, at the quality in the settings.</summary>
     public static void SetEnabled(bool on) {
         if (on && !_initialized)
             Initialize(TankGame.Instance.GraphicsDevice);
@@ -102,6 +104,7 @@ public static class LightManager {
             return;
         var cur = DynLightSettings.Current;
         cur.Enabled = on;
+        cur.SetQualityLevel(QualityFromSettings);
         DynLightSettings.Current = cur;
         cur.Apply();
     }
