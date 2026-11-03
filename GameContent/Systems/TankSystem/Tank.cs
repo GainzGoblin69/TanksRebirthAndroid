@@ -131,6 +131,14 @@ public abstract class Tank {
     public Shell? LastShotShell;
 
     public static bool ShowTeamVisuals = false;
+    /// <summary>(1.9) Team colours: tints a tank's body with its team's colour, so teams can be told apart at a glance.
+    /// Tints the lighting instead of rewriting the shared tank texture (which the old code did every frame).</summary>
+    public static void ApplyTeamTint(Microsoft.Xna.Framework.Graphics.BasicEffect effect, Microsoft.Xna.Framework.Graphics.ModelMesh mesh, int team) {
+        if (!ShowTeamVisuals || team == TeamID.NoTeam || mesh.Name != "Chassis" || !TeamID.TeamColors.TryGetValue(team, out var c))
+            return;
+        effect.DiffuseColor *= Vector3.Lerp(Vector3.One, c.ToVector3() * 1.25f, 0.6f);
+        effect.EmissiveColor += c.ToVector3() * 0.12f;
+    }
 
     public static World CollisionsWorld = new(Vector2.Zero);
     public const float UNITS_PER_METER = 20f;
@@ -185,6 +193,10 @@ public abstract class Tank {
 
     public Vector2 Velocity;
     public Vector2 KnockbackVelocity;
+    /// <summary>Every shell the last <see cref="Shoot"/> made, in order (multiplayer gives them matching ids).</summary>
+    public readonly List<Shell> LastVolley = [];
+    /// <summary>True while replaying a shot that another device in a multiplayer game already fired.</summary>
+    public static bool ReplayingNetShot;
     public BoundingBox Worldbox { get; set; }
 
     /// <summary>The 2D circle-represented hitbox of this <see cref="Tank"/>.</summary>
@@ -310,7 +322,7 @@ public abstract class Tank {
             Team = TeamID.NoTeam;
         if (!Properties.Invisible || IsDestroyed) return;
 
-        SoundPlayer.PlaySoundInstance(invisibleTankSound, SoundContext.Effect, 0.3f);
+        SoundPlayer.PlaySoundInstance(invisibleTankSound, SoundContext.Effect, 0.3f, position: Position3D);
 
         var lp1 = GameHandler.Particles.MakeParticle(Position3D,
             GameResources.GetGameResource<Texture2D>("Assets/textures/misc/light_particle"));
@@ -424,9 +436,11 @@ public abstract class Tank {
         }
 
         if (Difficulties.Types["Shotguns"]) {
-            Properties.ShellSpread = 0.3f;
+            // (1.9) a tighter spread, and each blast pushes the tank back a little
+            Properties.ShellSpread = 0.15f;
             Properties.ShellShootCount = 3;
             Properties.ShellLimit *= 3;
+            Properties.Recoil = 2f;
 
             if (this is AITank tank)
                 tank.Parameters.DetectionForgivenessHostile *= 2;
@@ -586,7 +600,7 @@ public abstract class Tank {
         else if (Properties.SafeGetArmorHitPoints() > 0) {
             Properties.Armor!.HitPoints -= 1 + extraHit;
             var ding = SoundPlayer.PlaySoundInstance(
-                $"Assets/sounds/armor_ding_{Client.ClientRandom.Next(1, 3)}.ogg", SoundContext.Effect);
+                $"Assets/sounds/armor_ding_{Client.ClientRandom.Next(1, 3)}.ogg", SoundContext.Effect, position: Position3D);
 
             ding.Instance.Pitch = Client.ClientRandom.NextFloat(-0.1f, 0.1f);
             //if (CameraGlobals.IsUsingFirstPresonCamera)
@@ -669,7 +683,7 @@ public abstract class Tank {
         IsDestroyed = true;
 
         const string tankDestroySound0 = "Assets/sounds/tnk_destroy.ogg";
-        var destroy = SoundPlayer.PlaySoundInstance(tankDestroySound0, SoundContext.Effect, 0.2f);
+        var destroy = SoundPlayer.PlaySoundInstance(tankDestroySound0, SoundContext.Effect, 0.2f, pitchOverride: SoundPlayer.NaturalPitchShift, position: Position3D);
 
         //if (CameraGlobals.IsUsingFirstPresonCamera)
         //    SoundUtils.CreateSpatialSound(destroy, Position3D, CameraGlobals.RebirthFreecam.Position, 1.25f);
@@ -747,8 +761,15 @@ public abstract class Tank {
         if (!MainMenuUI.IsActive && !CampaignGlobals.InMission || !Properties.HasTurret)
             return;
 
-        if (CurShootCooldown > 0 || OwnedShellCount >= Properties.ShellLimit / Properties.ShellShootCount || ShootBlocked?.Invoke(this) == true)
+        // (1.9) a volley needs room for all its shells; the old rule let a 15-shell Shotguns tank fire only 2 volleys.
+        // Tank Troves keeps the old rule, which its bosses are balanced around.
+        bool noRoom = Systems.Troves.TroveRun.Active
+            ? OwnedShellCount >= Properties.ShellLimit / Properties.ShellShootCount
+            : Properties.ShellLimit - OwnedShellCount < Properties.ShellShootCount;
+        // a shot that already happened on another device is always shown, whatever this copy's cooldown says
+        if (!ReplayingNetShot && (CurShootCooldown > 0 || noRoom || ShootBlocked?.Invoke(this) == true))
             return;
+        LastVolley.Clear();
 
         bool flip = false;
         float angle = 0f;
@@ -760,6 +781,7 @@ public abstract class Tank {
                 Properties.ShellType, this, Properties.RicochetCount, homing: Properties.ShellHoming);
 
             LastShotShell = shell;
+            LastVolley.Add(shell);
 
             OnShoot?.Invoke(this, shell);
 
@@ -806,6 +828,7 @@ public abstract class Tank {
                                  Properties.ShellSpeed;
 
                 shell.RicochetsRemaining = Properties.RicochetCount;
+                LastVolley.Add(shell);
             }
         }
 
@@ -899,10 +922,10 @@ public abstract class Tank {
 
         if (this is PlayerTank pt) {
             if (NetPlay.IsClientMatched(pt.PlayerId))
-                Client.SyncMinePlace(mine.Position, mine.DetonateTime, WorldId);
+                Client.SyncMinePlace(mine.Position, mine.DetonateTime, WorldId, mine.NetId);
         }
         else
-            Client.SyncMinePlace(mine.Position, mine.DetonateTime, WorldId);
+            Client.SyncMinePlace(mine.Position, mine.DetonateTime, WorldId, mine.NetId);
 
         OnLayMine?.Invoke(this, mine);
 

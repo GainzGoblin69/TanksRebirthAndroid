@@ -109,9 +109,12 @@ public static class IntermissionHandler {
             CampaignCompleteUI.FanfaresAndDurations[context].Item1.Instance?.Play();
             CampaignCompleteUI.FanfaresAndDurations[context].Item1.Instance.Volume = TankGame.Settings.MusicVolume;
             SceneManager.DoEndScene(CampaignCompleteUI.FanfaresAndDurations[context].Item2, context);
+            SceneManager.InitResults((float)CampaignCompleteUI.FanfaresAndDurations[context].Item2.TotalSeconds * 60, context);
         }
-        else
+        else {
             IntermissionSystem.BeginOperation(delay);
+            SceneManager.InitResults(120f, context); // 2 seconds
+        }
     }
     /// <summary>
     /// A method that returns whether or not there was a victory- be it for the enemy or the player.
@@ -215,7 +218,10 @@ public static class IntermissionHandler {
                         var tank = GameHandler.AllPlayerTanks[i];
                         if (tank is null) continue;
                         var lives = PlayerTank.Lives[i];
-                        var livesCountLocal = tank.IsDestroyed ? lives - 1 : lives;
+                        // (1.9 fix) the life was already taken when the tank died, so taking another here gave Game Over with
+                        // a life left. Only an online player on another device may not have synced theirs yet.
+                        bool remote = Client.IsConnected() && !NetPlay.IsClientMatched(i) && !LocalCoop.ControlsPlayer(i);
+                        var livesCountLocal = remote && tank.IsDestroyed ? lives - 1 : lives;
 
                         // if any player has any lives remaining, the campaign isn't over
                         if (livesCountLocal > 0)

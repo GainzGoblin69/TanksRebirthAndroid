@@ -25,7 +25,23 @@ public static class SoundPlayer
     private static float EffectsVolume => TankGame.Settings.EffectsVolume;
     private static float AmbientVolume => TankGame.Settings.AmbientVolume;
     // my spidey senses are telling me this is horribly inefficient.
-    public static OggAudio PlaySoundInstance(string audioPath, SoundContext context, float volume = 1f, float maxVolume = 1f, float panOverride = 0f, float pitchOverride = 0f, bool rememberMe = false) {
+    /// <summary>(from 1.9) A small random pitch change, so repeated sounds (shots, bounces) don't all sound identical.</summary>
+    public static float NaturalPitchShift => (float)(Random.Shared.NextDouble() * 2 - 1) * 0.1f;
+    /// <summary>(from 1.9) Left/right pan for a sound happening at this world position: things on the left of the
+    /// screen are heard more in the left ear.</summary>
+    public static float PanFor(Vector3 position) {
+        try {
+            var clip = Vector4.Transform(new Vector4(position, 1f), GameContent.Globals.CameraGlobals.GameView * GameContent.Globals.CameraGlobals.GameProjection);
+            if (MathF.Abs(clip.W) < 1e-5f) return 0f;
+            return MathHelper.Clamp(clip.X / clip.W, -1f, 1f) * 0.5f;
+        }
+        catch { return 0f; }
+    }
+
+    /// <param name="position">Where in the world the sound happens (pans it left/right). Null plays it centred.</param>
+    public static OggAudio PlaySoundInstance(string audioPath, SoundContext context, float volume = 1f, float maxVolume = 1f, float panOverride = 0f, float pitchOverride = 0f, bool rememberMe = false, Vector3? position = null) {
+        if (position is { } at)
+            panOverride += PanFor(at);
         // because ogg is the only good audio format.
         audioPath = Path.Combine(audioPath.Contains("Content/") ? "" : TankGame.Instance.Content.RootDirectory, audioPath);
         if (Muted)
@@ -74,7 +90,7 @@ public static class SoundPlayer
 
         return sfx;
     }
-    public static void PlaySoundInstance(OggAudio fromSound, SoundContext context, float volume = 1f, float maxVolume = 1f, bool playNew = false, float panOverride = 0f, float pitchOverride = 0f) {
+    public static void PlaySoundInstance(OggAudio fromSound, SoundContext context, float volume = 1f, float maxVolume = 1f, bool playNew = false, float panOverride = 0f, float pitchOverride = 0f, Vector3? position = null) {
         volume *= context switch {
             SoundContext.Music => MusicVolume,
             SoundContext.Effect => EffectsVolume,
@@ -82,7 +98,7 @@ public static class SoundPlayer
             _ => throw new ArgumentOutOfRangeException(nameof(context), context, "Uh oh! Seems like a new sound type was implemented, but I was not given a way to handle it!"),
         };
         //if (playNew) {
-            PlaySoundInstance(fromSound.Path, context, volume, maxVolume, panOverride, pitchOverride);
+            PlaySoundInstance(fromSound.Path, context, volume, maxVolume, panOverride, pitchOverride, position: position);
             return;
         //}
     }

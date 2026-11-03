@@ -271,42 +271,24 @@ public class NetPlay {
                 GameHandler.AllTanks[hurtTankId]?.Damage(context, false, colorOverride);
                 break;
             case PacketID.ShellDestroy:
-                var otherShellUID = reader.GetByte();
+                var destroyedNetId = reader.GetInt();
                 var cxt = reader.GetByte();
 
-                // FIXME: crashes if recieving on a dead player. weird.
-                // FIXME? wait for results.
-                // TODO: see if this works.
-
-                /*var currentClientShellCount = Shell.AllShells.Count(x => x is not null);
-
-                var idAdjust = senderShellId + (currentClientShellCount - senderShellCount);
-
-                if (idAdjust < 0)
-                    return;
-
-                Shell.AllShells[idAdjust]?.Destroy((Shell.DestructionContext)cxt, wasSentByAnotherClient: true);*/
-
-                var currentClientShellCount = Shell.AllShells.Length;
-                for (int i = 0; i < currentClientShellCount; i++) {
-                    if (Shell.AllShells[i] is null) continue;
-                    if (Shell.AllShells[i].UID == otherShellUID) {
-                        Shell.AllShells[i].Destroy((Shell.DestructionContext)cxt, wasSentByAnotherClient: true);
-                        break;
-                    }
-                }
-
-                // old and stupid "ghost bullets" workaround
-                /*if (GameHandler.AllTanks[ownerId] is not null)
-                    if (ownerShellIndex > -1)
-                        if (GameHandler.AllTanks[ownerId].OwnedShells.Length > ownerShellIndex)
-                            if (GameHandler.AllTanks[ownerId].OwnedShells[ownerShellIndex] is not null)
-                                GameHandler.AllTanks[ownerId].OwnedShells[ownerShellIndex]?.Destroy((Shell.DestructionContext)cxt, wasSentByAnotherClient: true);*/
+                // (1.9) find the shell by its network id; if it isn't here (yet), remember it so a late
+                // fire message can't make a ghost shell
+                var destroyedShell = Shell.FindByNetId(destroyedNetId);
+                if (destroyedShell is not null)
+                    destroyedShell.Destroy((Shell.DestructionContext)cxt, wasSentByAnotherClient: true);
+                else
+                    NetIds.MarkDead(destroyedNetId);
                 break;
             case PacketID.MineDetonate:
                 var destroyedMineId = reader.GetInt();
 
-                Mine.AllMines[destroyedMineId]?.Detonate();
+                // (1.9) by network id: the array slot differs between devices, which blew up the wrong mine
+                var detonated = Mine.FindByNetId(destroyedMineId);
+                if (detonated is { Detonated: false })
+                    detonated.Detonate();
                 break;
             case PacketID.ShellFire:
                 var shellType = reader.GetInt();
@@ -314,18 +296,28 @@ public class NetPlay {
                 var shellVel = reader.GetVector2();
                 var shellRicochets = reader.GetUInt();
                 var shellOwner = reader.GetInt();
-                var shellUID = reader.GetByte();
+                var shellNetId = reader.GetInt();
+
+                // (1.9) already here, or already destroyed (the destroy message overtook this one)
+                if (Shell.FindByNetId(shellNetId) is not null || NetIds.WasDestroyed(shellNetId))
+                    break;
 
                 // GameHandler.AllTanks[shellOwner].Shoot(true);
                 //var shell = new Shell(shellPos, shellVel, shellType, GameHandler.AllTanks[shellOwner], ricochets: shellRicochets);
                 //shell.SetUID(shellUID);
                 // GameHandler.AllTanks[shellOwner]?.DoShootParticles();
-                var shooter = GameHandler.AllTanks[shellOwner];
+                var shooter = shellOwner >= 0 && shellOwner < GameHandler.AllTanks.Length ? GameHandler.AllTanks[shellOwner] : null;
 
                 if (shooter is null) break;
 
-                shooter.Shoot(false, false);
-                if (shooter.LastShotShell is not null) {
+                var lastBefore = shooter.LastShotShell;
+                GameContent.Systems.TankSystem.Tank.ReplayingNetShot = true;
+                try { shooter.Shoot(false, false); }
+                finally { GameContent.Systems.TankSystem.Tank.ReplayingNetShot = false; }
+                if (shooter.LastShotShell is not null && !ReferenceEquals(lastBefore, shooter.LastShotShell)) {
+                    // the volley's shells were numbered in order on the shooter's device
+                    for (int v = 0; v < shooter.LastVolley.Count; v++)
+                        shooter.LastVolley[v].NetId = shellNetId + v;
                     if (shellType == ShellID.Missile)
                         shooter.LastShotShell!.Swap(shellType); // missile looks/behaves differently
                     if (shellType == ShellID.Explosive && shooter is PlayerTank) {
@@ -336,7 +328,6 @@ public class NetPlay {
                     shooter.LastShotShell.Position = shellPos;
                     shooter.LastShotShell.Velocity = shellVel;
                     shooter.LastShotShell.Ricochets = shooter.LastShotShell.RicochetsRemaining = shellRicochets;
-                    shooter.LastShotShell.SetUID(shellUID);
                 }
 
                 // ChatSystem.SendMessage($"Pos: {shell.Position} | Vel: {shell.Velocity}", Color.White);
@@ -345,8 +336,10 @@ public class NetPlay {
                 var minePos = reader.GetVector2();
                 var detTime = reader.GetFloat();
                 var mineOwner = reader.GetInt();
+                var mineNetId = reader.GetInt();
 
-                new Mine(GameHandler.AllTanks[mineOwner], minePos, detTime);
+                var placed = new Mine(GameHandler.AllTanks[mineOwner], minePos, detTime);
+                if (mineNetId != -1) placed.NetId = mineNetId;
 
                 break;
             case PacketID.SendCampaignByName:
@@ -599,10 +592,10 @@ public class NetPlay {
                 Server.NetManager.SendToAll(message, deliveryMethod, peer);
                 break;
             case PacketID.ShellDestroy:
-                var senderShellUID = reader.GetByte();
+                var senderShellNetId = reader.GetInt();
                 var cxt = reader.GetByte();
 
-                message.Put(senderShellUID);
+                message.Put(senderShellNetId);
                 message.Put(cxt);
 
                 Server.NetManager.SendToAll(message, deliveryMethod, peer);
@@ -619,7 +612,7 @@ public class NetPlay {
                 var shellVel = reader.GetVector2();
                 var shellRicochets = reader.GetUInt();
                 var shellOwner = reader.GetInt();
-                var shellUniqueID = reader.GetByte();
+                var shellUniqueID = reader.GetInt(); // (1.9) network id
 
                 message.Put(shellType);
                 message.Put(shellPos);
@@ -634,10 +627,12 @@ public class NetPlay {
                 var minePos = reader.GetVector2();
                 var detTime = reader.GetFloat();
                 var mineOwner = reader.GetInt();
+                var mineNetId = reader.GetInt();
 
                 message.Put(minePos);
                 message.Put(detTime);
                 message.Put(mineOwner);
+                message.Put(mineNetId);
                 Server.NetManager.SendToAll(message, deliveryMethod, peer);
                 break;
             case PacketID.SendCampaign:

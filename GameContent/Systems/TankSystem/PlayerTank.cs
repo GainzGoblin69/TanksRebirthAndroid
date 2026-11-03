@@ -324,7 +324,7 @@ public class PlayerTank : Tank {
             Systems.Troves.TroveItems.AfterShot(this, before);
     }
     private void ShootInner(bool fxOnly, bool netSend) {
-        PlayerStatistics.ShellsShot++;
+        if (!ReplayingNetShot) PlayerStatistics.ShellsShot++; // another player's shot isn't yours
         // Gears of War missile upgrade: this shot is a missile
         if (MissileUpgrade.ShotsLeft(PlayerId) > 0) {
             var (type, bounces, speed) = (Properties.ShellType, Properties.RicochetCount, Properties.ShellSpeed);
@@ -701,48 +701,65 @@ public class PlayerTank : Tank {
                         effect.EmissiveColor = Color.White.ToVector3();
                     else
                         effect.EmissiveColor = Color.Black.ToVector3();
-                    if (ShowTeamVisuals) {
-                        if (Team != TeamID.NoTeam) {
-                            //var ex = new Color[1024];
-
-                            //Array.Fill(ex, new Color(Client.ClientRandom.Next(0, 256), Client.ClientRandom.Next(0, 256), Client.ClientRandom.Next(0, 256)));
-
-                            //effect.Texture.SetData(0, new Rectangle(0, 8, 32, 15), ex, 0, 480);
-                            var ex = new Color[1024];
-
-                            Array.Fill(ex, TeamID.TeamColors[Team]);
-
-                            effect.Texture.SetData(0, new Rectangle(0, 0, 32, 9), ex, 0, 288);
-                            effect.Texture.SetData(0, new Rectangle(0, 23, 32, 9), ex, 0, 288);
-                        }
-                    }
                     effect.SetDefaultGameLighting_IngameEntities(specular: _isPlayerModel, ambientMultiplier: _isPlayerModel ? 2f : 0.9f);
+                    ApplyTeamTint(effect, mesh, Team);
                     mesh.Draw();
                 }
             }
+        }
+    }
+    static readonly Dictionary<int, float[]> _bulletAnim = [];
+    /// <summary>(from 1.9) Every player's shells-left, not just your own: one column per player down the right edge,
+    /// in that player's colour, with shells shrinking away when fired and popping back when they return.
+    /// Columns stay clear of the phone buttons (they never reach the joystick area) and squeeze for big shell limits.</summary>
+    private void DrawBulletCount() {
+        int limit = Properties.ShellLimit;
+        if (limit <= 0) return;
+        var sb = TankGame.SpriteRenderer;
+        var tex = GameResources.GetGameResource<Texture2D>("Assets/textures/ui/bullet_ui");
+        float res = WindowUtils.WindowHeight / 1080f;
+
+        // how many players are in the game decides whether the columns get a "P1" label
+        int players = GameHandler.AllPlayerTanks.Count(t => t is not null && !t.IsDestroyed);
+        // the column's height is capped at ~40% of the screen, shrinking the icons for big shell limits
+        float baseScale = 0.5f * MathF.Min(1f, 5f / limit);
+        float step = tex.Height * baseScale * res + 5f * res;
+        float maxH = WindowUtils.WindowHeight * 0.4f;
+        if (step * limit > maxH) { float k = maxH / (step * limit); baseScale *= k; step *= k; }
+
+        float colW = MathF.Max(tex.Width * 0.5f * res, 36f * res) + 10f * res;
+        float x = WindowUtils.WindowWidth - 20f * res - colW / 2f - PlayerId * colW;
+        float y = 20f * res;
+
+        var bright = PlayerID.PlayerTankColors.TryGetValue(PlayerType, out var pc) ? Color.Lerp(pc, Color.White, 0.35f) : Color.White;
+        if (players > 1) {
+            var label = $"P{PlayerId + 1}";
+            DrawUtils.DrawStringWithBorder(sb, FontGlobals.RebirthFont, label, new Vector2(x, y + 12f * res), bright, Color.Black,
+                new Vector2(0.55f * res), 0f, borderThickness: 1.5f * res);
+            y += 32f * res;
+        }
+
+        if (!_bulletAnim.TryGetValue(PlayerId, out var anim) || anim.Length != limit) {
+            anim = new float[limit];
+            Array.Fill(anim, 1f); // full, so they don't pop in at the start
+            _bulletAnim[PlayerId] = anim;
+        }
+        for (int i = 0; i < limit; i++) {
+            float target = i < OwnedShellCount ? 0f : 1f;
+            anim[i] = MathHelper.Lerp(anim[i], target, MathHelper.Clamp(0.08f * RuntimeData.DeltaTime, 0f, 1f));
+            float v = target > 0.5f ? Easings.OutBack(anim[i]) : Easings.OutQuart(anim[i]);
+            var color = Color.Lerp(Color.DimGray * 0.5f, bright, MathHelper.Clamp(v, 0f, 1f));
+            float scale = MathHelper.Lerp(baseScale * 0.7f, baseScale, v) * res;
+            DrawUtils.DrawTextureWithBorder(sb, tex, new Vector2(x, y + step / 2f + i * step), color,
+                Color.White * MathHelper.Clamp(v, 0f, 1f), new Vector2(scale), 0f, Anchor.Center, borderThickness: 0.5f + MathF.Min(1f, 5f / limit));
         }
     }
     private void DrawExtras() {
         if (IsDestroyed)
             return;
 
-        if (!MainMenuUI.IsActive) {
-            if (NetPlay.IsClientMatched(PlayerId)) {
-                var tex = GameResources.GetGameResource<Texture2D>("Assets/textures/ui/bullet_ui");
-                var scale = 0.5f; // the graphic gets smaller for each availiable shell.
-                for (int i = 0; i < Properties.ShellLimit; i++) {
-                    var scalar = 0.95f + (i * 0.001f); //changetankproperty ShellLimit 
-                    scalar = MathHelper.Clamp(scalar, 0f, 0.99f);
-                    scale *= scalar;
-                }
-                var realSize = (tex.Size() * scale).ToResolution();
-                for (int i = 1; i <= Properties.ShellLimit; i++) {
-                    var colorToUse = i > OwnedShellCount ? Color.White : Color.DimGray;
-                    var position = new Vector2(WindowUtils.WindowWidth - realSize.X * scale, 0);
-                    TankGame.SpriteRenderer.Draw(tex, position + new Vector2(0, i * (realSize.Y + (scale * 10).ToResolutionY())), null, colorToUse, 0f, new Vector2(tex.Size().X, 0), new Vector2(scale).ToResolution(), default, default);
-                }
-            }
-        }
+        if (!MainMenuUI.IsActive && !LevelEditorUI.IsActive)
+            DrawBulletCount();
 
         // a bit hardcoded but whatever
         bool needClarification = (!MainMenuUI.IsActive && IntermissionHandler.TankFunctionWait > 0) || MainMenuUI.MenuState == MainMenuUI.UIState.Mulitplayer;

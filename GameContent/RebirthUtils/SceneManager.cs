@@ -42,6 +42,66 @@ public static class SceneManager {
     /// </summary>
     /// <param name="delay">The delay of time before starting the results screen.</param>
     /// <param name="context">The context of which the campaign is ending.</param>
+    // ---- (from 1.9) the mission-end message: the words slide in from both sides, flash gold, then fade ----
+    internal static float timeLeft;
+    static string _resultMsg = string.Empty;
+    static float _animTimer;
+
+    public static void InitResults(float time, MissionEndContext ctx) {
+        if (Systems.Troves.TroveRun.Active || UI.MainMenu.MainMenuUI.IsActive) return; // Troves has its own banners
+        timeLeft = time;
+        _animTimer = 0f;
+        _resultMsg = ctx switch {
+            MissionEndContext.GameOver => "Game Over!",
+            MissionEndContext.Win => "Mission Complete!",
+            MissionEndContext.Lose => "You Died!",
+            MissionEndContext.CampaignCompleteMajor => "Campaign Complete!",
+            MissionEndContext.CampaignCompleteMinor => "Campaign Complete!",
+            _ => string.Empty
+        };
+    }
+
+    public static void DrawResultsMessage(SpriteBatch sb) {
+        if (timeLeft <= 0 || string.IsNullOrEmpty(_resultMsg)) return;
+        timeLeft -= RuntimeData.DeltaTime;
+
+        _animTimer = MathF.Min(_animTimer + 0.025f * RuntimeData.DeltaTime, 2f);
+        float slideEase = Easings.OutCubic(MathHelper.Clamp(_animTimer, 0f, 1f));
+        float impactEase = Easings.OutSine(MathHelper.Clamp(_animTimer - 1f, 0f, 1f));
+
+        var font = FontGlobals.RebirthFontLarge;
+        float res = WindowUtils.WindowHeight / 1080f;
+        int mid = _resultMsg.Length / 2;
+        string left = _resultMsg[..mid], right = _resultMsg[mid..];
+        var leftSize = font.MeasureString(left) * res;
+        var rightSize = font.MeasureString(right) * res;
+
+        float gapX = MathHelper.Lerp(1200f * res, 0f, slideEase);
+        float alpha = slideEase;
+        if (_animTimer > 1.6f) alpha *= 1f - (_animTimer - 1.6f) / 0.4f;
+
+        Color textColor = Color.White;
+        float scale = 1f;
+        if (_animTimer >= 0.8f) {
+            textColor = Color.Lerp(Color.Goldenrod, IntermissionSystem.BackgroundColor, impactEase);
+            scale = 1f + 0.15f * (1f - impactEase);
+        }
+        // the text sits a little above the middle so it doesn't cover the tanks' last moments
+        var centre = WindowUtils.WindowCenter - new Vector2(0, WindowUtils.WindowHeight * 0.12f);
+        Vector2 leftPos = centre - new Vector2(gapX + rightSize.X / 2f, 0);
+        Vector2 rightPos = centre + new Vector2(gapX + leftSize.X / 2f, 0);
+
+        if (slideEase < 1f) { // afterimages while sliding
+            foreach (var (trail, a) in new[] { (220f, 0.2f), (100f, 0.45f) }) {
+                float t = trail * res * (1f - slideEase);
+                DrawUtils.DrawStringWithBorder(sb, font, left, leftPos - new Vector2(t, 0), Color.Red * a * alpha, Color.Transparent, new Vector2(res), 0f);
+                DrawUtils.DrawStringWithBorder(sb, font, right, rightPos + new Vector2(t, 0), Color.Red * a * alpha, Color.Transparent, new Vector2(res), 0f);
+            }
+        }
+        DrawUtils.DrawStringWithBorder(sb, font, left, leftPos, textColor * alpha, Color.Black * alpha, new Vector2(res * scale), 0f, borderThickness: 2f * res);
+        DrawUtils.DrawStringWithBorder(sb, font, right, rightPos, textColor * alpha, Color.Black * alpha, new Vector2(res * scale), 0f, borderThickness: 2f * res);
+    }
+
     public static void DoEndScene(TimeSpan delay, MissionEndContext context) {
         // i think this works.
         // only adjusts speed for when this is called.

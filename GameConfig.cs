@@ -27,6 +27,8 @@ public class GameConfig
     public bool ShowStartupInfo { get; set; } = false;
     /// <summary>Spread the enemy AI's thinking across CPU cores (from 1.9). Turn off if a device misbehaves.</summary>
     public bool MultiCoreAI { get; set; } = true;
+    /// <summary>Tint tanks with their team's colour (from 1.9).</summary>
+    public bool TeamColours { get; set; } = false;
     public int TankColorP1 { get; set; } = -1;
     public int TankColorP2 { get; set; } = -1;
     /// <summary>Name shown to others in Wi-Fi games.</summary>

@@ -20,6 +20,7 @@ namespace TanksRebirth.GameContent.UI.MainMenu;
 public static partial class MainMenuUI {
 
     private static bool _diffButtonsInitialized;
+    public static UITextButton FlipLeftRight, FlipUpDown;
     public static UITextButton TanksAreCalculators; // make them calculate shots abnormally
     public static UITextButton PieFactory;
     public static UITextButton UltraMines;
@@ -123,6 +124,8 @@ public static partial class MainMenuUI {
         FFA.Color = Difficulties.Types["FFA"] ? Color.Lime : Color.Red;
         LanternMode.Color = Difficulties.Types["LanternMode"] ? Color.Lime : Color.Red;
         DisguiseMode.Color = Difficulties.Types["Disguise"] ? Color.Lime : Color.Red;
+        FlipLeftRight.Color = Difficulties.Types["FlipX"] ? Color.Lime : Color.Red;
+        FlipUpDown.Color = Difficulties.Types["FlipY"] ? Color.Lime : Color.Red;
 
         if (Internals.Common.Framework.Input.TouchControls.Enabled)
             foreach (var (button, _) in DifficultyKeys)
@@ -344,9 +347,20 @@ public static partial class MainMenuUI {
             OnLeftClick = (elem) => Difficulties.Types["DoubleTanks"] = !Difficulties.Types["DoubleTanks"]
         };
 
+        FlipLeftRight = new("Flip Left-Right", font, Color.White) {
+            IsVisible = false,
+            Tooltip = "Every mission is mirrored left to right.",
+            OnLeftClick = (elem) => Difficulties.Types["FlipX"] = !Difficulties.Types["FlipX"]
+        };
+        FlipUpDown = new("Flip Up-Down", font, Color.White) {
+            IsVisible = false,
+            Tooltip = "Every mission is mirrored top to bottom.",
+            OnLeftClick = (elem) => Difficulties.Types["FlipY"] = !Difficulties.Types["FlipY"]
+        };
+
         AllDifficultyButtons.AddRange(new UITextButton[] { TanksAreCalculators, PieFactory, UltraMines, BulletHell, AllInvisible, AllStationary, Armored, AllHoming, BumpUp, Monochrome,
         InfiniteLives, MasterMode, TacticalPlanes, MachineGuns, RandomizedTanks, ThunderMode, POVMode, AiCompanion, Shotguns, Predictions,
-        RandomizedPlayer, BulletBlocking, FFA, LanternMode, DisguiseMode, DoubleTanks, KidMode, GearsOfWar });
+        RandomizedPlayer, BulletBlocking, FFA, LanternMode, DisguiseMode, DoubleTanks, KidMode, GearsOfWar, FlipLeftRight, FlipUpDown });
         // phones: Disguise is removed (only changes how enemies look)
         if (Internals.Common.Framework.Input.TouchControls.Enabled) {
             AllDifficultyButtons.Remove(DisguiseMode);
@@ -371,6 +385,7 @@ public static partial class MainMenuUI {
         (RandomizedPlayer, "RandomPlayer"), (BulletBlocking, "BulletBlocking"), (FFA, "FFA"),
         (LanternMode, "LanternMode"), (DisguiseMode, "Disguise"),
         (DoubleTanks, "DoubleTanks"), (KidMode, "KidMode"), (GearsOfWar, "GearsOfWar"),
+        (FlipLeftRight, "FlipX"), (FlipUpDown, "FlipY"),
     ];
 
     /// <summary>

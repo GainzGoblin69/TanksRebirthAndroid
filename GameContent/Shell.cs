@@ -122,6 +122,13 @@ public class Shell : IAITankDanger {
     public int Id { get; private set; }
     /// <summary>Represents an ID between (0-63 * client #) used for syncing. Set randomly and is synced on spawn but not manipulated! Useful for state change operations on the bullet, such as death.</summary>
     public byte UID { get; private set; }
+    /// <summary>(1.9) The same number for this shell on every device in a multiplayer game. See <see cref="NetIds"/>.</summary>
+    public int NetId { get; set; }
+    public static Shell? FindByNetId(int id) {
+        foreach (var s in AllShells)
+            if (s is not null && s.NetId == id) return s;
+        return null;
+    }
     private float _wallRicCooldown;
     /// <summary>How long this shell has existed in the world.</summary>
     public float LifeTime;
@@ -318,7 +325,7 @@ public class Shell : IAITankDanger {
             }
             if (owner is not null) {
                 ShootSound!.Instance.Pitch = MathHelper.Clamp(owner.Properties.ShootPitch, -1, 1);
-                SoundPlayer.PlaySoundInstance(ShootSound, SoundContext.Effect, volume: 0.6f);
+                SoundPlayer.PlaySoundInstance(ShootSound, SoundContext.Effect, volume: 0.6f, pitchOverride: MathHelper.Clamp(owner.Properties.ShootPitch + SoundPlayer.NaturalPitchShift, -1, 1), position: owner.TurretPosition3D);
                 //if (CameraGlobals.IsUsingFirstPresonCamera)
                 //    SoundUtils.CreateSpatialSound(ShootSound, owner.TurretPosition3D, CameraGlobals.RebirthFreecam.Position);
             }
@@ -347,6 +354,7 @@ public class Shell : IAITankDanger {
             Owner.OwnedShells[idx] = this;
 
         SetUID(GenerateUID(owner));
+        NetId = NetIds.NextShell(owner);
         PostCreate?.Invoke(this);
     }
     private void StopSounds(int delay, MissionEndContext context, bool result1up) {
@@ -373,6 +381,8 @@ public class Shell : IAITankDanger {
 
         if (_wallRicCooldown <= 0) {
             if (Position.X is < GameScene.MIN_X or > GameScene.MAX_X) {
+                // (1.9 fix) put the shell back on the border first, so fast shells can't end up past it
+                Position = new(Math.Clamp(Position.X, GameScene.MIN_X, GameScene.MAX_X), Position.Y);
                 OnRicochet?.Invoke(this);
                 Ricochet(true);
 
@@ -382,6 +392,7 @@ public class Shell : IAITankDanger {
             }
 
             if (Position.Y is < GameScene.MIN_Z or > GameScene.MAX_Z) {
+                Position = new(Position.X, Math.Clamp(Position.Y, GameScene.MIN_Z, GameScene.MAX_Z));
                 OnRicochet?.Invoke(this);
                 Ricochet(false);
 
@@ -654,7 +665,7 @@ public class Shell : IAITankDanger {
         }
 
 
-        var sound = SoundPlayer.PlaySoundInstance(ricochetSound, SoundContext.Effect, 0.5f);
+        var sound = SoundPlayer.PlaySoundInstance(ricochetSound, SoundContext.Effect, 0.5f, pitchOverride: SoundPlayer.NaturalPitchShift, position: Position3D);
 
         //bool fp = CameraGlobals.IsUsingFirstPresonCamera;
         //if (fp)
@@ -663,7 +674,7 @@ public class Shell : IAITankDanger {
         if (Owner is not null) {
             if (Owner.Properties.ShellType == ShellID.TrailedRocket) {
                 sound.Instance.Pitch = Client.ClientRandom.NextFloat(0.15f, 0.25f);
-                var rocketRSound = SoundPlayer.PlaySoundInstance("Assets/sounds/ricochet_zip.ogg", SoundContext.Effect, 0.05f);
+                var rocketRSound = SoundPlayer.PlaySoundInstance("Assets/sounds/ricochet_zip.ogg", SoundContext.Effect, 0.05f, position: Position3D);
                 rocketRSound.Instance.Pitch = -0.65f;
                 //if (fp)
                 //    SoundUtils.CreateSpatialSound(sound, Position3D, CameraGlobals.RebirthFreecam.Position);
@@ -781,7 +792,7 @@ public class Shell : IAITankDanger {
         if (context != DestructionContext.WithHostileTank && context != DestructionContext.WithMine &&
             context != DestructionContext.WithExplosion) {
             if (playSound) {
-                var sfx = SoundPlayer.PlaySoundInstance("Assets/sounds/bullet_destroy.ogg", SoundContext.Effect, 0.5f);
+                var sfx = SoundPlayer.PlaySoundInstance("Assets/sounds/bullet_destroy.ogg", SoundContext.Effect, 0.5f, pitchOverride: SoundPlayer.NaturalPitchShift, position: Position3D);
                 sfx.Instance.Pitch = Client.ClientRandom.NextFloat(-0.1f, 0.1f);
 
                 if (CameraGlobals.IsUsingFirstPresonCamera)

@@ -48,7 +48,10 @@ public record Difficulties {
         // co-op helpers and extra challenge (added for phones)
         ["KidMode"] = false,
         ["GearsOfWar"] = false,
-        ["DoubleTanks"] = false
+        ["DoubleTanks"] = false,
+        // from 1.9: mirror every mission
+        ["FlipX"] = false,
+        ["FlipY"] = false
     };
     public static readonly Dictionary<int, int> VanillaToMasterModeConversions = new() {
         [TankID.Brown] = TankID.Bronze,

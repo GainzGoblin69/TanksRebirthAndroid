@@ -51,6 +51,13 @@ public sealed class Mine : IAITankDanger {
     static Texture2D? _envTexture;
 
     public int Id { get; private set; }
+    /// <summary>(1.9) The same number for this mine on every device in a multiplayer game.</summary>
+    public int NetId { get; set; }
+    public static Mine? FindByNetId(int id) {
+        foreach (var m in AllMines)
+            if (m is not null && m.NetId == id) return m;
+        return null;
+    }
     public int Team => Owner?.Team ?? TeamID.NoTeam;
 
     readonly ModelMesh? _mineMesh;
@@ -97,6 +104,7 @@ public sealed class Mine : IAITankDanger {
     /// <param name="radius">The radius of this <see cref="Mine"/>'s explosion.</param>
     public Mine(Tank? owner, Vector2 pos, float detonateTime, float radius = 1f) { // radius, old = 65
         Owner = owner;
+        NetId = Net.NetIds.NextMine(owner);
         ExplosionRadius = radius;
 
         AITank.Dangers.Add(this);
@@ -109,7 +117,7 @@ public sealed class Mine : IAITankDanger {
         Position = pos;
 
         if (owner != null) {
-            var placeSound = SoundPlayer.PlaySoundInstance("Assets/sounds/mine_place.ogg", SoundContext.Effect, 0.5f);
+            var placeSound = SoundPlayer.PlaySoundInstance("Assets/sounds/mine_place.ogg", SoundContext.Effect, 0.5f, pitchOverride: SoundPlayer.NaturalPitchShift, position: Position3D);
 
             //if (CameraGlobals.IsUsingFirstPresonCamera)
             //    SoundUtils.CreateSpatialSound(placeSound, Position3D, CameraGlobals.RebirthFreecam.Position);
@@ -176,12 +184,12 @@ public sealed class Mine : IAITankDanger {
                     _tickRed = !_tickRed;
                 }
                 if (_oldDetonateTime > TICKS_OF_FLASHING && Owner is not null && Owner is PlayerTank) {
-                    SoundPlayer.PlaySoundInstance("Assets/sounds/mine_trip.ogg", SoundContext.Effect, 1f);
+                    SoundPlayer.PlaySoundInstance("Assets/sounds/mine_trip.ogg", SoundContext.Effect, 1f, position: Position3D);
                 }
             }
             if (Owner is not null && Owner is PlayerTank) {
                 if (DetonateTime < TICKS_OF_FLASHING - 5 && _oldDetonateTime > TICKS_OF_FLASHING - 5) {
-                    TickingNoise = SoundPlayer.PlaySoundInstance("Assets/sounds/mine_tick.ogg", SoundContext.Effect, 0.7f);
+                    TickingNoise = SoundPlayer.PlaySoundInstance("Assets/sounds/mine_tick.ogg", SoundContext.Effect, 0.7f, position: Position3D);
                     TickingNoise.Instance.IsLooped = true;
                 }
             }

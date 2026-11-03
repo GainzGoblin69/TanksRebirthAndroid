@@ -781,7 +781,7 @@ public static class TroveItems {
                     tank.OwnedMineCount++;
                     AfterMine(tank, m);
                     if (Client.IsConnected())
-                        Client.SyncMinePlace(m.Position, m.DetonateTime, tank.WorldId);
+                        Client.SyncMinePlace(m.Position, m.DetonateTime, tank.WorldId, m.NetId);
                 }
                 break;
             case TroveItemId.Convert: {

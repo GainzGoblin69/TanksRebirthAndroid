@@ -227,14 +227,15 @@ public class Client {
         message.Put(shell.Velocity);
         message.Put(shell.RicochetsRemaining);
         message.Put(shell.Owner!.WorldId);
-        message.Put(shell.UID);
+        message.Put(shell.NetId);
 
         // ChatSystem.SendMessage($"Pos: {shell.Position} | Vel: {shell.Velocity}", Color.White);
 
         // FIXME: could probably use more syncing... who cares?
 
 
-        NetClient.Send(message, DeliveryMethod.Sequenced);
+        // (1.9) reliable: a lost fire message meant a shell that existed for the shooter but nobody else
+        NetClient.Send(message, DeliveryMethod.ReliableOrdered);
     }
     // maybe make contexts serializable?
     public static void SyncDamage(int hurtId, Color colorOverride) {
@@ -255,7 +256,7 @@ public class Client {
         NetDataWriter message = new();
         message.Put(PacketID.ShellDestroy);
         //sending the shell UID on the current client.
-        message.Put(shell.UID);
+        message.Put(shell.NetId);
         // send the index of the shell in the owner's OwnedShell array for destruction on other clients
         // message.Put(Array.IndexOf(shell.Owner.OwnedShells, shell));
         message.Put((byte)cxt);
@@ -269,11 +270,11 @@ public class Client {
         NetDataWriter message = new();
         message.Put(PacketID.MineDetonate);
 
-        message.Put(mine.Id);
+        message.Put(mine.NetId);
 
         NetClient.Send(message, DeliveryMethod.ReliableOrdered);
     }
-    public static void SyncMinePlace(Vector2 position, float detonateTime, int id) {
+    public static void SyncMinePlace(Vector2 position, float detonateTime, int id, int netId = -1) {
         if (MainMenuUI.IsActive || !IsConnected())
             return;
 
@@ -283,8 +284,9 @@ public class Client {
         message.Put(position);
         message.Put(detonateTime);
         message.Put(id);
+        message.Put(netId);
 
-        NetClient.Send(message, DeliveryMethod.Sequenced);
+        NetClient.Send(message, DeliveryMethod.ReliableOrdered);
     }
     public static void SendMessage(string text, Color color, string sender) {
         if (!IsConnected())

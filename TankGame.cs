@@ -377,6 +377,7 @@ public class TankGame : Game {
             SettingsHandler = new(Settings, Path.Combine(SaveDirectory, "settings.json"));
             Settings = SettingsHandler.Deserialize();
         }
+        GameContent.Systems.TankSystem.Tank.ShowTeamVisuals = Settings.TeamColours;
     }
     protected override void LoadContent() {
         ClientLog.Write("Preloading textures and sounds...", LogType.Info);
@@ -858,6 +859,8 @@ public class TankGame : Game {
 
         // draw black before intermission graphics because we don't want to reveal the mission as it's loading
         IntermissionSystem.DrawBlack(SpriteRenderer);
+
+        SceneManager.DrawResultsMessage(SpriteRenderer);
 
         SpriteRenderer.End();
 

@@ -126,6 +126,29 @@ public class Campaign
         return n;
     }
 
+    // ---- Mission Flip (from 1.9): mirror the whole mission left-right and/or up-down ----
+    static bool FlipX, FlipY;
+    static void RefreshFlip() {
+        bool on = !LevelEditorUI.IsActive && !UI.MainMenu.MainMenuUI.IsActive && !Troves.TroveRun.Active;
+        FlipX = on && Difficulties.Types["FlipX"];
+        FlipY = on && Difficulties.Types["FlipY"];
+    }
+    /// <summary>Mirrors a world position around the middle of the block grid.</summary>
+    public static Vector2 FlipPos(Vector2 p) {
+        if (!FlipX && !FlipY) return p;
+        Vector2 a = new BlockMapPosition(0, 0);
+        Vector2 b = new BlockMapPosition(BlockMapPosition.MAP_WIDTH_169 - 1, BlockMapPosition.MAP_HEIGHT - 1);
+        if (FlipX) p.X = a.X + b.X - p.X;
+        if (FlipY) p.Y = a.Y + b.Y - p.Y;
+        return p;
+    }
+    /// <summary>Mirrors a facing: left-right turns θ into -θ, up-down into π - θ.</summary>
+    public static float FlipRot(float r) {
+        if (FlipX) r = -r;
+        if (FlipY) r = MathHelper.Pi - r;
+        return r;
+    }
+
     private void SpawnDoubles(bool fresh) {
         var tanks = LoadedMission.Tanks;
         if (fresh || !ReferenceEquals(_doubleMission, tanks) || _doubleAlive.Length != tanks.Length) {
@@ -135,8 +158,8 @@ public class Campaign
             _doubleMission = tanks;
         }
         float S = Block.SIDE_LENGTH;
-        var taken = tanks.Select(t => t.Position).ToList();
-        var blocks = LoadedMission.Blocks.Select(b => b.Position).ToList();
+        var taken = tanks.Select(t => FlipPos(t.Position)).ToList();
+        var blocks = LoadedMission.Blocks.Select(b => FlipPos(b.Position)).ToList();
         Vector2[] offsets = [new(S, 0), new(-S, 0), new(0, S), new(0, -S), new(S, S), new(-S, S), new(S, -S), new(-S, -S),
             new(2 * S, 0), new(-2 * S, 0), new(0, 2 * S), new(0, -2 * S)];
 
@@ -144,6 +167,8 @@ public class Campaign
             var template = tanks[i];
             if (template.IsPlayer || !_doubleAlive[i])
                 continue;
+            template.Position = FlipPos(template.Position);
+            template.Rotation = FlipRot(template.Rotation);
             Vector2? spot = null;
             foreach (var off in offsets) {
                 var p = template.Position + off;
@@ -189,6 +214,7 @@ public class Campaign
         SceneManager.CleanupScene();
         const int roundingFactor = 5;
         int numPlayers = 0;
+        RefreshFlip();
         for (int i = 0; i < LoadedMission.Tanks.Length; i++) {
             var template = LoadedMission.Tanks[i];
 
@@ -196,6 +222,9 @@ public class Campaign
                 TrackedSpawnPoints[i].Position = LoadedMission.Tanks[i].Position;
                 TrackedSpawnPoints[i].Alive = true;
             }
+            var spawnKey = template.Position; // which spawn point this is (the unflipped spot)
+            template.Position = FlipPos(template.Position);
+            template.Rotation = FlipRot(template.Rotation);
 
             while (template.Rotation < 0) {
                 template.Rotation += MathHelper.Tau;
@@ -222,7 +251,7 @@ public class Campaign
                     tank.Team = template.Team;
                     if (CampaignGlobals.ShouldMissionsProgress) {
                         tank.OnDestroy += () => {
-                            TrackedSpawnPoints[Array.IndexOf(TrackedSpawnPoints, TrackedSpawnPoints.First(pos => pos.Position == template.Position))].Alive = false; // make sure the tank is not spawned again
+                            TrackedSpawnPoints[Array.IndexOf(TrackedSpawnPoints, TrackedSpawnPoints.First(pos => pos.Position == spawnKey))].Alive = false; // make sure the tank is not spawned again
                         };
                     }
                     var placement = PlacementSquare.GetFromClosest(tank.Position3D);
@@ -297,6 +326,7 @@ public class Campaign
 
         for (int b = 0; b < LoadedMission.Blocks.Length; b++) {
             var template = LoadedMission.Blocks[b];
+            template.Position = FlipPos(template.Position);
 
             OnPreLoadBlock?.Invoke(ref template);
 

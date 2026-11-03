@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using TanksRebirth.Internals.Common.GameUI;
 using TanksRebirth.Internals.Common.Utilities;
@@ -288,7 +288,8 @@ public static class GameUI
             GraphicsUI.PerPixelLightingButton,
             GraphicsUI.PerPixelLightingToggle,
             GraphicsUI.FullScreenButton,
-            GraphicsUI.ResolutionButton
+            GraphicsUI.ResolutionButton,
+            GraphicsUI.TeamColoursButton
         ];
         foreach (UIElement button in graphicsElements)
         {

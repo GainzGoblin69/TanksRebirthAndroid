@@ -539,18 +539,10 @@ public partial class AITank : Tank {
 
                     // TODO: uncomment code when disabling implementation is re-implemented.
 
-                    if (ShowTeamVisuals) {
-                        if (Team != TeamID.NoTeam) {
-                            var ex = new Color[1024];
-
-                            Array.Fill(ex, TeamID.TeamColors[Team]);
-
-                            effect.Texture?.SetData(0, new Rectangle(0, 0, 32, 9), ex, 0, 288);
-                            effect.Texture?.SetData(0, new Rectangle(0, 23, 32, 9), ex, 0, 288);
-                        }
-                    }
 
                     effect.SetDefaultGameLighting_IngameEntities(0.9f);
+
+                    ApplyTeamTint(effect, mesh, Team);
                     mesh.Draw();
                 }
             }

@@ -34,7 +34,7 @@ public static class NetExtensions {
             writer.Put(false);
             writer.Put(false);
 
-            writer.Put(s.Shell.Id);
+            writer.Put(s.Shell?.NetId ?? -1); // (1.9) the same shell on every device, so the right player gets the points
         }
         else if (cxt is TankHurtContextExplosion m) {
             writer.Put(false); 
@@ -77,10 +77,9 @@ public static class NetExtensions {
 
         if (wasShell) {
             // either reads the forced shell id or the organic shell id
-            int shellId = reader.GetInt();
-            // should report null instead of crashing
-            var shell = Shell.AllShells[shellId];
-            return new TankHurtContextShell(shell);
+            int shellNetId = reader.GetInt();
+            var shell = Shell.FindByNetId(shellNetId);
+            return new TankHurtContextShell(shell!);
         }
 
         if (wasMine) {

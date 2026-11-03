@@ -157,6 +157,8 @@ public class Particle
                     effect.View = System.SystemView;
                     effect.Projection = System.SystemProjection;
 
+                    // (1.9 fix) smoke clouds came out the wrong colour: make sure the texture is actually used
+                    effect.TextureEnabled = true;
                     effect.Texture = Texture;
 
                     effect.Alpha = Alpha;
