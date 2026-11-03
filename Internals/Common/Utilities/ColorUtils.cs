@@ -165,6 +165,24 @@ public static class ColorUtils
         return c;
     }
     public static float GetLuminosity(Color color) => Vector3.Dot(color.ToVector3(), new Vector3(0.299f, 0.587f, 0.114f));
+    /// <summary>
+    /// Loads a PNG and premultiplies its alpha on the CPU, without ever reading the texture back from the GPU.
+    /// Phones: <see cref="Texture2D.GetData{T}(T[])"/> goes through a framebuffer read on OpenGL ES, and some GPUs
+    /// hand back alpha as fully solid, which turned the board's soft edge shadows solid black.
+    /// </summary>
+    public static Texture2D LoadPremultiplied(GraphicsDevice device, System.IO.Stream stream) {
+        var img = StbImageSharp.ImageResult.FromStream(stream, StbImageSharp.ColorComponents.RedGreenBlueAlpha);
+        var data = img.Data;
+        var colors = new Color[img.Width * img.Height];
+        for (int i = 0; i < colors.Length; i++) {
+            int a = data[i * 4 + 3];
+            colors[i] = new Color((byte)(data[i * 4] * a / 255), (byte)(data[i * 4 + 1] * a / 255), (byte)(data[i * 4 + 2] * a / 255), (byte)a);
+        }
+        var tex = new Texture2D(device, img.Width, img.Height, false, SurfaceFormat.Color);
+        tex.SetData(colors);
+        return tex;
+    }
+
     public static void FromPremultiplied(ref Texture2D texture)
     {
         var buffer =  new Color[texture.Width * texture.Height];

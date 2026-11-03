@@ -99,6 +99,15 @@ public static class GameResources {
 
 
             // Bustin' all the bells out the box
+            if (premultiply && OperatingSystem.IsAndroid()) {
+                // phones: premultiply on the CPU (no reading back from the GPU)
+                Texture2D pm;
+                using (var fs = File.OpenRead(texturePath))
+                    pm = ColorUtils.LoadPremultiplied(TankGame.Instance.GraphicsDevice, fs);
+                pm.Name = name;
+                ResourceCache[name] = pm;
+                return (T)(object)pm;
+            }
             var texture = Texture2D.FromFile(TankGame.Instance.GraphicsDevice, texturePath);
             texture.Name = name;
 

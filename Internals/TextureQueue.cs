@@ -49,6 +49,15 @@ public class TextureQueue {
 
         _taskList.Remove(entry.LoadTask!);
 
+        if (entry.PreloadSettings.Premultiply && OperatingSystem.IsAndroid()) {
+            // phones: premultiply on the CPU (no reading back from the GPU)
+            entry.ContentBuffer!.Position = 0;
+            entry.Texture = ColorUtils.LoadPremultiplied(TankGame.Instance.GraphicsDevice, entry.ContentBuffer);
+            entry.ContentBuffer.Dispose();
+            entry.IsLoadedInGraphicsDevice = true;
+            return entry.Texture;
+        }
+
         entry.Texture = Texture2D.FromStream(TankGame.Instance.GraphicsDevice, entry.ContentBuffer);
 
         entry.ContentBuffer?.Dispose();
