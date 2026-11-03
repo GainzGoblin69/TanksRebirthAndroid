@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework.Input;
+﻿using Microsoft.Xna.Framework.Input;
 using TanksRebirth.GameContent;
 using TanksRebirth.Graphics;
 using TanksRebirth.Localization;
@@ -25,6 +25,8 @@ public class GameConfig
     /// <summary>Tank color picked on this device for player 1 / player 2 (index into PlayerColors.Palette; -1 = that player's standard color).</summary>
     /// <summary>Phones: show the yellow startup/debug readout (frames, log tail) over the game.</summary>
     public bool ShowStartupInfo { get; set; } = false;
+    /// <summary>Spread the enemy AI's thinking across CPU cores (from 1.9). Turn off if a device misbehaves.</summary>
+    public bool MultiCoreAI { get; set; } = true;
     public int TankColorP1 { get; set; } = -1;
     public int TankColorP2 { get; set; } = -1;
     /// <summary>Name shown to others in Wi-Fi games.</summary>

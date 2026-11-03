@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -7,6 +7,8 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using TanksRebirth.Internals;
+using System.Threading.Tasks;
 using TanksRebirth.GameContent.ID;
 using TanksRebirth.GameContent.ModSupport;
 using TanksRebirth.GameContent.Systems;
@@ -939,6 +941,17 @@ public static class AIManager {
 
     //static Stopwatch s = new();
     //static List<double> msList = [];
+    /// <summary>Multi-core AI (from 1.9): the read-only "thinking" (target picking, danger scanning, shot-path tracing)
+    /// is spread over the phone's CPU cores. Movement, shooting and mine laying stay on the main thread in the same
+    /// order as before, so gameplay and online sync behave the same.</summary>
+    public static bool MultiCoreEnabled => TankGame.Settings.MultiCoreAI && Environment.ProcessorCount > 1;
+    static readonly ParallelOptions _parallel = new() { MaxDegreeOfParallelism = Math.Max(1, Math.Min(Environment.ProcessorCount - 1, 4)) };
+    static AITank[] _work = new AITank[16];
+    static bool[] _think = new bool[16];
+    /// <summary>Milliseconds the AI took last frame (for the debug readout).</summary>
+    public static double LastAIMs;
+    static readonly Stopwatch _sw = new();
+
     internal static void ProcessAITanks() {
         if (ModLoader.Status != LoadStatus.Complete)
             return;
@@ -946,40 +959,77 @@ public static class AIManager {
         if (!GameScene.ShouldRenderAll)
             return;
 
-        //if (InputUtils.KeyJustPressed(Microsoft.Xna.Framework.Input.Keys.H)) {
-        //    msList = [];
-        //    msList.Clear();
-        //}
+        _sw.Restart();
 
+        // 1. movement/physics: main thread, every tank
+        int n = 0;
         Span<AITank> aiTanks = GameHandler.AllAITanks;
-        ref var tanksSearchSpace = ref MemoryMarshal.GetReference(aiTanks);
         for (var i = 0; i < aiTanks.Length; i++) {
-            var tank = Unsafe.Add(ref tanksSearchSpace, i);
+            var tank = aiTanks[i];
             if (tank is null || tank.IsDestroyed) continue;
-
             tank.Update();
-            tank.HandleTankMetaData();
+            if (tank.IsDestroyed) continue;
+            if (n == _work.Length) { Array.Resize(ref _work, n * 2); Array.Resize(ref _think, n * 2); }
+            _work[n++] = tank;
         }
 
-        // if you're not connected to a server or you aren't *the* server
-        if (!Client.IsHost() && Client.IsConnected()) return;
+        // if you're not connected to a server or you aren't *the* server, the AI decisions come from the host
+        bool decide = !(!Client.IsHost() && Client.IsConnected());
+        for (int i = 0; i < n; i++)
+            _think[i] = decide && AITank.IsFrozen?.Invoke(_work[i]) != true; // Tank Troves Stopwatch
 
-        //s.Restart();
-
-        for (var i = 0; i < aiTanks.Length; i++) {
-            var tank = Unsafe.Add(ref tanksSearchSpace, i);
-            if (tank is null || tank.IsDestroyed) continue;
-            if (AITank.IsFrozen?.Invoke(tank) == true) continue; // Tank Troves Stopwatch
-
-            tank.DoAI();
-
-            // only does anything if you're in a multiplayer context.
-            Client.SyncAITank(tank);
+        // 2. perception: read-only, spread across cores
+        if (MultiCoreEnabled && n >= 2) {
+            try {
+                Parallel.For(0, n, _parallel, i => {
+                    var t = _work[i];
+                    t.GatherMetaData();
+                    if (_think[i]) t.PrepareAI();
+                });
+            }
+            catch (Exception e) {
+                // never let a threading hiccup cost a run: redo this frame's thinking on the main thread
+                TankGame.ClientLog.Write($"[AI] multi-core pass failed, redoing on main thread: {e.InnerException?.Message ?? e.Message}", LogType.Warn);
+                for (int i = 0; i < n; i++) { _work[i].ClearAimCache(); _work[i].GatherMetaData(); }
+            }
         }
-        //s.Stop();
-        //double ms = (s.ElapsedTicks * 1_000_000.0) / Stopwatch.Frequency / 1000;
-        //Console.WriteLine($"AI time this frame: {ms:0.000}ms | Average: {(msList.Sum() / msList.Count):0.000}");
+        else {
+            for (int i = 0; i < n; i++) _work[i].GatherMetaData();
+        }
+        for (int i = 0; i < n; i++)
+            _work[i].RaiseDangerEvents();
 
-        //msList?.Add(ms);
+        // 3. decisions (turning, shooting, mines): main thread, same order as always
+        if (decide) {
+            for (int i = 0; i < n; i++) {
+                var tank = _work[i];
+                if (tank.IsDestroyed || !_think[i]) continue;
+
+                tank.DoAI();
+
+                // only does anything if you're in a multiplayer context.
+                Client.SyncAITank(tank);
+            }
+        }
+        for (int i = 0; i < n; i++) { _work[i].ClearAimCache(); _work[i] = null!; }
+
+        _sw.Stop();
+        LastAIMs = _sw.Elapsed.TotalMilliseconds;
+
+        // a short report every ~10 s of play with enemies about (shows up in the game log and logcat)
+        if (n > 0) {
+            _statFrames++; _statMs += LastAIMs; _statMax = Math.Max(_statMax, LastAIMs); _statTanks += n;
+            if (_statFrames >= 600) {
+                var msg = $"[AI-MC] {(MultiCoreEnabled ? $"multi-core x{_parallel.MaxDegreeOfParallelism}" : "single")} cores={Environment.ProcessorCount} "
+                    + $"avg={_statMs / _statFrames:0.000}ms max={_statMax:0.000}ms tanks={_statTanks / (float)_statFrames:0.0} "
+                    + $"paths reused={AITank.AimCacheHits} traced={AITank.AimCacheMisses}";
+                TankGame.ClientLog.Write(msg, LogType.Info);
+                Console.WriteLine(msg);
+                _statFrames = 0; _statMs = 0; _statMax = 0; _statTanks = 0;
+                AITank.AimCacheHits = AITank.AimCacheMisses = 0;
+            }
+        }
     }
+    static int _statFrames, _statTanks;
+    static double _statMs, _statMax;
 }

@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
@@ -380,6 +380,12 @@ public partial class AITank : Tank {
     /// <summary>Sets various meta-data things about this <see cref="AITank"/>.
     /// <br></br>Sets <see cref="TargetTank"/>, <see cref="NearbyDangers"/>, and <see cref="ClosestDanger"/>.</summary>
     public void HandleTankMetaData() {
+        GatherMetaData();
+        RaiseDangerEvents();
+    }
+    /// <summary>The read-only half of <see cref="HandleTankMetaData"/>: finds the target and nearby dangers.
+    /// Only reads the world and writes this tank's own fields, so it can run on a worker thread.</summary>
+    internal void GatherMetaData() {
         TanksNearMineAwareness.Clear();
         BlocksNear.Clear();
 
@@ -394,11 +400,27 @@ public partial class AITank : Tank {
 
         NearbyDangers = GetEvasionData();
         ClosestDanger = NearbyDangers.Closest(Position);
-
+    }
+    /// <summary>The half of <see cref="HandleTankMetaData"/> that calls out to other code (events, mods): main thread only.</summary>
+    internal void RaiseDangerEvents() {
         if (NearbyDangers.Count > 0) {
             WhileDangerDetected?.Invoke(this, ClosestDanger!);
             ModdedData?.DangerDetected();
         }
+    }
+    bool _nearPrecomputed;
+    void FindNearbyTanks() {
+        TanksNearMineAwareness = [.. GameHandler.AllTanks.Where(x => x is not null && x != this && !x.IsDestroyed && GameUtils.Distance_WiiTanksUnits(Position, x.Position) <= Parameters.TankAwarenessMine)];
+        TanksNearShootAwareness = [.. GameHandler.AllTanks.Where(x => x is not null && x != this && !x.IsDestroyed && GameUtils.Distance_WiiTanksUnits(TurretPosition, x.Position) <= Parameters.TankAwarenessShoot)];
+    }
+    /// <summary>Multi-core: the expensive, read-only part of <see cref="DoAI"/> (nearby tanks, shot-path tracing),
+    /// done ahead of time on a worker thread. <see cref="DoAI"/> then uses the results on the main thread.</summary>
+    internal void PrepareAI() {
+        if (!MainMenuUI.IsActive && !CampaignGlobals.InMission) return;
+        FindNearbyTanks();
+        _nearPrecomputed = true;
+        if (ModdedData is null) // a mod's own AI may change what gets aimed at, so leave those to the main thread
+            PrecomputeAim();
     }
     /// <summary>The main AI loop of this <see cref="AITank"/>.</summary>
     public void DoAI() {
@@ -411,8 +433,9 @@ public partial class AITank : Tank {
 
         Array.ForEach(Behaviors, x => x.Value += RuntimeData.DeltaTime);
 
-        TanksNearMineAwareness = [.. GameHandler.AllTanks.Where(x => x is not null && x != this && !x.IsDestroyed && GameUtils.Distance_WiiTanksUnits(Position, x.Position) <= Parameters.TankAwarenessMine)];
-        TanksNearShootAwareness = [.. GameHandler.AllTanks.Where(x => x is not null && x != this && !x.IsDestroyed && GameUtils.Distance_WiiTanksUnits(TurretPosition, x.Position) <= Parameters.TankAwarenessShoot)];
+        if (!_nearPrecomputed)
+            FindNearbyTanks();
+        _nearPrecomputed = false;
         
         if (ModdedData is not null) {
             if (!ModdedData.CustomAI())

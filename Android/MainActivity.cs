@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -368,7 +368,13 @@ public class MainActivity : AndroidGameActivity {
         }
         catch { }
 
-        _overlay.Text = $"frames drawn: {_frames}\n" + Tail(StartupPath, 3) + "\n" + newestLog
+        string ai = "";
+        try {
+            ai = $"AI: {TanksRebirth.GameContent.Systems.AI.AIManager.LastAIMs:0.00} ms/frame, "
+                + (TanksRebirth.GameContent.Systems.AI.AIManager.MultiCoreEnabled ? $"multi-core ({System.Environment.ProcessorCount} cores)" : "single core") + "\n";
+        }
+        catch { }
+        _overlay.Text = $"frames drawn: {_frames}\n" + ai + Tail(StartupPath, 3) + "\n" + newestLog
             + (crashed ? "\n--- ERROR ---\n" + Tail(CrashPath, 15) : "");
         _handler?.PostDelayed(UpdateOverlay, 500);
     }

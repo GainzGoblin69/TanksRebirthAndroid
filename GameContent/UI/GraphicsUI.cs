@@ -1,4 +1,4 @@
-using TanksRebirth.GameContent.Systems;
+﻿using TanksRebirth.GameContent.Systems;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
@@ -181,6 +181,23 @@ public static class GraphicsUI {
 
             ResolutionButton.Text = $"{TankGame.GameLanguage.Resolution}: {CurrentRes.Key}x{CurrentRes.Value}";
         };
+        if (Internals.Common.Framework.Input.TouchControls.Enabled) {
+            // phones run at native resolution, so this slot becomes the multi-core AI setting
+            ResolutionButton.Text = "Multi-Core AI";
+            ResolutionButton.Tooltip = "Spread enemy thinking across your phone's CPU cores for smoother big fights.";
+            ResolutionButton.HoverColor = Color.White;
+            ResolutionButton.Color = Color.WhiteSmoke;
+            ResolutionButton.OnRightClick = null;
+            ResolutionButton.OnLeftClick = (_) => {
+                TankGame.Settings.MultiCoreAI = !TankGame.Settings.MultiCoreAI;
+                PlayerColors.SaveSettings();
+            };
+            ResolutionButton.UniqueDraw = (elem, sb) => {
+                var sw = ToggleSwitch.RightOf(elem.Hitbox, 0.45f);
+                ((UITextButton)elem).TextOffset = new Vector2(-(sw.Width + elem.Hitbox.Right - sw.Right) / 2f, 0);
+                ToggleSwitch.Draw(sb, sw, TankGame.Settings.MultiCoreAI);
+            };
+        }
     }
 
     public static void HideAll() {
@@ -201,7 +218,7 @@ public static class GraphicsUI {
         PerPixelLightingButton.IsVisible = true;
         VsyncButton.IsVisible = true; // phones: the debug readout switch
         FullScreenButton.IsVisible = true;
-        ResolutionButton.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled;
+        ResolutionButton.IsVisible = true; // phones: the multi-core AI switch
         PerPixelLightingToggle.IsVisible = true;
         VsyncToggle.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled;
         FullScreenButton.IsVisible = true;

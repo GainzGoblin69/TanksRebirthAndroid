@@ -179,7 +179,7 @@ public partial class AITank {
         List<Tank> tanksDef;
 
         if (Properties.ShellType == ShellID.Explosive) {
-            tanksDef = GetTanksInPath(Vector2.UnitY.Rotate(TurretRotation - MathHelper.Pi), out var ricP, out var tnkCol, offset: Vector2.UnitY * 20, pattern: x => !x.Properties.IsDestructible && x.Properties.IsSolid || x.Type == BlockID.Teleporter, missDist: Parameters.DetectionForgivenessHostile, doBounceReset: Parameters.BounceReset);
+            tanksDef = GetTanksInPath(Vector2.UnitY.Rotate(TurretRotation - MathHelper.Pi), out var ricP, out var tnkCol, offset: Vector2.UnitY * 20, pattern: ExplosivePathPattern, missDist: Parameters.DetectionForgivenessHostile, doBounceReset: Parameters.BounceReset);
             if (GameUtils.Distance_WiiTanksUnits(ricP[^1], Position) < 150f) // TODO: change from hardcode to normalcode :YES:
                 tooCloseToExplosiveShell = true;
         }
@@ -331,6 +331,83 @@ public partial class AITank {
     // TODO: literally fix everything about these turret rotation values.
     private List<Tank> GetTanksInPath(Vector2 pathDir, out Vector2[] ricochetPoints, out Vector2[] tankCollPoints,
         bool draw = false, Vector2 offset = default, float missDist = 0f, Func<Block, bool>? pattern = null, bool doBounceReset = true) {
+        // multi-core: the shot path may already have been traced on a worker thread this frame
+        if (!draw) {
+            for (int c = 0; c < _aimCacheCount; c++) {
+                ref var e = ref _aimCache[c];
+                if (e.Dir == pathDir && e.Offset == offset && e.TurretRot == TurretRotation && e.Pos == Position
+                    && e.Miss == missDist && ReferenceEquals(e.Pattern, pattern) && e.Bounce == doBounceReset) {
+                    ricochetPoints = e.Ric;
+                    tankCollPoints = e.Col;
+                    AimCacheHits++;
+                    return e.Tanks;
+                }
+            }
+            AimCacheMisses++;
+        }
+        return TracePath(pathDir, out ricochetPoints, out tankCollPoints, TurretRotation, draw, offset, missDist, pattern, doBounceReset);
+    }
+
+    struct AimCacheEntry {
+        public Vector2 Dir, Offset, Pos;
+        public float TurretRot, Miss;
+        public Func<Block, bool>? Pattern;
+        public bool Bounce;
+        public List<Tank> Tanks;
+        public Vector2[] Ric, Col;
+    }
+    readonly AimCacheEntry[] _aimCache = new AimCacheEntry[4];
+    /// <summary>Shot paths reused from the worker threads vs. traced on the main thread (main thread only).</summary>
+    internal static long AimCacheHits, AimCacheMisses;
+    int _aimCacheCount;
+    /// <summary>Block filter used for explosive-shell shot paths (one shared instance, so cached paths can be matched).</summary>
+    static readonly Func<Block, bool> ExplosivePathPattern = x => !x.Properties.IsDestructible && x.Properties.IsSolid || x.Type == BlockID.Teleporter;
+
+    void CacheAim(Vector2 dir, Vector2 offset, float turretRot, float miss, Func<Block, bool>? pattern, bool bounce) {
+        if (_aimCacheCount >= _aimCache.Length) return;
+        var tanks = TracePath(dir, out var ric, out var col, turretRot, false, offset, miss, pattern, bounce);
+        _aimCache[_aimCacheCount++] = new AimCacheEntry {
+            Dir = dir, Offset = offset, Pos = Position, TurretRot = turretRot, Miss = miss,
+            Pattern = pattern, Bounce = bounce, Tanks = tanks, Ric = ric, Col = col
+        };
+    }
+    internal void ClearAimCache() => _aimCacheCount = 0;
+
+    /// <summary>Multi-core: traces the shot paths <see cref="UpdateAim"/> is about to ask for, using exactly the same inputs.
+    /// Safe on a worker thread: it only reads the world and writes this tank's own cache. If anything differs by the
+    /// time the main thread aims (a deflection turned the turret, say), the lookup misses and the path is traced there as before.</summary>
+    internal void PrecomputeAim() {
+        _aimCacheCount = 0;
+        if (TargetTank is null) return;
+        if (TanksNearShootAwareness.Any(x => IsOnSameTeamAs(x.Team))) return; // UpdateAim bails out before tracing
+
+        // the turret step HandleTurret takes (DoAI resets the multiplier to 1 first)
+        var tgt = TargetTurretRotation % MathHelper.TwoPi;
+        var cur = TurretRotation % MathHelper.TwoPi;
+        var diff = tgt - cur;
+        if (diff > MathHelper.Pi) tgt -= MathHelper.TwoPi;
+        else if (diff < -MathHelper.Pi) tgt += MathHelper.TwoPi;
+        var tr = MathUtils.RoughStep(cur, tgt, Parameters.TurretSpeed * 1f * RuntimeData.DeltaTime);
+
+        var miss = Parameters.DetectionForgivenessHostile;
+        var bounce = Parameters.BounceReset;
+        CacheAim(Vector2.UnitY.Rotate(tr - MathHelper.Pi), Vector2.UnitY * 20, tr, miss,
+            Properties.ShellType == ShellID.Explosive ? ExplosivePathPattern : null, bounce);
+
+        if (Parameters.PredictsPositions) {
+            var calculation = Position.Distance(TargetTank.Position) / (float)(Properties.ShellSpeed * 1.2f);
+            float rot = -Position.DirectionTo(GeometryUtils.PredictFuturePosition(TargetTank.Position, TargetTank.Velocity, calculation))
+                .ToRotation() - MathHelper.PiOver2;
+            CacheAim(Vector2.UnitY.Rotate(-Position.DirectionTo(TargetTank.Position).ToRotation() - MathHelper.PiOver2),
+                Vector2.Zero, tr, miss, null, bounce);
+            CacheAim(Vector2.UnitY.Rotate(rot), Vector2.UnitY * 20, tr, miss, null, bounce);
+        }
+        if (Parameters.SmartRicochets && !(CurShootCooldown > 0 || OwnedShellCount >= Properties.ShellLimit))
+            CacheAim(Vector2.UnitY.Rotate(_seekRotation + Parameters.TurretSpeed * 0.25f), default, tr, miss, null, bounce);
+    }
+
+    private List<Tank> TracePath(Vector2 pathDir, out Vector2[] ricochetPoints, out Vector2[] tankCollPoints, float turretRot,
+        bool draw = false, Vector2 offset = default, float missDist = 0f, Func<Block, bool>? pattern = null, bool doBounceReset = true) {
         const int MAX_PATH_UNITS = 1000;
         const int PATH_UNIT_LENGTH = 8;
 
@@ -340,8 +417,8 @@ public partial class AITank {
 
         pattern ??= c => c.Properties.IsSolid || c.Type == BlockID.Teleporter;
 
-        var whitePixel = TextureGlobals.Pixels[Color.White];
-        Vector2 pathPos = Position + offset.Rotate(-TurretRotation);
+        var whitePixel = draw ? TextureGlobals.Pixels[Color.White] : null!; // debug drawing only (keeps worker threads off shared lookups)
+        Vector2 pathPos = Position + offset.Rotate(-turretRot);
         pathDir.Y *= -1;
         pathDir *= PATH_UNIT_LENGTH;
 
