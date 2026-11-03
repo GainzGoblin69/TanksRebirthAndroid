@@ -12,7 +12,9 @@ using TanksRebirth.Net;
 namespace TanksRebirth.Internals.Common.Utilities;
 
 public static class WebUtils {
-    private static HttpClient _client = new(new HttpClientHandler { SslProtocols = SslProtocols.Tls12 });
+    // a short timeout: on a network with no internet (Wi-Fi up, internet down) requests hang instead of failing,
+    // and the default (100 s) froze the game at startup
+    private static HttpClient _client = new(new HttpClientHandler { SslProtocols = SslProtocols.Tls12 }) { Timeout = TimeSpan.FromSeconds(8) };
 
     public static bool CheckInternetConnection(int timeout, string url) {
         try {
@@ -35,7 +37,14 @@ public static class WebUtils {
     public static byte[] DownloadWebFile(string url, out string fileName, out HttpStatusCode status) {
         // Run on the thread pool: blocking on async code from a thread with a SynchronizationContext (Android's UI
         // thread, where the game loop runs) deadlocks, because the awaits try to resume on the blocked thread.
-        var data = Task.Run(() => Inner_DownloadWebFile(url)).GetAwaiter().GetResult();
+        (byte[] Data, string Name, HttpStatusCode Status) data;
+        try {
+            data = Task.Run(() => Inner_DownloadWebFile(url)).GetAwaiter().GetResult();
+        }
+        catch {
+            // no internet, timed out, etc: report it as a failed status instead of throwing
+            data = (null!, null!, HttpStatusCode.ServiceUnavailable);
+        }
 
         fileName = data.Name;
         status = data.Status;

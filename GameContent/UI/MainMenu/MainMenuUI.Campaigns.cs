@@ -204,6 +204,8 @@ public static partial class MainMenuUI {
         }
         campaignExists = true;
         dlBytes = WebUtils.DownloadWebFile("https://github.com/RighteousRyan1/tanks_rebirth_motds/blob/master/Vanilla.campaign?raw=true", out dlName, out var status);
+        if (dlBytes is null || status != System.Net.HttpStatusCode.OK)
+            return true; // offline: keep the copy we have
         var fileBytes = File.ReadAllBytes(checkPath);
 
 
@@ -211,6 +213,8 @@ public static partial class MainMenuUI {
     }
     public static void DownloadVanillaCampaign(bool inCampaignsMenu) {
         var bytes = WebUtils.DownloadWebFile("https://github.com/RighteousRyan1/tanks_rebirth_motds/blob/master/Vanilla.campaign?raw=true", out var filename, out var status);
+        if (bytes is null || status != System.Net.HttpStatusCode.OK)
+            return; // offline
         var path = Path.Combine(TankGame.SaveDirectory, "Campaigns", filename);
         File.WriteAllBytes(path, bytes);
 

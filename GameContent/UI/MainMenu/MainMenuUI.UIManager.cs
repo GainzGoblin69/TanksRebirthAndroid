@@ -283,7 +283,11 @@ public static partial class MainMenuUI
     public static void OpenUI() {
         if (!Speedrun.AreSpeedrunsFetched) {
             Speedrun.AreSpeedrunsFetched = true;
-            Speedrun.GetSpeedruns();
+            // in the background: the main menu never waits on the internet
+            System.Threading.Tasks.Task.Run(() => {
+                try { Speedrun.GetSpeedruns(); }
+                catch (System.Exception e) { TankGame.ClientLog.Write($"Couldn't fetch speedruns: {e.Message}", TanksRebirth.Internals.LogType.Warn); }
+            });
         }
 
         plrsConfirmed = 0;
