@@ -491,9 +491,23 @@ public static class LightingSystem {
         // swap after registering so sharing between meshes is preserved exactly
         foreach (var mesh in model.Meshes) {
             foreach (var part in mesh.MeshParts) {
-                if (part.Effect is not null && clones.TryGetValue(part.Effect, out var capture))
+                if (part.Effect is not null && clones.TryGetValue(part.Effect, out var capture)) {
+                    _originalEffects[part] = part.Effect;
                     part.Effect = capture;
+                }
             }
+        }
+    }
+
+    static readonly Dictionary<ModelMeshPart, Effect> _originalEffects = [];
+
+    /// <summary>Puts every model's original effects back, exactly as before lighting was loaded (lighting switched off).</summary>
+    public static void UninstrumentAll() {
+        lock (_instrumented) {
+            foreach (var (part, original) in _originalEffects)
+                part.Effect = original;
+            _originalEffects.Clear();
+            _instrumented.Clear();
         }
     }
 
@@ -637,7 +651,8 @@ public static class LightingSystem {
     }
 
     static bool HasTransparentTexels(Texture2D texture) {
-        if (texture.Format != SurfaceFormat.Color)
+        // phones: reading a texture back from the GPU isn't reliable on OpenGL ES, so cutouts are treated as solid
+        if (texture.Format != SurfaceFormat.Color || OperatingSystem.IsAndroid())
             return false;
 
         var cutoff = (int)(TextureAlphaCutoff * 255f);

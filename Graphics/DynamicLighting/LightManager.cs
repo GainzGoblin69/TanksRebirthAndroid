@@ -112,6 +112,18 @@ public static class LightManager {
             Initialize(TankGame.Instance.GraphicsDevice);
         if (!_initialized)
             return;
+        if (on && !InstrumentNewModels) {
+            // back on after being switched off: models join in again
+            foreach (var m in GameResources.CachedModels())
+                LightingSystem.Instrument(m);
+            LightingSystem.Instrument(RoomScene.RoomSkyboxScene);
+            InstrumentNewModels = true;
+        }
+        if (!on) {
+            // off means off: every model draws with its original effects again, exactly as without lighting
+            InstrumentNewModels = false;
+            LightingSystem.UninstrumentAll();
+        }
         var cur = DynLightSettings.Current;
         cur.Enabled = on;
         cur.SetQualityLevel(QualityFromSettings);
