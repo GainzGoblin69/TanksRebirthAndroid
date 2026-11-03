@@ -651,8 +651,12 @@ public static class LightingSystem {
     }
 
     static bool HasTransparentTexels(Texture2D texture) {
-        // phones: reading a texture back from the GPU isn't reliable on OpenGL ES, so cutouts are treated as solid
-        if (texture.Format != SurfaceFormat.Color || OperatingSystem.IsAndroid())
+        // phones: reading a texture back from the GPU isn't reliable on OpenGL ES, so every texture is treated as
+        // possibly see-through: the shader then checks each texel's alpha itself. (Treating them as solid made the
+        // board's see-through edge shadows block the light: the table under them went black.)
+        if (OperatingSystem.IsAndroid())
+            return true;
+        if (texture.Format != SurfaceFormat.Color)
             return false;
 
         var cutoff = (int)(TextureAlphaCutoff * 255f);
