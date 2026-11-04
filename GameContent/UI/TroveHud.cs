@@ -118,7 +118,7 @@ public static class TroveHud {
                 break;
             }
             case FloorTheme.Swamp:
-                sb.Draw(_vignette, new Rectangle(0, 0, W, H), new Color(40, 70, 30) * 0.5f);
+                sb.Draw(_vignette, new Rectangle(0, 0, W, H), new Color(40, 70, 30) * 0.35f);
                 break;
             case FloorTheme.Factory: {
                 // red alert: the edges of the screen pulse red

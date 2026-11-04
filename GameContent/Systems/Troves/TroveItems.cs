@@ -525,7 +525,7 @@ public static class TroveItems {
             : TroveBosses.Twin is { } tw ? [bt, tw] : [bt];
         Graphics.DynamicLighting.LightManager.ExtraLights = TroveThemes.AddLights;
         Graphics.DynamicLighting.LightManager.SceneDarkness = () => !TroveRun.Active || !CampaignGlobals.InMission ? 0f : TroveThemes.Current switch {
-            FloorTheme.Haunted => 0.65f, FloorTheme.Crystal => 0.75f, FloorTheme.Factory => 0.5f, FloorTheme.Swamp => 0.3f, FloorTheme.Volcano => 0.35f, _ => 0f,
+            FloorTheme.Haunted => 0.35f, FloorTheme.Crystal => 0.4f, FloorTheme.Factory => 0.3f, FloorTheme.Swamp => 0.12f, FloorTheme.Volcano => 0.15f, _ => 0f,
         };
         AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady || IcedUntil.TryGetValue(t, out var iu) && Now < iu;
         // Smoke Bomb: enemies can't see you

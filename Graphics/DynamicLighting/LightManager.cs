@@ -309,15 +309,15 @@ public static class LightManager {
     static void FilterLook(ref LightingPresets.TimeOfDay time) {
         if (_dark > 0f) {
             // a darker room for moody floors; the tanks' headlights come on
-            float keep = 1f - _dark * 0.75f;
+            float keep = 1f - _dark * 0.6f;
             time.Ambient *= keep;
             time.Background *= keep;
             time.SunIntensity *= 1f - _dark;
             time.ShaftDensity *= 1f - _dark;
-            time.Sky = Color.Lerp(time.Sky, new Color(20, 22, 40), _dark * 0.7f);
-            time.Ground = Color.Lerp(time.Ground, new Color(10, 10, 16), _dark * 0.7f);
+            time.Sky = Color.Lerp(time.Sky, new Color(20, 22, 40), _dark * 0.5f);
+            time.Ground = Color.Lerp(time.Ground, new Color(10, 10, 16), _dark * 0.5f);
             time.TableLamp *= keep; time.DeskLamp *= keep; time.ClockLight *= keep; time.FloorLamp *= keep;
-            if (_dark > 0.3f) {
+            if (_dark > 0.25f) {
                 time.Headlights = 1f;
                 time.DynamicBrightness = MathF.Max(time.DynamicBrightness, 1.2f);
             }
