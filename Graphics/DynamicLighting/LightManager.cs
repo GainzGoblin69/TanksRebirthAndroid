@@ -110,19 +110,31 @@ public static class LightManager {
 
     /// <summary>
     /// Phones: how much of the scene around the board gets lighting (Options > Graphics > "Lit:"), least risky first.
-    /// 0 = only the play area (known good), 1 = + the room and table, 2 = + the board's wooden border,
-    /// 3 = + sun through the windows (the room shadow map, reused between frames). PCs always get everything.
+    /// 0 = only the play area (known good), 1 = + the room and table, 2 = + sun through the windows (the room
+    /// shadow map), 3 = + the board's wooden border (its see-through shadow overlays and its unplaced outer pieces
+    /// stay out of lighting on phones). PCs always get everything.
     /// </summary>
     public static int Surroundings => PhoneGpu ? Math.Clamp(TankGame.Settings?.LitSurroundings ?? 0, 0, 3) : 3;
-    public static bool AllowRoomCascade => Surroundings >= 3;
+    public static bool AllowRoomCascade => Surroundings >= 2;
 
     static void UpdateExcludedModels() {
         LightingSystem.NeverInstrument.Clear();
         if (Surroundings < 1 && RoomScene.RoomSkyboxScene is { } room)
             LightingSystem.NeverInstrument.Add(room);
-        if (Surroundings < 2)
-            foreach (var m in new[] { GameScene.BoundsRenderer.BoundaryModel, TanksRebirth.GameContent.Globals.Assets.ModelGlobals.GameBoundary.Asset })
+        var borders = new[] { GameScene.BoundsRenderer.BoundaryModel, TanksRebirth.GameContent.Globals.Assets.ModelGlobals.GameBoundary.Asset };
+        if (Surroundings < 3)
+            foreach (var m in borders)
                 if (m is not null) LightingSystem.NeverInstrument.Add(m);
+        // phones: the border's see-through shadow overlays (the soft dark edges laid on the table) and its outer pieces
+        // (drawn without being placed) stay out of lighting; the solid wood frame is lit. ("+ Border" went black with them.)
+        foreach (var m in borders) {
+            if (m is null) continue;
+            foreach (var mesh in m.Meshes) {
+                bool overlay = mesh.Name is "polygon2" or "polygon5" or "polygon7" or "polygon15" or "polygon20" or "polygon21"
+                    || mesh.Name.Contains("outer", StringComparison.OrdinalIgnoreCase);
+                if (PhoneGpu && overlay) LightingSystem.SetMeshLighting(mesh, new MeshLighting { Ignore = true });
+            }
+        }
     }
 
     /// <summary>Applies a new "Lit:" level right away: models are put back to their own effects and handed to lighting again.</summary>

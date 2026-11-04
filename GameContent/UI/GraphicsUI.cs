@@ -247,7 +247,7 @@ public static class GraphicsUI {
         // phones: how much around the board gets lighting, least risky first (each step adds to the last)
         LitSurroundingsButton = new("Lit: Play Area", FontGlobals.RebirthFont, Color.WhiteSmoke) {
             IsVisible = false,
-            Tooltip = "How much around the board gets dynamic lighting: the play area, + the room, + the board's border, + sun through the windows.",
+            Tooltip = "How much around the board gets dynamic lighting: the play area, + the room, + sun through the windows, + the board's border.",
             HoverColor = Color.White,
         };
         LitSurroundingsButton.SetDimensions(() => new Vector2(1240, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
@@ -258,7 +258,7 @@ public static class GraphicsUI {
             PlayerColors.SaveSettings();
         };
         LitSurroundingsButton.UniqueDraw = (elem, sb) => {
-            ((UITextButton)elem).Text = "Lit: " + (TankGame.Settings.LitSurroundings switch { 0 => "Play Area", 1 => "+ Room", 2 => "+ Border", _ => "+ Window Sun" });
+            ((UITextButton)elem).Text = "Lit: " + (TankGame.Settings.LitSurroundings switch { 0 => "Play Area", 1 => "+ Room", 2 => "+ Window Sun", _ => "+ Border" });
             ((UITextButton)elem).Color = TankGame.Settings.DynamicLighting ? Color.WhiteSmoke : Color.Gray;
         };
 
