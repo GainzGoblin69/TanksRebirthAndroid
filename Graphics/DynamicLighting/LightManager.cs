@@ -82,7 +82,10 @@ public static class LightManager {
             cur.Enabled = TankGame.Settings?.DynamicLighting == true;
             cur.SetQualityLevel(QualityFromSettings);
             cur.RoomShadows = AllowRoomCascade;
+            cur.TimeOfDay = Preset.DayCycle; // follows the real time of day (see Update)
             DynLightSettings.Current = cur;
+            LightingPresets.DayCyclePaused = true;
+            LightingPresets.Hour = RealHour;
         }
 
         // every model already loaded joins in; models loaded from now on join as they load
@@ -115,8 +118,11 @@ public static class LightManager {
     /// stay out of lighting on phones). PCs always get everything.
     /// </summary>
     // phones stop at 2: lighting the board's wooden border drew it black on a Red Magic 11 Pro (even without its overlays)
-    public static int Surroundings => PhoneGpu ? Math.Clamp(TankGame.Settings?.LitSurroundings ?? 0, 0, 2) : 3;
+    public static int Surroundings => PhoneGpu ? 2 : 3; // phones: play area, room and window sun (everything that works)
     public static bool AllowRoomCascade => Surroundings >= 2;
+
+    /// <summary>The device's clock as hours (6.5 = 6:30 AM).</summary>
+    static float RealHour { get { var n = DateTime.Now; return n.Hour + n.Minute / 60f + n.Second / 3600f; } }
 
     static void UpdateExcludedModels() {
         LightingSystem.NeverInstrument.Clear();
@@ -241,6 +247,10 @@ public static class LightManager {
         }
 
         UpdateModifierLooks();
+
+        // the light through the windows follows the real time of day (like the clock on the wall)
+        if (LightingPresets.Current == Preset.DayCycle)
+            LightingPresets.Hour = RealHour;
 
         // a short report every ~10 s while lighting is on (shows in the debug readout)
         if (LightingSystem.IsActive && (_reportIn -= RuntimeData.DeltaTime) <= 0) {

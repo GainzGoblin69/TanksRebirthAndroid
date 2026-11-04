@@ -35,6 +35,8 @@ public class GameConfig
     public int LightingQuality { get; set; } = 0;
     /// <summary>Phones: how much around the board gets dynamic lighting (0 play area .. 3 everything).</summary>
     public int LitSurroundings { get; set; } = 0;
+    /// <summary>Phones: vibrate for shooting, mines, items and getting hit.</summary>
+    public bool Vibration { get; set; } = true;
     public int TankColorP1 { get; set; } = -1;
     public int TankColorP2 { get; set; } = -1;
     /// <summary>Name shown to others in Wi-Fi games.</summary>

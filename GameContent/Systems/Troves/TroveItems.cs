@@ -567,6 +567,7 @@ public static class TroveItems {
         var def = Def(id);
         var p = Players[playerId];
         bool local = IsLocal(playerId);
+        if (local) TanksRebirth.Internals.Common.Framework.Input.Haptics.ItemPickup();
         var synergiesBefore = Synergies.Where(p.Has).ToList();
         int stack = def.Kind == TroveItemKind.Passive ? p.Count(id) + 1 : 1;
         LastPickup = (def, Now, stack);
@@ -710,6 +711,7 @@ public static class TroveItems {
         }
         var id = p.Active!.Value;
         var tank = GameHandler.AllPlayerTanks[playerId];
+        if (IsLocal(playerId)) TanksRebirth.Internals.Common.Framework.Input.Haptics.ItemUse();
         switch (id) {
             case TroveItemId.Rocket:
                 MissileUpgrade.StartShots(playerId, 5);

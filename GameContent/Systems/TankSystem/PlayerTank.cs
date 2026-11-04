@@ -325,6 +325,8 @@ public class PlayerTank : Tank {
     }
     private void ShootInner(bool fxOnly, bool netSend) {
         if (!ReplayingNetShot) PlayerStatistics.ShellsShot++; // another player's shot isn't yours
+        if (!ReplayingNetShot && !fxOnly && CurShootCooldown <= 0 && TanksRebirth.Internals.Common.Framework.Input.Haptics.IsLocal(this))
+            TanksRebirth.Internals.Common.Framework.Input.Haptics.Shoot();
         // Gears of War missile upgrade: this shot is a missile
         if (MissileUpgrade.ShotsLeft(PlayerId) > 0) {
             var (type, bounces, speed) = (Properties.ShellType, Properties.RicochetCount, Properties.ShellSpeed);
@@ -354,6 +356,8 @@ public class PlayerTank : Tank {
         PlayerStatistics.MinesLaid++;
         int before = OwnedMineCount;
         base.LayMine();
+        if (OwnedMineCount > before && TanksRebirth.Internals.Common.Framework.Input.Haptics.IsLocal(this))
+            TanksRebirth.Internals.Common.Framework.Input.Haptics.Mine();
         if (OwnedMineCount > before)
             foreach (var m in Mine.AllMines)
                 if (m is not null && ReferenceEquals(m.Owner, this) && m.DetonateTime >= m.DetonateTimeMax - 1)

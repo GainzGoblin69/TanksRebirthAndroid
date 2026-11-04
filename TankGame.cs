@@ -519,6 +519,7 @@ public class TankGame : Game {
         GameResources.EnsurePreloadedAssetsArePreloaded();
         ClientLog.Write("Setting up graphics and UI...", LogType.Info);
         GameHandler.SetupGraphics();
+        Internals.Common.Framework.Input.Haptics.Install();
         // (from 1.9) dynamic lighting, if it's switched on in Options > Graphics
         if (Settings.DynamicLighting) {
             try { TanksRebirth.Graphics.DynamicLighting.LightManager.Initialize(GraphicsDevice); }

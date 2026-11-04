@@ -60,6 +60,26 @@ public class MainActivity : AndroidGameActivity {
     protected override void OnCreate(Bundle? bundle) {
         base.OnCreate(bundle);
         HideSystemUi();
+        // vibration (Options > Graphics > Vibration): short pulses for shots, mines, items and hits
+        try {
+            Vibrator? vib = Build.VERSION.SdkInt >= BuildVersionCodes.S
+                ? (GetSystemService(Context.VibratorManagerService) as VibratorManager)?.DefaultVibrator
+#pragma warning disable CA1422
+                : GetSystemService(Context.VibratorService) as Vibrator;
+#pragma warning restore CA1422
+            if (vib is not null && vib.HasVibrator) {
+                bool amp = Build.VERSION.SdkInt >= BuildVersionCodes.O && vib.HasAmplitudeControl;
+                TanksRebirth.Internals.Common.Framework.Input.Haptics.Impl = (ms, strength) => {
+                    if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
+                        vib.Vibrate(VibrationEffect.CreateOneShot(ms, amp ? strength : VibrationEffect.DefaultAmplitude));
+#pragma warning disable CA1422
+                    else
+                        vib.Vibrate(ms);
+#pragma warning restore CA1422
+                };
+            }
+        }
+        catch { }
         // the build number shown in the corner of the main menu (it goes up with every build)
         try {
             var info = PackageManager!.GetPackageInfo(PackageName!, 0)!;

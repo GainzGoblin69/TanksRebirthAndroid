@@ -244,22 +244,23 @@ public static class GraphicsUI {
                 : "Dynamic Lighting";
         };
 
-        // phones: how much around the board gets lighting, least risky first (each step adds to the last)
-        LitSurroundingsButton = new("Lit: Play Area", FontGlobals.RebirthFont, Color.WhiteSmoke) {
+        // phones: vibration for shooting, mines, items and getting hit
+        LitSurroundingsButton = new("Vibration", FontGlobals.RebirthFont, Color.WhiteSmoke) {
             IsVisible = false,
-            Tooltip = "How much around the board gets dynamic lighting: the play area, + the room, + sun through the windows.",
+            Tooltip = "Short vibrations when you shoot, lay a mine, get or use an item, get hit, or a blast goes off near you.",
             HoverColor = Color.White,
         };
         LitSurroundingsButton.SetDimensions(() => new Vector2(1240, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
         LitSurroundingsButton.OnLeftClick = (_) => {
-            TankGame.Settings.LitSurroundings = (TankGame.Settings.LitSurroundings + 1) % 3; // (the border stays unlit on phones: it draws black on some GPUs)
-            try { TanksRebirth.Graphics.DynamicLighting.LightManager.ApplySurroundings(); }
-            catch (Exception e) { TankGame.ClientLog.Write($"[Lighting] couldn't change what's lit: {e.Message}", Internals.LogType.Warn); }
+            TankGame.Settings.Vibration = !TankGame.Settings.Vibration;
             PlayerColors.SaveSettings();
+            if (TankGame.Settings.Vibration)
+                Internals.Common.Framework.Input.Haptics.ItemPickup(); // a taste of it
         };
         LitSurroundingsButton.UniqueDraw = (elem, sb) => {
-            ((UITextButton)elem).Text = "Lit: " + (Math.Min(TankGame.Settings.LitSurroundings, 2) switch { 0 => "Play Area", 1 => "+ Room", _ => "+ Window Sun" });
-            ((UITextButton)elem).Color = TankGame.Settings.DynamicLighting ? Color.WhiteSmoke : Color.Gray;
+            var sw = ToggleSwitch.RightOf(elem.Hitbox, 0.45f);
+            ((UITextButton)elem).TextOffset = new Vector2(-(sw.Width + elem.Hitbox.Right - sw.Right) / 2f, 0);
+            ToggleSwitch.Draw(sb, sw, TankGame.Settings.Vibration);
         };
 
         if (Internals.Common.Framework.Input.TouchControls.Enabled) {
