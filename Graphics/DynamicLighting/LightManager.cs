@@ -114,7 +114,8 @@ public static class LightManager {
     /// shadow map), 3 = + the board's wooden border (its see-through shadow overlays and its unplaced outer pieces
     /// stay out of lighting on phones). PCs always get everything.
     /// </summary>
-    public static int Surroundings => PhoneGpu ? Math.Clamp(TankGame.Settings?.LitSurroundings ?? 0, 0, 3) : 3;
+    // phones stop at 2: lighting the board's wooden border drew it black on a Red Magic 11 Pro (even without its overlays)
+    public static int Surroundings => PhoneGpu ? Math.Clamp(TankGame.Settings?.LitSurroundings ?? 0, 0, 2) : 3;
     public static bool AllowRoomCascade => Surroundings >= 2;
 
     static void UpdateExcludedModels() {
