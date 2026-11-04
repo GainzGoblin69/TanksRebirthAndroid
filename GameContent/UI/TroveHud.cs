@@ -26,7 +26,7 @@ public static class TroveHud {
 
     private static float S => WindowUtils.WindowHeight / 1080f;
 
-    private static Vector2 ToScreen(Vector2 world) =>
+    internal static Vector2 ToScreen(Vector2 world) =>
         MatrixUtils.ConvertWorldToScreen(Vector3.Zero, Matrix.CreateTranslation(world.X, 0, world.Y), CameraGlobals.GameView, CameraGlobals.GameProjection);
 
     public static void Draw(SpriteBatch sb) {
@@ -41,8 +41,12 @@ public static class TroveHud {
             DrawFog(sb);
             DrawInRoom(sb);
             DrawItemStrip(sb);
-            DrawMap(sb, floor);
-            DrawBossBar(sb);
+            if (TroveRun.Battle)
+                BattleHud.DrawInGame(sb);
+            else {
+                DrawMap(sb, floor);
+                DrawBossBar(sb);
+            }
             DrawPickupBanner(sb);
             DrawSynergyBanner(sb);
             DrawReadyGo(sb);
@@ -1179,7 +1183,7 @@ public static class TroveHud {
         sb.DrawString(font, lp.Def.Description, new Vector2(box.X + 130 * s, box.Y + 82 * s), new Color(80, 62, 46) * a, new Vector2(0.62f * s), 0f, new Vector2(0, font.MeasureString("A").Y / 2f));
     }
 
-    private static void Text(SpriteBatch sb, string t, Vector2 center, float scale, Color color, bool border = false) {
+    internal static void Text(SpriteBatch sb, string t, Vector2 center, float scale, Color color, bool border = false) {
         var font = FontGlobals.RebirthFont;
         var m = font.MeasureString(t);
         if (border)
@@ -1214,24 +1218,29 @@ public static class TroveHud {
         ToggleSwitch.DrawRoundedRect(sb, panel, 36 * s, UITextButton.PhoneFill);
         var ink = new Color(40, 30, 22);
         var cx = panel.Center.X;
-        Text(sb, won ? "Trove Conquered!" : "Run Over", new Vector2(cx, panel.Y + 85 * s), 2.0f * s, won ? new Color(190, 130, 20) : new Color(170, 50, 40));
-        var t = TimeSpan.FromSeconds(TroveRun.PlayTime);
-        Text(sb, won ? "You beat all 5 floors." : $"Reached floor {TroveRun.FloorNumber}: {TroveRun.Floor?.Name}", new Vector2(cx, panel.Y + 175 * s), 1.0f * s, ink);
-        Text(sb, $"Rooms cleared: {TroveRun.RoomsCleared}     Tanks destroyed: {TroveRun.TanksDestroyed}     Time: {(int)t.TotalMinutes}:{t.Seconds:00}",
-            new Vector2(cx, panel.Y + 245 * s), 0.8f * s, UITextButton.PhoneEdge);
+        if (TroveRun.Battle)
+            BattleHud.DrawFinal(sb, panel);
+        else {
+            Text(sb, won ? "Trove Conquered!" : "Run Over", new Vector2(cx, panel.Y + 85 * s), 2.0f * s, won ? new Color(190, 130, 20) : new Color(170, 50, 40));
+            var t = TimeSpan.FromSeconds(TroveRun.PlayTime);
+            Text(sb, won ? "You beat all 5 floors." : $"Reached floor {TroveRun.FloorNumber}: {TroveRun.Floor?.Name}", new Vector2(cx, panel.Y + 175 * s), 1.0f * s, ink);
+            Text(sb, $"Rooms cleared: {TroveRun.RoomsCleared}     Tanks destroyed: {TroveRun.TanksDestroyed}     Time: {(int)t.TotalMinutes}:{t.Seconds:00}",
+                new Vector2(cx, panel.Y + 245 * s), 0.8f * s, UITextButton.PhoneEdge);
+        }
 
         float bw = 400 * s, bh = 130 * s, by = panel.Bottom - 70 * s - bh;
         if (decider) {
             var again = new Rectangle((int)(cx - bw - 30 * s), (int)by, (int)bw, (int)bh);
             var menu = new Rectangle((int)(cx + 30 * s), (int)by, (int)bw, (int)bh);
-            Button(sb, again, "Try Again", new Color(255, 226, 140));
+            Button(sb, again, TroveRun.Battle ? "Play Again" : "Try Again", new Color(255, 226, 140));
             Button(sb, menu, "Menu", Color.White);
             if (Tapped(again)) { sb.End(); TroveRun.TryAgain(); return; }
             if (Tapped(menu)) { sb.End(); TroveRun.ToMenu(); return; }
         }
         else {
             int dots = (int)(DateTime.UtcNow.TimeOfDay.TotalSeconds * 2) % 4;
-            Text(sb, "Waiting on host" + new string('.', dots), new Vector2(cx, panel.Y + 330 * s), 1.1f * s, ink);
+            if (!TroveRun.Battle)
+                Text(sb, "Waiting on host" + new string('.', dots), new Vector2(cx, panel.Y + 330 * s), 1.1f * s, ink);
             var leave = new Rectangle((int)(cx - bw / 2), (int)by, (int)bw, (int)bh);
             Button(sb, leave, "Leave", Color.White);
             if (Tapped(leave)) { sb.End(); TroveRun.Leave(); return; }
@@ -1239,9 +1248,10 @@ public static class TroveHud {
         sb.End();
     }
 
-    private static void Button(SpriteBatch sb, Rectangle r, string label, Color fill) {
+    private static void Button(SpriteBatch sb, Rectangle r, string label, Color fill) => Button(sb, r, label, fill, _down, _press);
+    internal static void Button(SpriteBatch sb, Rectangle r, string label, Color fill, bool down, Vector2 press) {
         int lip = Math.Max(3, (int)(r.Height * 0.07f));
-        bool pressing = _down && r.Contains(_press) && r.Contains(MouseUtils.MousePosition);
+        bool pressing = down && r.Contains(press) && r.Contains(MouseUtils.MousePosition);
         var face = pressing ? new Rectangle(r.X, r.Y + lip / 2, r.Width, r.Height - lip / 2) : new Rectangle(r.X, r.Y, r.Width, r.Height - lip);
         ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X, r.Y + lip, r.Width, r.Height - lip), r.Height * 0.3f, UITextButton.PhoneEdge);
         ToggleSwitch.DrawRoundedRect(sb, face, r.Height * 0.3f, pressing ? UITextButton.PhonePressed : fill);

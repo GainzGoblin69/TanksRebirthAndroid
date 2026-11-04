@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Microsoft.Xna.Framework;
 using TanksRebirth.GameContent.Globals;
@@ -29,7 +29,8 @@ public static class TroveRun {
         EV_WALL = 17, EV_CONVERT = 18, EV_SHRINK = 19, EV_BLAST = 20,
         EV_CLONE = 21, EV_EMP = 22, EV_TURRET = 23, EV_MIRROR = 24, EV_GIVE = 25,
         EV_BOSS_SHOT = 26, EV_BOSS_MINE = 27, EV_BOSS_ACT = 28, EV_BOSS_EXTRA = 29,
-        EV_WELL = 30, EV_SMOKE = 31, EV_FLAG = 32, EV_SHOCK = 33, EV_FREEZE_BOMB = 34, EV_GROUND_ITEM = 35, EV_FRIENDS = 36, EV_OIL = 37, EV_PAD = 38;
+        EV_WELL = 30, EV_SMOKE = 31, EV_FLAG = 32, EV_SHOCK = 33, EV_FREEZE_BOMB = 34, EV_GROUND_ITEM = 35, EV_FRIENDS = 36, EV_OIL = 37, EV_PAD = 38,
+        EV_BATTLE_START = 39, EV_ROUND_END = 40, EV_ROUND_NEXT = 41, EV_BFLAG_TAKE = 42, EV_BFLAG_DROP = 43;
     /// <summary>How close (game units) a tank has to get to an item to pick it up.</summary>
     public const float PICKUP_REACH = 26f;
     public static Vector2 PickupPoint => new Coordinates.BlockMapPosition(10, 8);
@@ -43,6 +44,8 @@ public static class TroveRun {
     private static bool _hooked;
 
     public static bool Active { get; private set; }
+    /// <summary>Battle mode: players against each other over several rounds (built on the Troves rooms and items).</summary>
+    public static bool Battle { get; private set; }
     public static int Seed { get; private set; }
     public static int FloorNumber { get; private set; }
     public static TroveFloor? Floor { get; private set; }
@@ -56,7 +59,7 @@ public static class TroveRun {
     /// <summary>"Ready... Go!": a room with enemies waits this long before anyone can move or shoot.</summary>
     public const double READY_SECONDS = 2.5;
     public static double ReadyUntil = -1;
-    public static bool InReady => Active && CampaignGlobals.InMission && PlayTime < ReadyUntil;
+    public static bool InReady => Active && CampaignGlobals.InMission && (PlayTime < ReadyUntil || Battle && BattleMode.RoundOver);
 
     private static bool _starting;
     private static TroveDir? _entry;
@@ -85,6 +88,7 @@ public static class TroveRun {
     }
 
     public static void Begin(int seed) {
+        Battle = false;
         Active = true;
         _starting = true;
         Seed = seed;
@@ -119,6 +123,83 @@ public static class TroveRun {
         TestSetup();
         RevealMap();
         BossTank = null;
+        Hook();
+        ReviveSystem.Clear();
+        PlayerTank.StartingLives = Difficulties.Types["GearsOfWar"] ? 1 : STARTING_LIVES;
+        IntermissionSystem.BannerColor = TroveThemes.Def(Floor.Theme)?.Banner ?? new Color(92, 60, 140);
+        IntermissionSystem.BackgroundColor = new Color(222, 210, 182);
+
+        MainMenuUI.LaunchCustomGame();
+        // rooms and floors are handled here, not by the campaign's "mission complete" logic
+        CampaignGlobals.ShouldMissionsProgress = false;
+    }
+
+    /// <summary>Starts a Battle match (every phone runs this with the same seed; the arena for each round comes from it).</summary>
+    public static void BeginBattle(int seed) {
+        Battle = true;
+        Active = true;
+        _starting = true;
+        Seed = seed;
+        FloorNumber = 1;
+        TroveBosses.TestKind = null;
+        TroveThemes.TestTheme = null;
+        BattleMode.Setup(seed);
+        Floor = BattleMode.BuildArena(seed, 1);
+        Current = Floor.Start;
+        SetFloorTint();
+        Ended = EndKind.None;
+        RoomsCleared = TanksDestroyed = 0;
+        PlayTime = 0;
+        ReadyUntil = -1;
+        _entry = null;
+        _fadeDir = 0;
+        Fade = 0;
+        _atBlack = null;
+        _deadTimer = _bossTimer = _roomTime = 0;
+        _testHoldPickup = _testTour = false;
+
+        var campaign = new Campaign();
+        campaign.MetaData = campaign.MetaData with { Name = "Battle", StartingLives = 99 };
+        campaign.CachedMissions = [TroveGen.BuildMission(Floor, Room!, null)];
+        CampaignGlobals.LoadedCampaign = campaign;
+        campaign.LoadMission(0);
+
+        LevelProgress.CurrentCampaignKey = "Battle";
+        MissileUpgrade.Reset();
+        TroveItems.Reset();
+        BossTank = null;
+        TroveBosses.Clear();
+        Hook();
+        ReviveSystem.Clear();
+        PlayerTank.StartingLives = 99;
+        for (int i = 0; i < PlayerTank.Lives.Length; i++)
+            PlayerTank.Lives[i] = 99;
+        IntermissionSystem.BannerColor = BattleMode.BannerColor(Floor);
+        IntermissionSystem.BackgroundColor = new Color(222, 210, 182);
+
+        MainMenuUI.LaunchCustomGame();
+        CampaignGlobals.ShouldMissionsProgress = false;
+    }
+
+    /// <summary>Battle: the next round, in a new arena (items carry over).</summary>
+    internal static void NextBattleRound() {
+        if (!Battle)
+            return;
+        FadeThen(() => {
+            BattleMode.Round++;
+            Floor = BattleMode.BuildArena(Seed, BattleMode.Round);
+            Current = Floor.Start;
+            TroveItems.OnRoomCleared(); // ITEM-button items recharge between rounds
+            TroveItems.NewFloor();
+            TroveItems.OnNewFloor();
+            for (int i = 0; i < PlayerTank.Lives.Length; i++)
+                PlayerTank.Lives[i] = 99;
+            SetFloorTint();
+            LoadRoom(null);
+        });
+    }
+
+    private static void Hook() {
         if (!_hooked) {
             _hooked = true;
             // a floor's first room is set up by the campaign's own sequence: give the players their items then
@@ -126,8 +207,10 @@ public static class TroveRun {
                 if (!Active)
                     return;
                 TroveItems.SpawnBuddies(); // (also refills health ups)
+                if (Battle)
+                    BattleMode.OnRoundLoaded();
                 ApplyItems();
-                if (Room is { Kind: TroveRoomKind.Boss or TroveRoomKind.MiniBoss, Cleared: false } br)
+                if (!Battle && Room is { Kind: TroveRoomKind.Boss or TroveRoomKind.MiniBoss, Cleared: false } br)
                     BuffBoss(br); // (only happens when a floor starts in a boss room: testing)
             };
             // the new floor's colour appears when its first room is set up (behind the floor banner), not when the boss falls
@@ -140,14 +223,6 @@ public static class TroveRun {
                     TroveThemes.SetupRoom(f, r, Seed);
             };
         }
-        ReviveSystem.Clear();
-        PlayerTank.StartingLives = Difficulties.Types["GearsOfWar"] ? 1 : STARTING_LIVES;
-        IntermissionSystem.BannerColor = TroveThemes.Def(Floor.Theme)?.Banner ?? new Color(92, 60, 140);
-        IntermissionSystem.BackgroundColor = new Color(222, 210, 182);
-
-        MainMenuUI.LaunchCustomGame();
-        // rooms and floors are handled here, not by the campaign's "mission complete" logic
-        CampaignGlobals.ShouldMissionsProgress = false;
     }
 
     /// <summary>Each floor's floor colour: it gets darker and stranger the deeper you go.</summary>
@@ -169,6 +244,7 @@ public static class TroveRun {
         Block.Tint = Vector3.One;
         TroveThemes.ClearRoom();
         Active = false;
+        Battle = false;
         _starting = false;
         Ended = EndKind.None;
         Fade = 0;
@@ -382,6 +458,13 @@ public static class TroveRun {
         PlayTime += Dt;
         _roomTime += Dt;
 
+        if (Battle) {
+            BattleMode.Update(Dt, Authority && _fadeDir == 0);
+            if (Authority && _fadeDir == 0)
+                CheckGroundDrops(room);
+            return;
+        }
+
         // a room is cleared when its enemies are gone
         bool enemies = GameHandler.AllAITanks.Any(t => t is not null && !t.IsDestroyed && t.Team != TeamID.Red);
         if (!room.Cleared && !enemies && _roomTime > 0.6f && _fadeDir == 0 && room.Kind == TroveRoomKind.Challenge && !room.Wave2Spawned) {
@@ -442,18 +525,7 @@ public static class TroveRun {
         }
         _deadTimer = 0;
 
-        // items found in broken cork: whoever drives over one gets it
-        for (int i = 0; i < room.GroundDrops.Count; i++) {
-            var g = room.GroundDrops[i];
-            if (g.Taken) continue;
-            foreach (var p in GameHandler.AllPlayerTanks) {
-                if (p is null || p.IsDestroyed || p.PlayerId is < 0 or > 3 || Vector2.Distance(p.Position, g.At) > PICKUP_REACH)
-                    continue;
-                Send(EV_GROUND_ITEM, i * 4 + p.PlayerId);
-                TakeGroundDrop(i, p.PlayerId);
-                break;
-            }
-        }
+        CheckGroundDrops(room);
 
         // the boss is down: on to the next floor (or the run is won)
         if (room.Kind == TroveRoomKind.Boss && room.Cleared && _bossTimer > 0) {
@@ -470,7 +542,25 @@ public static class TroveRun {
             }
             return;
         }
+        CheckPickupsAndDoors(room);
+    }
 
+    /// <summary>Items lying on the floor (found in broken cork, or put there in Battle): whoever drives over one gets it.</summary>
+    private static void CheckGroundDrops(TroveRoom room) {
+        for (int i = 0; i < room.GroundDrops.Count; i++) {
+            var g = room.GroundDrops[i];
+            if (g.Taken) continue;
+            foreach (var p in GameHandler.AllPlayerTanks) {
+                if (p is null || p.IsDestroyed || p.PlayerId is < 0 or > 3 || Vector2.Distance(p.Position, g.At) > PICKUP_REACH)
+                    continue;
+                Send(EV_GROUND_ITEM, i * 4 + p.PlayerId);
+                TakeGroundDrop(i, p.PlayerId);
+                break;
+            }
+        }
+    }
+
+    private static void CheckPickupsAndDoors(TroveRoom room) {
         // picking up an item
         if (room.PickupVisible && !_testHoldPickup) {
             foreach (var p in GameHandler.AllPlayerTanks) {
@@ -546,6 +636,8 @@ public static class TroveRun {
         CampaignGlobals.LoadedCampaign.LoadMission(mission);
         CampaignGlobals.LoadedCampaign.SetupLoadedMission(true);
         TroveItems.SpawnBuddies(); // (also refills health ups)
+        if (Battle)
+            BattleMode.OnRoundLoaded();
         ApplyItems();
         RestartMusic();
         // what normally happens when a mission starts (invisible tanks vanish, free-for-all teams)
@@ -573,6 +665,15 @@ public static class TroveRun {
             return;
         // broken cork stays broken: it's gone from the room's layout, so it isn't there when you come back
         room.Blocks.RemoveAt(bi);
+        if (Battle) {
+            // Battle: only the items hidden in this arena's cork
+            if (room.Hidden.Remove(g, out var hid)) {
+                room.GroundDrops.Add(new TroveGroundDrop { At = block.Position, Item = hid });
+                GameHandler.Particles.MakeShineSpot(new Vector3(block.Position.X, 12, block.Position.Y), Color.Gold, 1.2f);
+                SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.8f, pitchOverride: 0.5f);
+            }
+            return;
+        }
         if (!room.CorkRolled.Add(g))
             return;
         // cork rooms and floors are full of it: at most 3 items from one of those rooms
@@ -675,9 +776,26 @@ public static class TroveRun {
 
     /// <summary>Try again (host or solo): a new run.</summary>
     public static void TryAgain() {
+        bool battle = Battle;
         Stop();
         GameUI.QuitOut(netSent: true);
-        StartFromMenu();
+        if (battle)
+            BattleMode.StartFromMenu();
+        else
+            StartFromMenu();
+    }
+
+    /// <summary>Battle: a round is over (winner = fighter index, -1 = nobody). Runs on every phone.</summary>
+    internal static void BattleRoundEnd(int winner) {
+        if (!Battle)
+            return;
+        BattleMode.EndRound(winner);
+    }
+    internal static void BattleSend(int ev, int a = 0) => Send(ev, a);
+    internal static void BattleSendAny(int ev, int a = 0) => SendAny(ev, a);
+    internal static void BattleOver() {
+        Send(EV_VICTORY);
+        End(EndKind.Victory);
     }
 
     /// <summary>Back to the menus (host or solo: everyone).</summary>
@@ -715,6 +833,26 @@ public static class TroveRun {
     /// <summary>Joined players: an event from the host.</summary>
     public static void OnEvent(int ev, int a) {
         switch (ev) {
+            case EV_BATTLE_START:
+                if (!MainMenuUI.IsActive) {
+                    Stop();
+                    GameUI.QuitOut(netSent: true);
+                }
+                BattleMode.ReadConfig(a);
+                BeginBattle(BattleMode.SeedFrom(a));
+                break;
+            case EV_ROUND_END:
+                if (Active && Battle) BattleMode.EndRound(a - 1);
+                break;
+            case EV_ROUND_NEXT:
+                if (Active && Battle) NextBattleRound();
+                break;
+            case EV_BFLAG_TAKE:
+                if (Active && Battle) BattleMode.TakeFlag(a);
+                break;
+            case EV_BFLAG_DROP:
+                if (Active && Battle) BattleMode.DropFlag(TroveItems.DecodePos(a));
+                break;
             case EV_START:
                 if (!MainMenuUI.IsActive) {
                     Stop();

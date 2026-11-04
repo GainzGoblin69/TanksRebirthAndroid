@@ -40,6 +40,8 @@ public sealed class TroveRoom {
     public List<TroveGroundDrop> GroundDrops = [];
     /// <summary>Cork blocks (grid x, y) that already had their chance at an item this run.</summary>
     public HashSet<Point> CorkRolled = [];
+    /// <summary>Battle: items hidden inside cork blocks (found when the block breaks).</summary>
+    public Dictionary<Point, TroveItemId> Hidden = [];
     /// <summary>A cork room: every wall and piece of cover is breakable cork, with extra cork about.</summary>
     public bool CorkStyle;
     public bool PickupVisible => Pickup is not null && !PickupTaken && (Kind is TroveRoomKind.Item or TroveRoomKind.Secret || Cleared || ForcePickup);
@@ -303,7 +305,7 @@ public static class TroveGen {
 
     /// <summary>Cork rooms: walls and cover become cork, plus extra cork clusters (before the paths are carved,
     /// so doors and the middle stay open and no part of the room is shut off).</summary>
-    private static void Corkify(TroveRoom room, int[,] solid, int[,] type) {
+    internal static void Corkify(TroveRoom room, int[,] solid, int[,] type) {
         if (!room.CorkStyle)
             return;
         var r = new Random(unchecked(room.Cell.X * 92821 + room.Cell.Y * 68917 + solid.Length));
@@ -393,7 +395,7 @@ public static class TroveGen {
     /// two blocks wide so a tank fits once it's broken. Teleporters count as a way through.
     /// </summary>
     /// <returns>Open cells that still can't be reached (shut in by holes): nothing should be put there.</returns>
-    private static HashSet<Point> ConnectRegions(int[,] solid, int[,] type, List<(int X, int Y, int Link)> teleporters) {
+    internal static HashSet<Point> ConnectRegions(int[,] solid, int[,] type, List<(int X, int Y, int Link)> teleporters) {
         var stuck = new HashSet<Point>();
         bool Open(int x, int y) => solid[x, y] == 0 || type[x, y] == BlockID.Cork;
         IEnumerable<Point> Next(Point p) {
@@ -479,7 +481,7 @@ public static class TroveGen {
     public const double TELEPORTER_CHANCE = 0.3;
 
     /// <summary>Two linked teleporter pads in open spots on opposite sides of the room (never in doorways or the middle).</summary>
-    private static List<(int X, int Y, int Link)> PlaceTeleporters(int[,] solid, List<TroveDir> doors, Random rng) {
+    internal static List<(int X, int Y, int Link)> PlaceTeleporters(int[,] solid, List<TroveDir> doors, Random rng) {
         bool Ok(int x, int y) {
             if (x < 1 || y < 1 || x > GW - 2 || y > GH - 2 || solid[x, y] > 0)
                 return false;
@@ -749,6 +751,8 @@ public static class TroveGen {
     };
 
     public static Mission BuildMission(TroveFloor f, TroveRoom room, TroveDir? entry) {
+        if (TroveRun.Battle)
+            return BattleMode.BuildMission(f, room);
         var tanks = new List<TankTemplate>();
         var spawns = SpawnCells(entry);
         float facing = entry switch {

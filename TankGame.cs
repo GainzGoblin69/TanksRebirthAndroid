@@ -675,6 +675,7 @@ public class TankGame : Game {
             // the cursor shows on desktop, and on phones while a controller is in use (it's the aim point)
             RebirthMouse.ShouldRender = (!TouchControls.Enabled || TouchControls.GamepadMode) && !(LocalCoop.Active && TouchControls.GameplayControlsActive) && (!Difficulties.Types["POV"] || GameUI.Paused || MainMenuUI.IsActive || LevelEditorUI.IsActive);
 
+            BattleHud.UpdateSetup(); // the Battle options screen keeps the menu's buttons out of the way
             UIElement.UpdateElements();
             GameUI.UpdateButtons();
 
@@ -945,6 +946,7 @@ public class TankGame : Game {
         LocalCoop.DrawAim(SpriteRenderer); // same-device co-op: each controller player's aim
         ReviveSystem.Draw(SpriteRenderer); // Gears of War: revive rings
         TroveHud.Draw(SpriteRenderer); // Tank Troves: doors, minimap, room fades, end screen
+        BattleHud.DrawSetup(SpriteRenderer); // the Battle options screen
         MPEndScreen.Draw(SpriteRenderer); // multiplayer game over: Restart / Quit
     }
 

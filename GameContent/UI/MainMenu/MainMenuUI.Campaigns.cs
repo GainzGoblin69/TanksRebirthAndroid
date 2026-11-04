@@ -65,7 +65,7 @@ public static partial class MainMenuUI {
         var defaultDimensions = new Vector2(300, 40);
         float padding = 20f;
 
-        int totalCampaigns = campaignFiles.Length + (hasVanilla ? 2 : 0); // + Level Select, Tank Troves
+        int totalCampaigns = campaignFiles.Length + (hasVanilla ? 3 : 0); // + Level Select, Tank Troves, Battle
         int numColumns = (int)Math.Ceiling(totalCampaigns / (float)MAX_CAMPAIGNS_PER_COLUMN);
 
         // totalWidth and uiStartX must be calculated in logical units
@@ -161,6 +161,14 @@ public static partial class MainMenuUI {
                 tt.OnMouseOver = (_) => SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect);
                 tt.OnLeftClick += (_) => Systems.Troves.TroveRun.StartFromMenu();
                 campaignNames.Add(tt);
+
+                // Battle: players against each other
+                var bt = new UITextButton("Battle", FontGlobals.RebirthFont, Color.White, 0.8f) { IsVisible = true };
+                var (bPos, bSize) = nextSlot();
+                bt.SetDimensions(bPos, bSize);
+                bt.OnMouseOver = (_) => SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect);
+                bt.OnLeftClick += (_) => BattleHud.OpenSetup();
+                campaignNames.Add(bt);
             }
         }
         // phones: Freeplay is gone (it only opened an empty board); Validate joins the column

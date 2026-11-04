@@ -278,6 +278,18 @@ public static class TroveItems {
         or TroveItemId.SniperShells or TroveItemId.RegenPlating or TroveItemId.VampireTreads
         or (>= TroveItemId.NitroTreads and <= TroveItemId.Featherweight);
     // cleared rooms mostly leave hearts and shields, sometimes a stacking item or a Block Bust
+    /// <summary>Battle: items that work against other players (no enemy-only tricks), found on the map and in cork.</summary>
+    public static readonly TroveItemId[] BattlePool = [
+        TroveItemId.Shield, TroveItemId.Shield, TroveItemId.SpeedTreads, TroveItemId.BouncyShells, TroveItemId.ExtraShell, TroveItemId.MinePack,
+        TroveItemId.BigMines, TroveItemId.TripleShot, TroveItemId.QuickReload, TroveItemId.HeavyShells, TroveItemId.ExplosiveShells,
+        TroveItemId.GhostTreads, TroveItemId.SplitShot, TroveItemId.SniperShells, TroveItemId.TinyTank, TroveItemId.RicochetMaster,
+        TroveItemId.GiantTank, TroveItemId.EchoShot, TroveItemId.GhostShells, TroveItemId.NitroTreads, TroveItemId.RapidBarrel,
+        TroveItemId.ArmorPlating, TroveItemId.LongBarrel, TroveItemId.Steroids, TroveItemId.MagicMushroom,
+        TroveItemId.BoomerangShells, TroveItemId.MortarShells, TroveItemId.Wraparound, TroveItemId.MegaShell, TroveItemId.HolyMantle,
+        TroveItemId.Pyromaniac, TroveItemId.CupidsArrow, TroveItemId.Battery, TroveItemId.MysteryPill,
+        TroveItemId.Rocket, TroveItemId.Dash, TroveItemId.Teleport, TroveItemId.WallBuilder, TroveItemId.Invincibility,
+        TroveItemId.RepairKit, TroveItemId.TeleportPads,
+    ];
     public static readonly TroveItemId[] DropPool = [
         TroveItemId.ExtraLife, TroveItemId.ExtraLife, TroveItemId.Shield, TroveItemId.Shield, TroveItemId.Shield,
         TroveItemId.BouncyShells, TroveItemId.ExtraShell, TroveItemId.MinePack, TroveItemId.BlockBust, TroveItemId.RepairKit,
@@ -355,6 +367,8 @@ public static class TroveItems {
         public readonly List<Mine> DroneMines = [];
         /// <summary>Health from stat items: refilled each room / each floor (lost after shields).</summary>
         public int RoomHp, FloorHp;
+        /// <summary>Battle: the extra hits from the match's hit points setting (refilled every round).</summary>
+        public int BattleHp;
         public int RoomHpMax => Count(TroveItemId.ArmorPlating) + 3 * Count(TroveItemId.HeavyArmor) + Count(TroveItemId.MagicMushroom)
             + (Has(TroveItemId.HeavyArmor) && Has(TroveItemId.GiantTank) ? 2 : 0) + (Has(TroveItemId.HeartyMeal) && Has(TroveItemId.RegenPlating) ? 2 * Count(TroveItemId.HeartyMeal) : 0);
         public int FloorHpMax => Has(TroveItemId.HeartyMeal) && Has(TroveItemId.RegenPlating) ? 0 : 2 * Count(TroveItemId.HeartyMeal);
@@ -746,7 +760,7 @@ public static class TroveItems {
     /// <summary>A room was cleared: active items recharge.</summary>
     public static void OnRoomCleared() {
         // Bounty Hunter (the host decides, and tells the others what dropped)
-        if ((!Client.IsConnected() || Client.IsHost()) && TroveRun.Room is { } br && !br.PickupVisible)
+        if (!TroveRun.Battle && (!Client.IsConnected() || Client.IsHost()) && TroveRun.Room is { } br && !br.PickupVisible)
             for (int i = 0; i < 4; i++) {
                 var bp = Players[i];
                 if (!bp.Has(TroveItemId.BountyHunter) || bp.HitThisRoom || GameHandler.AllPlayerTanks[i] is not { IsDestroyed: false })
@@ -759,7 +773,7 @@ public static class TroveItems {
                 break;
             }
         // Lucky Foot: a cleared room with nothing to pick up sometimes drops something anyway
-        if ((!Client.IsConnected() || Client.IsHost()) && Luck() > 1 && TroveRun.Room is { PickupVisible: false } lr && lr.Kind != TroveRoomKind.Start
+        if (!TroveRun.Battle && (!Client.IsConnected() || Client.IsHost()) && Luck() > 1 && TroveRun.Room is { PickupVisible: false } lr && lr.Kind != TroveRoomKind.Start
             && Random.Shared.NextDouble() < (Luck() >= 3 ? 0.5 : 0.3)) {
             var drop = DropPool[Random.Shared.Next(DropPool.Length)];
             lr.Pickup = null;
@@ -1761,7 +1775,7 @@ public static class TroveItems {
             p.Shields = 0; // glass cannons can't keep shields
         p.RoomHp = Math.Min(p.RoomHp, p.RoomHpMax);
         p.FloorHp = Math.Min(p.FloorHp, p.FloorHpMax);
-        int extraHits = p.Shields + p.RoomHp + p.FloorHp;
+        int extraHits = p.Shields + p.RoomHp + p.FloorHp + p.BattleHp;
         if (extraHits > 0)
             props.Armor = new TankArmor(tank, kidArmor + extraHits);
         _shieldBase[tank.PlayerId] = kidArmor;
@@ -1801,13 +1815,14 @@ public static class TroveItems {
             if (IsLocal(i)) {
                 if (t.IsDestroyed)
                     p.Shields = 0;
-                else if (p.Shields + p.RoomHp + p.FloorHp > 0) {
+                else if (p.Shields + p.RoomHp + p.FloorHp + p.BattleHp > 0) {
                     int have = Math.Max(0, (t.Properties.Armor?.HitPoints ?? 0) - _shieldBase[i]);
-                    int lost = p.Shields + p.RoomHp + p.FloorHp - have;
+                    int lost = p.Shields + p.RoomHp + p.FloorHp + p.BattleHp - have;
                     for (; lost > 0; lost--) {
                         if (p.Shields > 0) p.Shields--;
                         else if (p.RoomHp > 0) p.RoomHp--;
                         else if (p.FloorHp > 0) p.FloorHp--;
+                        else if (p.BattleHp > 0) p.BattleHp--;
                     }
                 }
             }

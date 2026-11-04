@@ -83,11 +83,11 @@ tapy 384 5
 adb exec-out screencap -p > diag/run2-mp-lobby.png
 tapy 736 4
 tapy 806 3
-# Single Player -> campaign screen (Campaign, Level Select, Tank Troves, Difficulties, Update Campaign, Back)
+# Single Player -> campaign screen (Campaign, Level Select, Tank Troves, Battle, Difficulties, Update Campaign, Back)
 tapy 244 5
 adb exec-out screencap -p > diag/run2-singleplayer.png
 # Difficulties: flip the first two toggles and Lantern Mode, then Back to the campaign screen
-tapy 595 4
+tapy 649 4
 adb exec-out screencap -p > diag/run2-difficulties.png
 adb shell input tap $((W * 263 / 1000)) $((H * 147 / 1000)); sleep 3
 adb shell input tap $((W * 263 / 1000)) $((H * 214 / 1000)); sleep 3
@@ -98,13 +98,13 @@ adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 3
 adb exec-out screencap -p > diag/run2-singleplayer-back.png
 
 # Level Select (the button under "Campaign"): let previews render, then start mission 1
-adb shell input tap $CX $((H * 314 / 1000)); sleep 15
+adb shell input tap $CX $((H * 277 / 1000)); sleep 15
 adb exec-out screencap -p > diag/run2-levelselect-15s.png
 sleep 60
 adb exec-out screencap -p > diag/run2-levelselect-75s.png
 # back to the campaign screen and start the Campaign: Double Enemies should give mission 1 two enemy tanks
 adb shell input tap $((H * 143 / 1080)) $((H * 59 / 1000)); sleep 4
-tapy 173 8
+tapy 153 8
 adb exec-out screencap -p > diag/run2-levelrun-banner.png; sleep 9
 adb exec-out screencap -p > diag/run2-levelrun.png
 
@@ -117,7 +117,7 @@ adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 5
 tapy 314 4
 tapy 244 5
-tapy 455 6
+tapy 401 6
 adb exec-out screencap -p > diag/run2-troves-banner.png; sleep 12
 adb exec-out screencap -p > diag/run2-troves-room.png
 # fire (tap the right side: triple explosive heavy shells), then use the ITEM (Stopwatch) - the item button sits above the mine button
@@ -136,6 +136,25 @@ adb shell input swipe $((W * 15 / 100)) $((H * 75 / 100)) $((W * 15 / 100)) $((H
 adb exec-out screencap -p > diag/run2-troves-up.png
 adb shell input swipe $((W * 20 / 100)) $((H * 70 / 100)) $((W * 5 / 100)) $((H * 70 / 100)) 6000; sleep 2
 adb exec-out screencap -p > diag/run2-troves-left.png
+
+# Battle: pause, Quit, Play > Single Player > Battle; King of the Hill, 3 rounds, 3 CPU tanks (from battle_test.txt)
+adb shell "printf 'KingOfTheHill 3 3\n' > '$EXT/battle_test.txt'"
+adb shell input keyevent KEYCODE_BACK; sleep 2
+adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 5
+tapy 314 4
+tapy 244 5
+tapy 525 3
+adb exec-out screencap -p > diag/run2-battle-setup.png
+# Start (right-hand button at the bottom of the options panel)
+adb shell input tap $((W / 2 + H * 220 / 1080)) $((H * 824 / 1000)); sleep 7
+adb exec-out screencap -p > diag/run2-battle-banner.png; sleep 9
+adb exec-out screencap -p > diag/run2-battle-round1.png; sleep 20
+adb exec-out screencap -p > diag/run2-battle-30s.png; sleep 25
+adb exec-out screencap -p > diag/run2-battle-55s.png; sleep 25
+adb exec-out screencap -p > diag/run2-battle-80s.png; sleep 30
+adb exec-out screencap -p > diag/run2-battle-110s.png; sleep 40
+adb exec-out screencap -p > diag/run2-battle-150s.png
+adb shell pidof $PKG > diag/run2-battle-pid.txt 2>&1
 
 adb logcat -d -v threadtime > diag/logcat-full.txt
 grep -iE "mono-rt|Thread|at |TanksRebirth|DOTNET|mono|monodroid|AndroidRuntime|FATAL|Exception|libc|DEBUG|OpenGL|EGL|Adreno|MonoGame|$PKG" diag/logcat-full.txt > diag/logcat-filtered.txt

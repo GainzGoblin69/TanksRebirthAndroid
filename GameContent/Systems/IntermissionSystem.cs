@@ -472,7 +472,9 @@ public static class IntermissionSystem {
 
         // draw large(r) text
         float spacing = 10;
-        string enemyTankDisplay = Troves.TroveRun.Active && Troves.TroveRun.Floor is { } tf
+        string enemyTankDisplay = Troves.TroveRun.Battle
+            ? Troves.BattleMode.MatchName
+            : Troves.TroveRun.Active && Troves.TroveRun.Floor is { } tf
             ? $"{tf.Rooms.Count} rooms" // Tank Troves: the floor, not one mission
             : $"{TankGame.GameLanguage.EnemyTanks}: {mafs}";
         string missionName = CampaignGlobals.LoadedCampaign.LoadedMission.Name;
@@ -516,7 +518,8 @@ public static class IntermissionSystem {
             DrawUtils.DrawStringWithBorderAndShadow(spriteBatch, FontGlobals.RebirthFontLarge,
                 new Vector2(WindowUtils.WindowWidth / 2, textOffsetDetails),
                 Vector2.One,
-                $"Tank Troves - Floor {Troves.TroveRun.FloorNumber} of {Troves.TroveGen.FLOORS}",
+                Troves.TroveRun.Battle ? $"Battle - {Troves.BattleMode.Rounds} rounds, {Troves.BattleMode.Fighters.Count} tanks"
+                    : $"Tank Troves - Floor {Troves.TroveRun.FloorNumber} of {Troves.TroveGen.FLOORS}",
                 BackgroundColor,
                 ColorForBorders,
                 TextAnimatorSmall.CurrentScale.ToResolution(),
