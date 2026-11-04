@@ -932,8 +932,17 @@ public class TankGame : Game {
         var shader = Difficulties.Types["LanternMode"] && !MainMenuUI.IsActive && !TanksRebirth.Graphics.DynamicLighting.LightingSystem.IsActive ? GameShaders.LanternShader : (MainMenuUI.IsActive && !TouchControls.Enabled ? GameShaders.GaussianBlurShader : null);
         if (!GameScene.ShouldRenderAll) shader = null;
 
+        // the brightness setting: below 100% the picture is tinted darker, above it a little of it is added again on top
+        float bright = Math.Clamp(Settings.Brightness, 50, 130) / 100f;
         SpriteRenderer.Begin(effect: shader);
-        SpriteRenderer.Draw(GameFrameBuffer, Vector2.Zero, null, Color.White, 0f, Vector2.Zero, Vector2.One, default, 0f);
+        SpriteRenderer.Draw(GameFrameBuffer, Vector2.Zero, null, bright < 1f ? new Color(bright, bright, bright) : Color.White, 0f, Vector2.Zero, Vector2.One, default, 0f);
+        SpriteRenderer.End();
+        if (bright > 1.001f) {
+            SpriteRenderer.Begin(blendState: BlendState.Additive);
+            SpriteRenderer.Draw(GameFrameBuffer, Vector2.Zero, null, Color.White * (bright - 1f), 0f, Vector2.Zero, Vector2.One, default, 0f);
+            SpriteRenderer.End();
+        }
+        SpriteRenderer.Begin(effect: shader);
         // phones: darken the still battlefield behind the menu a little so the logo and buttons stand out
         if (TouchControls.Enabled && MainMenuUI.IsActive && TextureGlobals.Pixels.TryGetValue(Color.White, out var px))
             SpriteRenderer.Draw(px, WindowUtils.ScreenRect, Color.Black * 0.3f);

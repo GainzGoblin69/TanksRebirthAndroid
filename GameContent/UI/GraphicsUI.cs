@@ -37,6 +37,7 @@ public static class GraphicsUI {
 
     /// <summary>Phones: how much around the board gets dynamic lighting.</summary>
     public static UITextButton LitSurroundingsButton;
+    public static UITextButton BrightnessButton;
     private static bool _initialized;
 
     private static int _idxPair;
@@ -263,8 +264,27 @@ public static class GraphicsUI {
             ToggleSwitch.Draw(sb, sw, TankGame.Settings.Vibration);
         };
 
+        // brightness of the game picture: tap the left side for darker, the right side for brighter
+        BrightnessButton = new("Brightness", FontGlobals.RebirthFont, Color.WhiteSmoke) {
+            IsVisible = false,
+            Tooltip = "How bright the game looks. Tap the left side to make it darker, the right side to make it brighter.",
+            HoverColor = Color.White,
+        };
+        BrightnessButton.SetDimensions(() => new Vector2(1250, 600).ToResolution(), () => new Vector2(500, 150).ToResolution());
+        BrightnessButton.OnLeftClick = (elem) => {
+            bool brighter = MouseUtils.MousePosition.X > elem.Hitbox.Center.X;
+            TankGame.Settings.Brightness = Math.Clamp(TankGame.Settings.Brightness + (brighter ? 5 : -5), 50, 130);
+            PlayerColors.SaveSettings();
+        };
+        BrightnessButton.UniqueDraw = (elem, sb) => {
+            var b = (UITextButton)elem;
+            b.Text = $"<   Brightness: {TankGame.Settings.Brightness}%   >";
+            b.TextOffset = Vector2.Zero;
+        };
+
         if (Internals.Common.Framework.Input.TouchControls.Enabled) {
-            // phones: three columns (the bottom slot sits under the Back button)
+            // phones: three columns
+            BrightnessButton.SetDimensions(() => new Vector2(1240, 350).ToResolution(), () => new Vector2(500, 150).ToResolution());
             PerPixelLightingToggle.SetDimensions(() => new Vector2(155, 95).ToResolution(), () => new Vector2(510, 160).ToResolution());
             PerPixelLightingButton.SetDimensions(() => new Vector2(160, 100).ToResolution(), () => new Vector2(500, 150).ToResolution());
             VsyncButton.SetDimensions(() => new Vector2(160, 350).ToResolution(), () => new Vector2(500, 150).ToResolution());
@@ -298,6 +318,7 @@ public static class GraphicsUI {
         TeamColoursButton.IsVisible = false;
         LightingButton.IsVisible = false;
         LitSurroundingsButton.IsVisible = false;
+        BrightnessButton.IsVisible = false;
         PerPixelLightingToggle.IsVisible = false;
         VsyncToggle.IsVisible = false;
         FullScreenButton.IsVisible = false;
@@ -315,6 +336,7 @@ public static class GraphicsUI {
         TeamColoursButton.IsVisible = true;
         LightingButton.IsVisible = true;
         LitSurroundingsButton.IsVisible = Internals.Common.Framework.Input.TouchControls.Enabled;
+        BrightnessButton.IsVisible = true;
         PerPixelLightingToggle.IsVisible = true;
         VsyncToggle.IsVisible = !Internals.Common.Framework.Input.TouchControls.Enabled;
         FullScreenButton.IsVisible = true;

@@ -37,6 +37,8 @@ public class GameConfig
     public int LitSurroundings { get; set; } = 0;
     /// <summary>Phones: vibrate for shooting, mines, items and getting hit.</summary>
     public bool Vibration { get; set; } = true;
+    /// <summary>Brightness of the game picture, in percent (50-130).</summary>
+    public int Brightness { get; set; } = 100;
     public int TankColorP1 { get; set; } = -1;
     public int TankColorP2 { get; set; } = -1;
     /// <summary>Name shown to others in Wi-Fi games.</summary>
