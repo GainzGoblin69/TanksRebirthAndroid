@@ -46,6 +46,8 @@ public class Explosion : IAITankDanger {
     public int Team => Owner?.Team ?? TeamID.NoTeam;
 
     public float Scale;
+    /// <summary>Set by Tank Troves: true when this tank soaks up the blast instead of being hurt (Pyromaniac).</summary>
+    public static Func<Tank, Explosion, bool>? Absorbs;
     /// <summary>(1.9) The blast grows out to <see cref="Scale"/> over its first few frames instead of appearing at full size;
     /// damage and the fireball both follow it.</summary>
     public float DamageRadiusScale;
@@ -158,6 +160,8 @@ public class Explosion : IAITankDanger {
                     || (SparesOwner && ReferenceEquals(tank, Owner)))
                     continue;
                 HasHit[tank.WorldId] = true;
+                if (Absorbs?.Invoke(tank, this) == true)
+                    continue; // Tank Troves Pyromaniac: it gives a shield instead
                 if (Owner is null)
                     tank.Damage(new TankHurtContextOther(null, TankHurtContextOther.HurtContext.FromIngame, "Unowned Explosion"), true);
                 else if (Owner is not null) {

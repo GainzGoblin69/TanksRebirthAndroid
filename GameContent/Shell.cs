@@ -86,7 +86,7 @@ public class Shell : IAITankDanger {
     public Tank? Owner;
     public ModShell? ModdedData { get; private set; }
 
-    public Vector3 Position3D => Position.ExpandZ() + new Vector3(0, 11, 0);
+    public Vector3 Position3D => Position.ExpandZ() + new Vector3(0, 11 + Height, 0);
     public Vector3 Velocity3D => Velocity.ExpandZ();
 
     /// <summary>Maximum amount of times this <see cref="Shell"/> can bounce off walls.</summary>
@@ -182,6 +182,22 @@ public class Shell : IAITankDanger {
     public bool GrowsOnBounce;
     /// <summary>How many walls this shell can still pass through instead of bouncing (Ghost Shells).</summary>
     public int WallPasses;
+    // ---- more Tank Troves shells
+    /// <summary>Boomerang Shells: after <see cref="BoomerangAt"/> ticks it curves back to its tank (and can't hurt it).</summary>
+    public bool Boomerang;
+    public float BoomerangAt = 38f;
+    /// <summary>Lawnmower: on its way back it goes through every enemy.</summary>
+    public bool PiercesOnReturn;
+    bool _returning;
+    /// <summary>Mortar Shells: flies in an arc over walls and explodes where it lands after <see cref="LobTime"/> ticks.</summary>
+    public bool Lobbed;
+    public float LobTime = 50f;
+    /// <summary>How high above the floor it is (a mortar shell's arc).</summary>
+    public float Height;
+    /// <summary>Wraparound: how many more times it leaves one side of the room and comes in the other instead of bouncing.</summary>
+    public int Wraps;
+    /// <summary>Mortar Boomerang: this is the shell lobbed back, so it doesn't bounce back again.</summary>
+    public bool SecondLob;
     /// <summary>Ticks before this shell can use a teleporter again (Tank Troves: shells go through teleporters).</summary>
     public float TeleportCooldown;
     /// <summary>Tank Troves stat items colour your shells (null: the normal look); Rainbow cycles through colours.</summary>
@@ -221,6 +237,7 @@ public class Shell : IAITankDanger {
             Pierce = Pierce, BreaksCork = BreaksCork, HitRadius = HitRadius, ShellHitRadius = ShellHitRadius,
             VisualScale = VisualScale * 0.85f, ExplodeScale = ExplodeScale, ExplodeOnPierce = ExplodeOnPierce,
             SparesOwner = SparesOwner, GrowsOnBounce = GrowsOnBounce,
+            Boomerang = Boomerang, PiercesOnReturn = PiercesOnReturn, Lobbed = Lobbed, LobTime = LobTime, Wraps = Wraps,
         };
         c.LifeTime = 20; // already clear of its tank
         return c;
@@ -373,6 +390,34 @@ public class Shell : IAITankDanger {
             TeleportCooldown -= RuntimeData.DeltaTime;
         Rotation = Velocity.ToRotation() - MathHelper.PiOver2;
         Position += Velocity * 0.62f * RuntimeData.DeltaTime;
+        if (Lobbed) {
+            // up and over: high in the middle of the flight, then it comes down and goes off
+            float t = LifeTime / MathF.Max(LobTime, 1f);
+            Height = MathF.Sin(MathHelper.Pi * MathHelper.Clamp(t, 0f, 1f)) * 42f;
+            _ghostTicks = 2f; // walls don't stop it while it's in the air
+            if (t >= 1f) {
+                Height = 0f;
+                Destroy(DestructionContext.WithObstacle);
+                return;
+            }
+        }
+        if (Boomerang && Owner is { IsDestroyed: false } home && LifeTime > BoomerangAt) {
+            // back to its tank; caught when it gets there
+            if (!_returning) {
+                _returning = true;
+                if (PiercesOnReturn) Pierce += 99;
+            }
+            var to = home.Position - Position;
+            float d = to.Length();
+            float speed = MathF.Max(Velocity.Length(), 2f);
+            if (d < 16f) {
+                Destroy(DestructionContext.WithObstacle, playSound: false);
+                return;
+            }
+            Velocity = Vector2.Normalize(Vector2.Lerp(Velocity, to / d * speed, MathHelper.Clamp(0.12f * RuntimeData.DeltaTime, 0f, 1f))) * speed;
+            _wallRicCooldown = MathF.Max(_wallRicCooldown, 2f); // flies back over the room's edge instead of bouncing off it
+            _ghostTicks = MathF.Max(_ghostTicks, 2f);
+        }
         World = Matrix.CreateScale(VisualScale) * Matrix.CreateFromYawPitchRoll(-Rotation, 0, 0)
                 * Matrix.CreateTranslation(Position3D);
 
@@ -382,7 +427,13 @@ public class Shell : IAITankDanger {
         //}
 
         if (_wallRicCooldown <= 0) {
-            if (Position.X is < GameScene.MIN_X or > GameScene.MAX_X) {
+            if (Wraps > 0 && Position.X is < GameScene.MIN_X or > GameScene.MAX_X) {
+                // Wraparound: out one side, in the other
+                Position = new(Position.X < GameScene.MIN_X ? GameScene.MAX_X - 2 : GameScene.MIN_X + 2, Position.Y);
+                Wraps--;
+                _wallRicCooldown = 5;
+            }
+            else if (Position.X is < GameScene.MIN_X or > GameScene.MAX_X) {
                 // (1.9 fix) put the shell back on the border first, so fast shells can't end up past it
                 Position = new(Math.Clamp(Position.X, GameScene.MIN_X, GameScene.MAX_X), Position.Y);
                 OnRicochet?.Invoke(this);
@@ -393,7 +444,12 @@ public class Shell : IAITankDanger {
                 _wallRicCooldown = 5;
             }
 
-            if (Position.Y is < GameScene.MIN_Z or > GameScene.MAX_Z) {
+            if (Wraps > 0 && Position.Y is < GameScene.MIN_Z or > GameScene.MAX_Z) {
+                Position = new(Position.X, Position.Y < GameScene.MIN_Z ? GameScene.MAX_Z - 2 : GameScene.MIN_Z + 2);
+                Wraps--;
+                _wallRicCooldown = 5;
+            }
+            else if (Position.Y is < GameScene.MIN_Z or > GameScene.MAX_Z) {
                 Position = new(Position.X, Math.Clamp(Position.Y, GameScene.MIN_Z, GameScene.MAX_Z));
                 OnRicochet?.Invoke(this);
                 Ricochet(false);
@@ -703,6 +759,8 @@ public class Shell : IAITankDanger {
             if (ReferenceEquals(tank, _lastPierced)) continue;
             // a fresh shell can't hit the tank that fired it (Triple Shot's side shells start right next to it)
             if (ReferenceEquals(tank, Owner) && LifeTime < 12 && Systems.Troves.TroveRun.Active) continue;
+            if (Boomerang && ReferenceEquals(tank, Owner)) continue; // coming back to you
+            if (Lobbed && Height > 12f) continue; // flying over it
             // Tank Troves: a shield stops it dead (Shield Commander's front)
             if (Blocks?.Invoke(this, tank) == true) {
                 Destroy(DestructionContext.WithObstacle);
@@ -747,6 +805,7 @@ public class Shell : IAITankDanger {
         for (var i = 0; i < AllShells.Length; i++) {
             ref var bullet = ref Unsafe.Add(ref bulletSSpace, i);
             if (bullet == null || bullet == this) continue;
+            if (Lobbed && Height > 12f || bullet.Lobbed && bullet.Height > 12f) continue; // over the top
             if (Vector2.Distance(bullet.Position, Position) > bullet.ShellHitRadius + ShellHitRadius) continue;
             // Tank Troves: your own shells (a Triple Shot volley, a Shell Burst) don't knock each other out
             if (Systems.Troves.TroveRun.Active && Owner is not null && ReferenceEquals(bullet.Owner, Owner)) continue;

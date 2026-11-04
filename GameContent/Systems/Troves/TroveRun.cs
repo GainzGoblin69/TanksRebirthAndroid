@@ -29,7 +29,7 @@ public static class TroveRun {
         EV_WALL = 17, EV_CONVERT = 18, EV_SHRINK = 19, EV_BLAST = 20,
         EV_CLONE = 21, EV_EMP = 22, EV_TURRET = 23, EV_MIRROR = 24, EV_GIVE = 25,
         EV_BOSS_SHOT = 26, EV_BOSS_MINE = 27, EV_BOSS_ACT = 28, EV_BOSS_EXTRA = 29,
-        EV_WELL = 30, EV_SMOKE = 31, EV_FLAG = 32, EV_SHOCK = 33, EV_FREEZE_BOMB = 34, EV_GROUND_ITEM = 35;
+        EV_WELL = 30, EV_SMOKE = 31, EV_FLAG = 32, EV_SHOCK = 33, EV_FREEZE_BOMB = 34, EV_GROUND_ITEM = 35, EV_FRIENDS = 36, EV_OIL = 37, EV_PAD = 38;
     /// <summary>How close (game units) a tank has to get to an item to pick it up.</summary>
     public const float PICKUP_REACH = 26f;
     public static Vector2 PickupPoint => new Coordinates.BlockMapPosition(10, 8);
@@ -581,7 +581,8 @@ public static class TroveRun {
         uint h = (uint)Seed * 2654435761u ^ (uint)FloorNumber * 40503u ^ (uint)(room.Cell.X * 73856093) ^ (uint)(room.Cell.Y * 19349663)
             ^ (uint)(g.X * 83492791) ^ (uint)(g.Y * 2971215073u);
         h ^= h >> 15; h *= 2246822519u; h ^= h >> 13; h *= 3266489917u; h ^= h >> 16;
-        int roll = (int)(h % 100);
+        // Lucky Foot makes everything 2x (Four-Leaf Clover 3x) as likely
+        int roll = (int)(h % 100) / TroveItems.Luck();
         TroveItemId? item = roll switch {
             < 5 => TroveItemId.Shield,
             < 8 => TroveItemId.ExtraLife,
@@ -801,6 +802,15 @@ public static class TroveRun {
                 break;
             case EV_SHOCK:
                 if (Active && CampaignGlobals.InMission) TroveItems.DoShockwave(a);
+                break;
+            case EV_FRIENDS:
+                if (Active && CampaignGlobals.InMission) TroveItems.SpawnFriends(a);
+                break;
+            case EV_OIL:
+                if (Active && CampaignGlobals.InMission) TroveItems.SpillOil(TroveItems.DecodePos(a / 4), a % 4);
+                break;
+            case EV_PAD:
+                if (Active && CampaignGlobals.InMission) TroveItems.PlacePad(TroveItems.DecodePos(a / 4), a % 4);
                 break;
             case EV_GROUND_ITEM:
                 if (Active) TakeGroundDrop(a / 4, a % 4);
