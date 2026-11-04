@@ -681,6 +681,8 @@ public abstract class Tank {
 
         // i think this is right? | (Probably, a destroyed tank is a dead tank!)
         IsDestroyed = true;
+        // a big orange burst of light where the tank blew up
+        TanksRebirth.Graphics.DynamicLighting.GameplayLights.Flash(Position3D + new Vector3(0, 18, 0), new Color(255, 140, 60), 3.4f, 190f, 0.9f, shadows: true, priority: 9);
 
         const string tankDestroySound0 = "Assets/sounds/tnk_destroy.ogg";
         var destroy = SoundPlayer.PlaySoundInstance(tankDestroySound0, SoundContext.Effect, 0.2f, pitchOverride: SoundPlayer.NaturalPitchShift, position: Position3D);
@@ -843,6 +845,8 @@ public abstract class Tank {
         _oldShellLimit = Properties.ShellLimit;
     }
     public void DoShootParticles() {
+        // muzzle flash
+        TanksRebirth.Graphics.DynamicLighting.GameplayLights.Flash(TurretPosition3D + new Vector3(0, 6, 0), new Color(255, 214, 140), 1.6f, 70f, 0.12f, priority: 3);
         var hit = GameHandler.Particles.MakeParticle(TurretPosition3D,
             GameResources.GetGameResource<Texture2D>("Assets/textures/misc/bot_hit"));
 

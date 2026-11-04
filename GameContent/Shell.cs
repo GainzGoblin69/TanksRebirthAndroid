@@ -787,6 +787,9 @@ public class Shell : IAITankDanger {
     /// <param name="wasSentByAnotherClient">Whether or not the Destroy was sent by another client.</param>
     public void Destroy(DestructionContext context, bool playSound = true, bool wasSentByAnotherClient = false) {
         ShootSound?.Instance?.Stop(true);
+        // a small flash where the shell popped (a bigger one when it hit a tank)
+        TanksRebirth.Graphics.DynamicLighting.GameplayLights.Flash(Position3D + new Vector3(0, 10, 0), new Color(255, 190, 110),
+            context == DestructionContext.WithHostileTank ? 2.2f : 1.4f, context == DestructionContext.WithHostileTank ? 100f : 65f, 0.28f, priority: 4);
         // ParticleSystem.MakeSparkEmission(Position, 10);
         ModdedData?.OnDestroy(context, ref playSound);
         if (context != DestructionContext.WithHostileTank && context != DestructionContext.WithMine &&

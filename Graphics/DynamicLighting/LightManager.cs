@@ -367,6 +367,7 @@ public static class LightManager {
 
     static void CollectLights() {
         GameplayLights.BeginFrame();
+        GameplayLights.AddFlashes();
 
         var anySortOfTankLighting = LightingPresets.HeadlightsEnabled || _lantern;
         if (anySortOfTankLighting) {

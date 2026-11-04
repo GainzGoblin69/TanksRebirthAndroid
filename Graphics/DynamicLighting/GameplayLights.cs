@@ -90,12 +90,58 @@ public static class GameplayLights {
         var light = NextPoint();
         light.Position = position + new Vector3(0f, 14f, 0f);
         light.Color = new Color(255, 168, 82);
-        light.Intensity = 1.9f * MathF.Pow(MathHelper.Clamp(life, 0f, 1f), 1.5f) * MathF.Max(Brightness, 0.8f);
-        light.Range = 80f + radius * 3f;
+        light.Intensity = 3.2f * MathF.Pow(MathHelper.Clamp(life, 0f, 1f), 1.5f) * MathF.Max(Brightness, 1f);
+        light.Range = 110f + radius * 3.5f;
         light.Wrap = 0.2f;
         light.CastsShadows = true;
         light.Priority = 9;
         LightingSystem.AddFrameLight(light);
+    }
+
+    // ---- flashes: short-lived lights for things that go bang (shell impacts, muzzle flashes, tank explosions)
+
+    struct FlashInfo {
+        public Vector3 Position;
+        public Color Color;
+        public float Intensity, Range, Start, Duration;
+        public bool Shadows;
+        public int Priority;
+    }
+    static readonly List<FlashInfo> _flashes = [];
+
+    /// <summary>A light that bursts at full strength and fades out over <paramref name="seconds"/>. Does nothing while lighting is off.</summary>
+    public static void Flash(Vector3 position, Color color, float intensity, float range, float seconds, bool shadows = false, int priority = 5) {
+        if (!LightingSystem.IsActive)
+            return;
+        if (_flashes.Count > 48)
+            _flashes.RemoveAt(0); // a big fight: the oldest flash goes first
+        _flashes.Add(new FlashInfo { Position = position, Color = color, Intensity = intensity, Range = range,
+            Start = RuntimeData.RunTime, Duration = seconds * 60f, Shadows = shadows, Priority = priority });
+    }
+
+    /// <summary>Adds this frame's flash lights (called while collecting the frame's gameplay lights).</summary>
+    public static void AddFlashes() {
+        float now = RuntimeData.RunTime;
+        // bright enough to read in daylight, without blowing out at night
+        float boost = MathF.Max(Brightness, 1f);
+        for (int i = _flashes.Count - 1; i >= 0; i--) {
+            var f = _flashes[i];
+            float t = (now - f.Start) / MathF.Max(f.Duration, 1f);
+            if (t >= 1f || t < 0f) {
+                _flashes.RemoveAt(i);
+                continue;
+            }
+            float fade = (1f - t) * (1f - t); // bursts, then dies away quickly
+            var light = NextPoint();
+            light.Position = f.Position;
+            light.Color = f.Color;
+            light.Intensity = f.Intensity * fade * boost;
+            light.Range = f.Range * (0.75f + 0.25f * (1f - t));
+            light.Wrap = 0.3f;
+            light.CastsShadows = f.Shadows;
+            light.Priority = f.Priority;
+            LightingSystem.AddFrameLight(light);
+        }
     }
 
     public static void AddLantern(Vector3 position, float time, bool isLocalPlayer) {
