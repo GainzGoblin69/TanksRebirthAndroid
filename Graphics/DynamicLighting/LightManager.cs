@@ -387,6 +387,13 @@ public static class LightManager {
         if (ShellLights) {
             foreach (var shell in Shell.AllShells) {
                 if (shell is null) continue;
+                // coloured shells (Tank Troves stat items) glow their own colour, with a burst as they leave the barrel
+                if (shell.Tint is not null || shell.Rainbow) {
+                    var glow = shell.Rainbow ? shell.CurrentRainbowColor : shell.Tint!.Value;
+                    float burst = MathHelper.Clamp(1f - shell.LifeTime / 10f, 0f, 1f);
+                    GameplayLights.AddColoredShellLight(shell.Position3D, glow, burst);
+                    continue;
+                }
                 if (shell.Type is not (TanksRebirth.GameContent.ID.ShellID.TrailedRocket or TanksRebirth.GameContent.ID.ShellID.Missile or TanksRebirth.GameContent.ID.ShellID.Rocket)) continue;
 
                 var color = Color.Orange;

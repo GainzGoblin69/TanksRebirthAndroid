@@ -173,6 +173,16 @@ public static class IntermissionHandler {
         IntermissionSystem.IsAwaitingNewMission = true;
         CampaignGlobals.InMission = false;
 
+        // (1.9 fix) stop every tank: tanks stop updating here, but the physics kept moving them at their last speed,
+        // so their headlights, shields and other attached effects slid away from the (frozen) drawn tank
+        foreach (var tank in GameHandler.AllTanks) {
+            if (tank is null) continue;
+            tank.Velocity = Vector2.Zero;
+            tank.KnockbackVelocity = Vector2.Zero;
+            if (tank.Physics is not null)
+                tank.Physics.LinearVelocity = Vector2.Zero;
+        }
+
         if (!CampaignGlobals.InMission && _wasInMission) {
             bool isExtraLifeMission = CampaignGlobals.LoadedCampaign.CachedMissions[CampaignGlobals.LoadedCampaign.CurrentMissionId].GrantsExtraLife;
             int restartTime;

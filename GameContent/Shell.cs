@@ -187,6 +187,8 @@ public class Shell : IAITankDanger {
     /// <summary>Tank Troves stat items colour your shells (null: the normal look); Rainbow cycles through colours.</summary>
     public Color? Tint;
     public bool Rainbow;
+    /// <summary>The colour a Rainbow shell shows right now (its glow follows it).</summary>
+    public Color CurrentRainbowColor => ColorFromHue((float)(Systems.Troves.TroveRun.PlayTime * 0.8 + Id * 0.13) % 1f);
     private float _ghostTicks;
     /// <summary>Set by Tank Troves: true if this shell should bounce back off this tank instead of hitting it (Mirror Shield).</summary>
     public static Func<Shell, Tank, bool>? Reflects;

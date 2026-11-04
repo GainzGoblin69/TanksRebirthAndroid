@@ -71,6 +71,19 @@ public static class GameplayLights {
         LightingSystem.AddFrameLight(light);
     }
 
+    /// <summary>A coloured shell's glow; <paramref name="burst"/> (1 -> 0) is the bright flash as it leaves the barrel.</summary>
+    public static void AddColoredShellLight(Vector3 position, Color color, float burst) {
+        var light = NextPoint();
+        light.Position = position + new Vector3(0f, 8f, 0f);
+        light.Color = color;
+        light.Intensity = (1.1f + 2.2f * burst) * MathF.Max(Brightness, 1f);
+        light.Range = 60f + 50f * burst;
+        light.Wrap = 0.4f;
+        light.CastsShadows = false;
+        light.Priority = 2;
+        LightingSystem.AddFrameLight(light);
+    }
+
     public static void AddMineLight(Mine mine) {
         var light = NextPoint();
         light.Position = mine.Position3D + new Vector3(0f, 9f, 0f);
