@@ -12,7 +12,7 @@ using TanksRebirth.Net;
 
 namespace TanksRebirth.GameContent.Systems.Troves;
 
-public enum FloorTheme { Normal, Forest, Desert, IceCave, Volcano, Haunted }
+public enum FloorTheme { Normal, Forest, Desert, IceCave, Volcano, Haunted, Factory, Swamp, Crystal, Blizzard }
 
 /// <summary>
 /// Special versions of Tank Troves floors: about 1 in 3 runs, a floor shows up themed (the same on every phone, from the
@@ -21,7 +21,7 @@ public enum FloorTheme { Normal, Forest, Desert, IceCave, Volcano, Haunted }
 /// burn, and the Haunted Vault is foggy.
 /// </summary>
 public static class TroveThemes {
-    public const double THEME_CHANCE = 1.0 / 3.0;
+    public const double THEME_CHANCE = 0.45;
 
     public sealed record ThemeDef(FloorTheme Theme, int Floor, string Name, Vector3 FloorTint, Vector3 BlockTint, Color Banner, string Twist);
 
@@ -31,14 +31,24 @@ public static class TroveThemes {
         new(FloorTheme.IceCave, 3, "The Ice Cave", new(0.78f, 0.92f, 1.08f), new(0.82f, 0.95f, 1.1f), new Color(80, 150, 210), "The floor is slippery"),
         new(FloorTheme.Volcano, 4, "The Volcano", new(0.6f, 0.35f, 0.3f), new(0.7f, 0.45f, 0.4f), new Color(160, 40, 20), "Glowing lava cracks burn"),
         new(FloorTheme.Haunted, 5, "The Haunted Vault", new(0.48f, 0.38f, 0.62f), new(0.55f, 0.45f, 0.7f), new Color(70, 40, 100), "Thick fog: you can only see close by"),
+        new(FloorTheme.Blizzard, 1, "The Blizzard", new(0.95f, 0.98f, 1.1f), new(0.9f, 0.95f, 1.05f), new Color(150, 180, 210), "Snow drifts slow you down, and the snow hides what's far away"),
+        new(FloorTheme.Swamp, 2, "The Swamp", new(0.62f, 0.72f, 0.48f), new(0.6f, 0.68f, 0.5f), new Color(70, 95, 50), "Sticky mud pools slow tanks down"),
+        new(FloorTheme.Factory, 3, "The Factory", new(0.62f, 0.66f, 0.72f), new(0.7f, 0.72f, 0.78f), new Color(150, 30, 30), "Red alert! Steam vents burst every few seconds"),
+        new(FloorTheme.Crystal, 4, "The Crystal Caves", new(0.42f, 0.42f, 0.62f), new(0.5f, 0.5f, 0.72f), new Color(60, 120, 170), "A dark cave lit by glowing crystals"),
+        new(FloorTheme.Factory, 4, "The Foundry", new(0.6f, 0.55f, 0.55f), new(0.68f, 0.62f, 0.6f), new Color(150, 30, 30), "Red alert! Steam vents burst every few seconds"),
     ];
+    /// <summary>The theme's look for a floor (a theme can show up on more than one floor, under another name).</summary>
+    public static ThemeDef? Def(FloorTheme t, int floor) => All.FirstOrDefault(d => d.Theme == t && d.Floor == floor) ?? Def(t);
 
     /// <summary>This floor's theme for this run (Normal most of the time).</summary>
     public static FloorTheme PickFor(int floor, int seed) {
         if (TestTheme is { } tt && Def(tt)?.Floor == floor)
             return tt;
         var rng = new Random(unchecked(seed * 9277 + floor * 613));
-        return rng.NextDouble() < THEME_CHANCE ? All.FirstOrDefault(t => t.Floor == floor)?.Theme ?? FloorTheme.Normal : FloorTheme.Normal;
+        if (rng.NextDouble() >= THEME_CHANCE)
+            return FloorTheme.Normal;
+        var options = All.Where(t => t.Floor == floor).ToArray();
+        return options.Length == 0 ? FloorTheme.Normal : options[rng.Next(options.Length)].Theme;
     }
     public static ThemeDef? Def(FloorTheme t) => All.FirstOrDefault(d => d.Theme == t);
     /// <summary>For automated testing: this theme always shows up on its floor.</summary>
@@ -48,7 +58,7 @@ public static class TroveThemes {
 
     // ------------------------------------------------------------------ this room's details and hazards
 
-    private enum Deco { Grass, Flower, Leaf, Bush, Pebble, Cactus, Quicksand, Snow, Crack, Lava, Scorch, Cobweb, Candle }
+    private enum Deco { Grass, Flower, Leaf, Bush, Pebble, Cactus, Quicksand, Snow, Crack, Lava, Scorch, Cobweb, Candle, Grate, Stripes, Mud, LilyPad, Reed, Crystal, Drift }
 
     /// <summary>Areas with an effect (bushes, quicksand, lava): where, how big.</summary>
     public static readonly List<(Vector2 At, float Radius)> Zones = [];
@@ -120,6 +130,32 @@ public static class TroveThemes {
                 Scatter(Deco.Cobweb, 8, 0.8f, 0.7f);
                 Scatter(Deco.Candle, 8, 0.4f);
                 break;
+            case FloorTheme.Factory:
+                Scatter(Deco.Scorch, 8, 0.7f, 0.5f); // oil stains
+                Scatter(Deco.Stripes, 6, 0.7f, 0.85f);
+                Hazards(Deco.Grate, 3 + rng.Next(3), 18f, 0.8f);
+                // spinning red alarm lights in the corners of the room
+                foreach (var (ax, ay) in new[] { (1, 1), (TroveGen.GW - 2, 1), (1, TroveGen.GH - 2), (TroveGen.GW - 2, TroveGen.GH - 2) })
+                    Beacons.Add(new BlockMapPosition(ax, ay));
+                break;
+            case FloorTheme.Swamp:
+                Scatter(Deco.LilyPad, 12, 0.5f, 0.9f);
+                Scatter(Deco.Reed, 14, 0.55f);
+                Hazards(Deco.Mud, 3 + rng.Next(3), 30f, 1.3f);
+                break;
+            case FloorTheme.Crystal:
+                Scatter(Deco.Pebble, 12, 0.3f, 0.6f);
+                for (int i = 0; i < 9 && cells.Count > 0; i++) {
+                    var at = Jitter(W(cells[rng.Next(cells.Count)]));
+                    var col = CrystalColors[rng.Next(CrystalColors.Length)];
+                    Place(Deco.Crystal, at, 0.55f + rng.NextSingle() * 0.3f, rng.NextSingle() * MathHelper.TwoPi, 1f, col);
+                    Glows.Add((at, col));
+                }
+                break;
+            case FloorTheme.Blizzard:
+                Scatter(Deco.Snow, 22, 1.0f, 0.85f);
+                Hazards(Deco.Drift, 3 + rng.Next(3), 28f, 1.3f);
+                break;
         }
     }
 
@@ -128,24 +164,64 @@ public static class TroveThemes {
             p.Destroy();
         _decor.Clear();
         Zones.Clear();
+        Beacons.Clear();
+        Glows.Clear();
         _slide.Clear();
         _onLavaSince.Clear();
         _burnedAt.Clear();
     }
 
-    private static void Place(Deco d, Vector2 at, float scale, float yaw, float alpha) {
+    /// <summary>Factory: the red alarm lights; Crystal Caves: the crystals (where, what colour) for the dynamic lighting.</summary>
+    public static readonly List<Vector2> Beacons = [];
+    public static readonly List<(Vector2 At, Color Color)> Glows = [];
+    private static readonly Color[] CrystalColors = [new(90, 220, 255), new(220, 90, 255), new(120, 255, 170), new(255, 120, 200)];
+
+    /// <summary>Lights for the dynamic lighting: the factory's spinning alarm lights and bursting vents, glowing crystals, lava.</summary>
+    public static void AddLights() {
+        if (!TroveRun.Active || !CampaignGlobals.InMission)
+            return;
+        float t = (float)Now;
+        switch (Current) {
+            case FloorTheme.Factory:
+                for (int i = 0; i < Beacons.Count; i++) {
+                    var b = Beacons[i];
+                    Graphics.DynamicLighting.GameplayLights.AddBeacon(new Vector3(b.X, 45, b.Y), new Color(255, 30, 20), t * 3f + i * MathHelper.PiOver2);
+                    Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(b.X, 30, b.Y), new Color(255, 40, 30), 0.8f + 0.6f * MathF.Sin(t * 6f), 90f);
+                }
+                foreach (var z in Zones)
+                    if (Venting(z.At))
+                        Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(z.At.X, 12, z.At.Y), new Color(255, 230, 220), 1.2f, 70f);
+                break;
+            case FloorTheme.Crystal:
+                foreach (var (at, col) in Glows)
+                    Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(at.X, 12, at.Y), col, 1.4f + 0.3f * MathF.Sin(t * 1.5f + at.X), 95f);
+                break;
+            case FloorTheme.Volcano:
+                foreach (var z in Zones)
+                    Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(z.At.X, 8, z.At.Y), new Color(255, 110, 30), 1.1f + 0.3f * MathF.Sin(t * 2.5f + z.At.X), 80f);
+                break;
+        }
+    }
+
+    /// <summary>Factory steam vents: each one bursts for a second every 5 seconds (worked out from the clock, so every phone agrees).</summary>
+    public const float VENT_EVERY = 5f, VENT_BURST = 1.1f;
+    public static float VentPhase(Vector2 at) => (Math.Abs(at.X * 0.37f + at.Y * 0.61f) % VENT_EVERY);
+    public static bool Venting(Vector2 at) => (Now + VentPhase(at)) % VENT_EVERY > VENT_EVERY - VENT_BURST;
+    public static bool VentWarning(Vector2 at) { var k = (Now + VentPhase(at)) % VENT_EVERY; return k > VENT_EVERY - VENT_BURST - 0.8 && k <= VENT_EVERY - VENT_BURST; }
+
+    private static void Place(Deco d, Vector2 at, float scale, float yaw, float alpha, Color? color = null) {
         var tex = Texture(d);
         if (tex is null)
             return;
         var p = GameHandler.Particles.MakeParticle(new Vector3(at.X, 0.15f + _decor.Count * 0.001f, at.Y), tex);
-        p.HasAdditiveBlending = d is Deco.Lava or Deco.Candle;
+        p.HasAdditiveBlending = d is Deco.Lava or Deco.Candle or Deco.Crystal;
         p.Pitch = MathHelper.PiOver2;
         p.Yaw = yaw;
         p.Scale = new Vector3(scale);
         p.Alpha = alpha;
-        p.Color = Color.White;
-        if (d is Deco.Lava or Deco.Candle)
-            p.UniqueBehavior = q => q.Alpha = 0.75f + 0.25f * MathF.Sin((float)Now * (d == Deco.Lava ? 2.5f : 7f) + q.Position.X);
+        p.Color = color ?? Color.White;
+        if (d is Deco.Lava or Deco.Candle or Deco.Crystal)
+            p.UniqueBehavior = q => q.Alpha = 0.75f + 0.25f * MathF.Sin((float)Now * (d == Deco.Lava ? 2.5f : d == Deco.Crystal ? 1.5f : 7f) + q.Position.X);
         _decor.Add(p);
     }
 
@@ -161,6 +237,10 @@ public static class TroveThemes {
         switch (Current) {
             case FloorTheme.Desert:
                 return InZone(t.Position) ? v * 0.5f : null;
+            case FloorTheme.Swamp:
+                return InZone(t.Position) ? v * 0.55f : null;
+            case FloorTheme.Blizzard:
+                return InZone(t.Position) ? v * 0.6f : null;
             case FloorTheme.IceCave: {
                 // keep most of the last movement: turning and stopping take a moment
                 var last = _slide.TryGetValue(t, out var l) ? l : v;
@@ -176,6 +256,25 @@ public static class TroveThemes {
     public static void Update() {
         if (!TroveRun.Active || !CampaignGlobals.InMission)
             return;
+        if (Current == FloorTheme.Factory) {
+            bool host = !Client.IsConnected() || Client.IsHost();
+            foreach (var z in Zones) {
+                // a hiss of steam before it bursts, then a column of steam
+                if ((Venting(z.At) || VentWarning(z.At)) && Random.Shared.NextDouble() < (Venting(z.At) ? 0.9 : 0.25) * TanksRebirth.RuntimeData.DeltaTime)
+                    Puff(z.At, Venting(z.At));
+                if (!Venting(z.At))
+                    continue;
+                foreach (var t in GameHandler.AllTanks) {
+                    if (t is null || t.IsDestroyed || t.Properties.Immortal || Vector2.Distance(z.At, t.Position) > z.Radius)
+                        continue;
+                    bool decides = t is PlayerTank pt ? TroveItems.IsLocal(pt.PlayerId) : host;
+                    if (!decides || _burnedAt.TryGetValue(t, out var last) && Now - last < VENT_EVERY - 1)
+                        continue;
+                    _burnedAt[t] = Now;
+                    t.Damage(new TankHurtContextOther(null, TankHurtContextOther.HurtContext.FromIngame, "Steam"), true);
+                }
+            }
+        }
         if (Current == FloorTheme.Volcano) {
             bool host = !Client.IsConnected() || Client.IsHost();
             foreach (var t in GameHandler.AllTanks) {
@@ -212,6 +311,24 @@ public static class TroveThemes {
                 };
             }
         }
+    }
+
+    private static void Puff(Vector2 at, bool big) {
+        var tex = Texture(Deco.Snow);
+        if (tex is null)
+            return;
+        var p = GameHandler.Particles.MakeParticle(new Vector3(at.X + Random.Shared.NextSingle() * 10 - 5, 3, at.Y + Random.Shared.NextSingle() * 10 - 5), tex);
+        p.FaceTowardsMe = true;
+        p.Scale = new Vector3(big ? 0.35f : 0.18f);
+        p.Alpha = big ? 0.8f : 0.5f;
+        p.Color = new Color(235, 235, 240);
+        p.UniqueBehavior = q => {
+            q.Position += new Vector3(0, big ? 1.4f : 0.5f, 0) * TanksRebirth.RuntimeData.DeltaTime;
+            q.Scale += new Vector3(0.012f) * TanksRebirth.RuntimeData.DeltaTime;
+            q.Alpha -= 0.02f * TanksRebirth.RuntimeData.DeltaTime;
+            if (q.Alpha <= 0)
+                q.Destroy();
+        };
     }
 
     // ------------------------------------------------------------------ the pictures (drawn once, in code)
@@ -313,6 +430,55 @@ public static class TroveThemes {
                 for (int r = 8; r < 30; r += 7)
                     for (int i = 0; i < 6; i++)
                         Line(32 + MathF.Cos(i * 1.047f) * r, 32 + MathF.Sin(i * 1.047f) * r, 32 + MathF.Cos((i + 1) * 1.047f) * r, 32 + MathF.Sin((i + 1) * 1.047f) * r, 0.5f, new Color(230, 230, 240, 170));
+                break;
+            case Deco.Grate:
+                // a round steam vent with bars
+                Dot(32, 32, 28, new Color(60, 62, 68), 2f);
+                Dot(32, 32, 24, new Color(25, 25, 30), 2f);
+                for (int i = 0; i < 5; i++)
+                    Line(14, 18 + i * 7, 50, 18 + i * 7, 1.6f, new Color(110, 112, 120));
+                break;
+            case Deco.Stripes:
+                // yellow and black hazard stripes on a floor plate
+                for (int y = 20; y < 44; y++)
+                    for (int x = 4; x < 60; x++)
+                        px[y * N + x] = ((x + y) / 7) % 2 == 0 ? new Color(230, 190, 40, 230) : new Color(30, 30, 30, 230);
+                break;
+            case Deco.Mud:
+                for (int r = 30; r > 4; r -= 5)
+                    Dot(32 + (r % 3), 32 - (r % 4), r, r % 10 == 0 ? new Color(85, 70, 40, 225) : new Color(70, 58, 32, 225), 3f);
+                Dot(24, 26, 3, new Color(120, 105, 70, 200));
+                Dot(40, 38, 2, new Color(120, 105, 70, 200));
+                break;
+            case Deco.LilyPad:
+                Dot(32, 32, 20, new Color(60, 140, 60));
+                Line(32, 32, 50, 22, 3f, new Color(0, 0, 0, 0)); // the notch
+                for (int y = 0; y < N; y++)
+                    for (int x = 0; x < N; x++)
+                        if (x > 32 && Math.Abs((y - 32) - (x - 32) * -0.5f) < 4)
+                            px[y * N + x] = default;
+                if (rng.Next(2) == 0)
+                    Dot(26, 34, 5, new Color(250, 200, 220));
+                break;
+            case Deco.Reed:
+                for (int i = 0; i < 4; i++) {
+                    float x0 = 24 + i * 5;
+                    Line(x0, 58, x0 + (i - 1.5f) * 4, 14 + i * 3, 1.3f, new Color(90, 120, 50));
+                    Dot(x0 + (i - 1.5f) * 4, 16 + i * 3, 2.5f, new Color(110, 70, 35));
+                }
+                break;
+            case Deco.Crystal:
+                // a cluster of glowing shards (white, tinted by the particle colour)
+                Dot(32, 32, 28, new Color(255, 255, 255, 60), 20f);
+                for (int i = 0; i < 5; i++) {
+                    float a = i * 1.256f + 0.3f;
+                    Line(32, 32, 32 + MathF.Cos(a) * (14 + i * 2), 32 + MathF.Sin(a) * (14 + i * 2), 3.5f - i * 0.3f, new Color(230, 240, 255));
+                }
+                Dot(32, 32, 6, Color.White, 2f);
+                break;
+            case Deco.Drift:
+                for (int i = 0; i < 7; i++)
+                    Dot(32 + MathF.Cos(i * 0.9f) * (i % 3) * 8, 32 + MathF.Sin(i * 0.9f) * (i % 3) * 6, 16 - (i % 3) * 2, new Color(245, 250, 255, 235), 6f);
                 break;
             case Deco.Candle:
                 Dot(32, 32, 26, new Color(255, 190, 90, 70), 18f);

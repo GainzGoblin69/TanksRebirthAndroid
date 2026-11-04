@@ -163,10 +163,11 @@ public static partial class MainMenuUI {
                 break;
             case UIState.MPJoin:
                 LanSession.Leave();
+                Net.Online.OnlineBrowser.Stop();
                 GoToState(UIState.MPMode);
                 break;
             case UIState.MPKeypad:
-                GoToState(_keypadForCode ? UIState.MPOnline : UIState.MPJoin);
+                GoToState(UIState.MPJoin);
                 break;
             case UIState.MPOnline:
                 GoToState(UIState.MPMode);
@@ -176,12 +177,12 @@ public static partial class MainMenuUI {
                 break;
             case UIState.MPOnlineJoining:
                 Net.Online.OnlineSession.Leave();
-                GoToState(UIState.MPOnline);
+                OpenJoin();
                 break;
             case UIState.MPLobby:
                 if (Net.Online.OnlineSession.Active) {
                     Net.Online.OnlineSession.Leave();
-                    GoToState(UIState.MPOnline);
+                    GoToState(UIState.MPMode);
                 }
                 else {
                     LanSession.Leave();
@@ -201,13 +202,13 @@ public static partial class MainMenuUI {
             // hosting couldn't start: show why on the Online screen
             ChatSystem.SendMessage(Net.Online.OnlineSession.Error, Color.Red);
             Net.Online.OnlineSession.Leave();
-            MenuState = UIState.MPOnline;
+            MenuState = UIState.MPMode;
         }
         else if (MenuState == UIState.MPLobby && !Client.IsConnected() && _lobbyGrace <= 0 && !(online && Net.Online.OnlineSession.Busy)) {
             ChatSystem.SendMessage(online ? "Disconnected from the online game." : "Disconnected from the Wi-Fi game.", Color.Orange);
             if (online) {
                 Net.Online.OnlineSession.Leave();
-                MenuState = UIState.MPOnline;
+                MenuState = UIState.MPMode;
             }
             else {
                 LanSession.Leave();
@@ -220,6 +221,7 @@ public static partial class MainMenuUI {
             _lobbyGrace--;
         if (MenuState == UIState.MPJoin && Client.IsConnected()) {
             LanSession.StopSearch();
+            Net.Online.OnlineBrowser.Stop();
             MenuState = UIState.MPLobby;
         }
         // host: whenever someone joins, send them the current difficulty choices
@@ -263,28 +265,30 @@ public static partial class MainMenuUI {
 
     // ---- multiplayer: choose a mode
     private static void DrawMPMode(SpriteBatch sb) {
-        int n = 5;
+        int n = 4;
         var panel = RightPanel();
         DrawPanel(sb, panel);
         float s = PhoneScale;
         var cx = panel.Center.X;
         PText(sb, "Multiplayer", new Vector2(cx, panel.Y + 80 * s), 1.6f, Ink);
         var sub = UITextButton.PhoneEdge;
-        PText(sb, "Same Device", new Vector2(cx, panel.Y + 180 * s), 1.15f, Ink);
-        PText(sb, "Two players on this phone.", new Vector2(cx, panel.Y + 235 * s), 0.9f, sub);
-        PText(sb, "Touch + a controller, or two controllers.", new Vector2(cx, panel.Y + 280 * s), 0.9f, sub);
-        PText(sb, "Wi-Fi", new Vector2(cx, panel.Y + 365 * s), 1.15f, Ink);
-        PText(sb, "Phones on the same Wi-Fi network.", new Vector2(cx, panel.Y + 420 * s), 0.9f, sub);
-        PText(sb, "One hosts, the others join from a list.", new Vector2(cx, panel.Y + 465 * s), 0.9f, sub);
-        PText(sb, "Online", new Vector2(cx, panel.Y + 550 * s), 1.15f, Ink);
-        PText(sb, "Play with anyone over the internet.", new Vector2(cx, panel.Y + 605 * s), 0.9f, sub);
-        PText(sb, "The host shares a 6-digit code.", new Vector2(cx, panel.Y + 650 * s), 0.9f, sub);
+        PText(sb, "Same Device", new Vector2(cx, panel.Y + 190 * s), 1.15f, Ink);
+        PText(sb, "Two players on this phone (touch + a controller, or two controllers).", new Vector2(cx, panel.Y + 245 * s), 0.8f, sub);
+        PText(sb, "Host", new Vector2(cx, panel.Y + 340 * s), 1.15f, Ink);
+        PText(sb, "Start a game. Phones on your Wi-Fi and players online can join.", new Vector2(cx, panel.Y + 395 * s), 0.8f, sub);
+        PText(sb, "Join", new Vector2(cx, panel.Y + 490 * s), 1.15f, Ink);
+        PText(sb, "Pick a game from the list. Same Wi-Fi connects directly (faster).", new Vector2(cx, panel.Y + 545 * s), 0.8f, sub);
 
         if (PButton(sb, PhoneColumnSlot(0, n), "Same Device"))
             GoToState(UIState.MPLocal);
-        if (PButton(sb, PhoneColumnSlot(1, n), "Host on Wi-Fi")) {
-            if (LanSession.Host()) {
-                _lobbyGrace = 180; // give the local connection a moment
+        if (PButton(sb, PhoneColumnSlot(1, n), "Host")) {
+            if (Net.Online.OnlineSession.Configured) {
+                Net.Online.OnlineSession.Host();
+                _lobbyGrace = 240; // give the local connection a moment
+                GoToState(UIState.MPLobby);
+            }
+            else if (LanSession.Host()) {
+                _lobbyGrace = 180;
                 GoToState(UIState.MPLobby);
             }
             else {
@@ -292,14 +296,16 @@ public static partial class MainMenuUI {
                 SoundPlayer.SoundError();
             }
         }
-        if (PButton(sb, PhoneColumnSlot(2, n), "Join on Wi-Fi")) {
-            LanSession.StartSearch();
-            GoToState(UIState.MPJoin);
-        }
-        if (PButton(sb, PhoneColumnSlot(3, n), "Online"))
-            GoToState(UIState.MPOnline);
-        if (PButton(sb, PhoneColumnSlot(4, n), "Back"))
+        if (PButton(sb, PhoneColumnSlot(2, n), "Join"))
+            OpenJoin();
+        if (PButton(sb, PhoneColumnSlot(3, n), "Back"))
             PhoneScreenBack();
+    }
+
+    private static void OpenJoin() {
+        LanSession.StartSearch();
+        Net.Online.OnlineBrowser.Start();
+        GoToState(UIState.MPJoin);
     }
 
     // ---- online: host or join with a code
@@ -384,39 +390,58 @@ public static partial class MainMenuUI {
         EnterCampaigns();
     }
 
-    // ---- Wi-Fi join
+    // ---- join: games on this Wi-Fi and online games, in one list
     private static void DrawMPJoin(SpriteBatch sb) {
         float s = PhoneScale;
-        var games = LanSession.Found.OrderBy(g => g.Name).Take(4).ToList();
         int n = 2;
-        if (PButton(sb, PhoneColumnSlot(0, n), "Enter Address")) {
-            _keypadForCode = false;
+        if (PButton(sb, PhoneColumnSlot(0, n), "Enter Code", enabled: Net.Online.OnlineSession.Configured)) {
+            _keypadText = "";
+            _keypadForCode = true;
             GoToState(UIState.MPKeypad);
         }
         if (PButton(sb, PhoneColumnSlot(1, n), "Back"))
             PhoneScreenBack();
 
+        // a game on the same Wi-Fi shows once, and is joined directly
+        var rows = new List<(string Label, bool Enabled, Action Join)>();
+        var lan = LanSession.Found.OrderBy(g => g.Name).ToList();
+        foreach (var g in lan)
+            rows.Add(($"{g.Name}  ({g.Players}/{g.MaxPlayers})  -  Wi-Fi", g.Players < g.MaxPlayers, () => {
+                Net.Online.OnlineBrowser.Stop();
+                LanSession.Join(g.EndPoint.Address.ToString(), g.EndPoint.Port);
+                ChatSystem.SendMessage($"Joining {g.Name}...", Color.White);
+            }));
+        foreach (var g in Net.Online.OnlineBrowser.Games) {
+            if (g.Lan is { } le && lan.Any(l => l.EndPoint.Address.Equals(le.Address)))
+                continue;
+            var code = g.Code;
+            rows.Add(($"{g.Host}  ({g.Players}/{g.Max})  -  {(g.Playing ? "playing" : "Online")}", !g.Playing && g.Players < g.Max, () => {
+                Net.Online.OnlineBrowser.Stop();
+                LanSession.Leave();
+                Net.Online.OnlineSession.Join(code);
+                GoToState(UIState.MPOnlineJoining);
+            }));
+        }
+
         var panel = RightPanel();
         DrawPanel(sb, panel);
         var cx = panel.Center.X;
-        PText(sb, "Join on Wi-Fi", new Vector2(cx, panel.Y + 70 * s), 1.3f, Ink);
-        if (games.Count == 0) {
+        PText(sb, "Join a Game", new Vector2(cx, panel.Y + 70 * s), 1.3f, Ink);
+        if (rows.Count == 0) {
             int dots = (int)(DateTime.UtcNow.TimeOfDay.TotalSeconds * 2) % 4;
             PText(sb, "Looking for games" + new string('.', dots), new Vector2(cx, panel.Y + 220 * s), 0.9f, Ink);
-            PText(sb, "Make sure both phones are on the same Wi-Fi", new Vector2(cx, panel.Y + 300 * s), 0.6f, UITextButton.PhoneEdge);
-            PText(sb, "and the other phone tapped Host on Wi-Fi.", new Vector2(cx, panel.Y + 340 * s), 0.6f, UITextButton.PhoneEdge);
-            PText(sb, "Not showing up? Tap Enter Address and type the", new Vector2(cx, panel.Y + 420 * s), 0.6f, UITextButton.PhoneEdge);
-            PText(sb, "address shown on the host's screen.", new Vector2(cx, panel.Y + 460 * s), 0.6f, UITextButton.PhoneEdge);
+            PText(sb, "Ask a friend to tap Multiplayer > Host.", new Vector2(cx, panel.Y + 300 * s), 0.6f, UITextButton.PhoneEdge);
+            PText(sb, "Games on your Wi-Fi and online games both show up here.", new Vector2(cx, panel.Y + 340 * s), 0.6f, UITextButton.PhoneEdge);
+            PText(sb, "Have a code? Tap Enter Code.", new Vector2(cx, panel.Y + 420 * s), 0.6f, UITextButton.PhoneEdge);
+            if (Net.Online.OnlineBrowser.Failed)
+                PText(sb, "(Online games can't be listed: no internet)", new Vector2(cx, panel.Y + 480 * s), 0.55f, new Color(170, 60, 40));
             return;
         }
-        for (int i = 0; i < games.Count; i++) {
-            var g = games[i];
-            var r = new Rectangle(panel.X + (int)(40 * s), panel.Y + (int)((150 + i * 130) * s), panel.Width - (int)(80 * s), (int)(110 * s));
-            bool full = g.Players >= g.MaxPlayers;
-            if (PButton(sb, r, $"{g.Name}  ({g.Players}/{g.MaxPlayers})", enabled: !full)) {
-                LanSession.Join(g.EndPoint.Address.ToString(), g.EndPoint.Port);
-                ChatSystem.SendMessage($"Joining {g.Name}...", Color.White);
-            }
+        for (int i = 0; i < Math.Min(rows.Count, 5); i++) {
+            var row = rows[i];
+            var r = new Rectangle(panel.X + (int)(40 * s), panel.Y + (int)((140 + i * 118) * s), panel.Width - (int)(80 * s), (int)(100 * s));
+            if (PButton(sb, r, row.Label, enabled: row.Enabled))
+                row.Join();
         }
     }
 
@@ -429,6 +454,8 @@ public static partial class MainMenuUI {
         bool valid = _keypadForCode ? _keypadText.Length == 6 : System.Net.IPAddress.TryParse(_keypadText, out _);
         if (PButton(sb, PhoneColumnSlot(0, n), "Join", enabled: valid)) {
             if (_keypadForCode) {
+                Net.Online.OnlineBrowser.Stop();
+                LanSession.Leave();
                 Net.Online.OnlineSession.Join(_keypadText);
                 GoToState(UIState.MPOnlineJoining);
             }
@@ -477,11 +504,11 @@ public static partial class MainMenuUI {
             // the code is what friends need: make it big
             var c = Net.Online.OnlineSession.Code!;
             PText(sb, $"Code  {c[..3]} {c[3..]}", new Vector2(cx, panel.Y + 150 * s), 1.7f, new Color(30, 110, 200));
-            PText(sb, "Friends: Multiplayer > Online > Join with Code", new Vector2(cx, panel.Y + 215 * s), 0.75f, UITextButton.PhoneEdge);
+            PText(sb, "Friends: Multiplayer > Join (your game is in the list)", new Vector2(cx, panel.Y + 215 * s), 0.75f, UITextButton.PhoneEdge);
         }
         else if (Net.Online.OnlineSession.Active) {
             var os = Net.Online.OnlineSession.Code is { } code && host
-                ? $"Code: {code}   (friends: Multiplayer > Online > Join with Code)"
+                ? $"Code: {code}   (friends: Multiplayer > Join)"
                 : host ? Net.Online.OnlineSession.Status
                 : Net.Online.OnlineSession.Connection == Net.Online.OnlineSession.Link.Relay ? "Online, connected through the relay" : "Online, connected directly";
             PText(sb, os, new Vector2(cx, panel.Y + 135 * s), host && Net.Online.OnlineSession.Code is not null ? 0.9f : 0.7f, host && Net.Online.OnlineSession.Code is not null ? new Color(30, 110, 200) : UITextButton.PhoneEdge);

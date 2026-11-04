@@ -72,14 +72,71 @@ public static class TroveHud {
         DrawDoors(sb, floor, room);
     }
 
-    // ---- the Haunted Vault's fog: dark everywhere except a circle around you
-    private static Texture2D? _fogHole;
+    // ---- floor themes on screen: the Haunted Vault's fog, the Crystal Caves' dark, the blizzard's snow, the swamp haze,
+    //      the factory's red alert
+    private static Texture2D? _fogHole, _vignette;
+    private static readonly (float X, float Y, float Speed, float Size)[] _flakes = Enumerable.Range(0, 90)
+        .Select(i => { var r = new Random(i * 7919); return (r.NextSingle(), r.NextSingle(), 0.6f + r.NextSingle(), 2f + r.NextSingle() * 4f); }).ToArray();
+
     private static void DrawFog(SpriteBatch sb) {
-        if (TroveThemes.Current != FloorTheme.Haunted || !CampaignGlobals.InMission)
+        if (!CampaignGlobals.InMission)
             return;
+        var theme = TroveThemes.Current;
+        if (theme == FloorTheme.Normal)
+            return;
+        EnsureFogTextures(sb.GraphicsDevice);
+        float s = S;
+        float t = (float)TroveRun.PlayTime;
+        int W = WindowUtils.WindowWidth, H = WindowUtils.WindowHeight;
         int me = Systems.LocalCoop.Active ? 0 : Net.NetPlay.GetMyClientId();
-        if (GameHandler.AllPlayerTanks[Math.Clamp(me, 0, 3)] is not { IsDestroyed: false } tank)
-            return;
+        var tank = GameHandler.AllPlayerTanks[Math.Clamp(me, 0, 3)] is { IsDestroyed: false } mt ? mt : null;
+        switch (theme) {
+            case FloorTheme.Haunted:
+                if (tank is not null)
+                    FogAround(sb, ToScreen(tank.Position), 420 * s * (1f + 0.03f * MathF.Sin(t * 2f)), new Color(10, 5, 20) * 0.88f);
+                break;
+            case FloorTheme.Crystal:
+                // a dark cave: you see around you, and the crystals glow through the dark
+                if (tank is not null)
+                    FogAround(sb, ToScreen(tank.Position), 560 * s, new Color(4, 6, 22) * 0.72f);
+                foreach (var (at, col) in TroveThemes.Glows) {
+                    var c = ToScreen(at);
+                    float p = 0.8f + 0.2f * MathF.Sin(t * 1.5f + at.X);
+                    ToggleSwitch.DrawDisc(sb, c, 70 * s, col * (0.10f * p));
+                    ToggleSwitch.DrawDisc(sb, c, 36 * s, col * (0.18f * p));
+                    ToggleSwitch.DrawDisc(sb, c, 12 * s, Color.Lerp(col, Color.White, 0.6f) * (0.6f * p));
+                }
+                break;
+            case FloorTheme.Blizzard: {
+                // a white haze toward the edges and snow blowing across the screen
+                sb.Draw(_vignette, new Rectangle(0, 0, W, H), new Color(235, 242, 255) * 0.55f);
+                foreach (var (fx, fy, sp, sz) in _flakes) {
+                    float x = (fx * W + t * 220 * s * sp) % (W + 40) - 20;
+                    float y = (fy * H + t * 90 * s * sp + MathF.Sin(t * 2 + fx * 20) * 20 * s) % (H + 40) - 20;
+                    ToggleSwitch.DrawDisc(sb, new Vector2(x, y), sz * s, Color.White * 0.75f);
+                }
+                break;
+            }
+            case FloorTheme.Swamp:
+                sb.Draw(_vignette, new Rectangle(0, 0, W, H), new Color(40, 70, 30) * 0.5f);
+                break;
+            case FloorTheme.Factory: {
+                // red alert: the edges of the screen pulse red
+                float pulse = 0.5f + 0.5f * MathF.Sin(t * 4.5f);
+                sb.Draw(_vignette, new Rectangle(0, 0, W, H), new Color(200, 10, 10) * (0.25f + 0.45f * pulse));
+                sb.Draw(_fogHole!, new Rectangle(0, 0, W, H), new Rectangle(0, 0, 1, 1), new Color(255, 0, 0) * (0.05f * pulse));
+                // steam vents about to burst: a warning ring
+                foreach (var z in TroveThemes.Zones)
+                    if (TroveThemes.VentWarning(z.At)) {
+                        var c = ToScreen(z.At);
+                        ToggleSwitch.DrawDisc(sb, c, 26 * s, new Color(255, 230, 230) * (0.25f + 0.25f * MathF.Sin(t * 20)));
+                    }
+                break;
+            }
+        }
+    }
+
+    private static void EnsureFogTextures(GraphicsDevice gd) {
         if (_fogHole is null || _fogHole.IsDisposed) {
             const int N = 256;
             var px = new Color[N * N];
@@ -91,24 +148,38 @@ public static class TroveHud {
                     a = a * a * (3 - 2 * a);
                     px[y * N + x] = new Color(0, 0, 0, (int)(a * 255));
                 }
-            _fogHole = new Texture2D(sb.GraphicsDevice, N, N);
+            _fogHole = new Texture2D(gd, N, N);
             _fogHole.SetData(px);
         }
-        float s = S;
-        var c = ToScreen(tank.Position);
-        float r = 420 * s * (1f + 0.03f * MathF.Sin((float)TroveRun.PlayTime * 2f));
-        var dark = new Color(10, 5, 20) * 0.88f;
-        var hole = new Rectangle((int)(c.X - r), (int)(c.Y - r), (int)(r * 2), (int)(r * 2));
-        sb.Draw(_fogHole, hole, new Color(10, 5, 20) * 0.88f);
-        var px1 = TextureGlobals.Pixels[Color.White];
+        if (_vignette is null || _vignette.IsDisposed) {
+            // white, see-through in the middle and solid at the edges (tinted when drawn)
+            const int N = 128;
+            var px = new Color[N * N];
+            for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++) {
+                    float dx = (x + 0.5f) / N * 2 - 1, dy = (y + 0.5f) / N * 2 - 1;
+                    float d = MathF.Sqrt(dx * dx * 0.8f + dy * dy * 1.1f);
+                    float a = Math.Clamp((d - 0.55f) / 0.75f, 0, 1);
+                    a = a * a * (3 - 2 * a);
+                    px[y * N + x] = new Color(255, 255, 255, (int)(a * 255));
+                }
+            _vignette = new Texture2D(gd, N, N);
+            _vignette.SetData(px);
+        }
+    }
+
+    /// <summary>Dark everywhere except a soft circle (the whole screen is drawn from one texture, so there are no seams).</summary>
+    private static void FogAround(SpriteBatch sb, Vector2 c, float r, Color dark) {
         int W = WindowUtils.WindowWidth, H = WindowUtils.WindowHeight;
+        var hole = new Rectangle((int)(c.X - r), (int)(c.Y - r), (int)(r * 2), (int)(r * 2));
+        sb.Draw(_fogHole!, hole, dark);
         // the rest of the screen uses the same texture's fully dark corner texel, so it matches the edge of the hole exactly
         // (a plain white pixel came out a different shade on some phones, leaving a lighter square around the tank)
         var corner = new Rectangle(0, 0, 1, 1);
-        sb.Draw(_fogHole, new Rectangle(0, 0, W, Math.Max(0, hole.Top)), corner, dark);
-        sb.Draw(_fogHole, new Rectangle(0, hole.Bottom, W, Math.Max(0, H - hole.Bottom)), corner, dark);
-        sb.Draw(_fogHole, new Rectangle(0, hole.Top, Math.Max(0, hole.Left), hole.Height), corner, dark);
-        sb.Draw(_fogHole, new Rectangle(hole.Right, hole.Top, Math.Max(0, W - hole.Right), hole.Height), corner, dark);
+        sb.Draw(_fogHole!, new Rectangle(0, 0, W, Math.Max(0, hole.Top)), corner, dark);
+        sb.Draw(_fogHole!, new Rectangle(0, hole.Bottom, W, Math.Max(0, H - hole.Bottom)), corner, dark);
+        sb.Draw(_fogHole!, new Rectangle(0, hole.Top, Math.Max(0, hole.Left), hole.Height), corner, dark);
+        sb.Draw(_fogHole!, new Rectangle(hole.Right, hole.Top, Math.Max(0, W - hole.Right), hole.Height), corner, dark);
     }
 
     // ---- things in the room: the item on the floor, orbiters, buddy/decoy tags, the Stopwatch freeze

@@ -59,6 +59,17 @@ public static class LanSession {
         }
     }
 
+    /// <summary>Answer "who's hosting?" broadcasts on the Wi-Fi from the game's server (the online host does this too,
+    /// so phones on the same Wi-Fi find it in the list and connect directly).</summary>
+    public static void EnableDiscovery() {
+        if (Server.NetManager is null || Server.NetListener is null)
+            return;
+        Server.NetManager.BroadcastReceiveEnabled = true;
+        Server.NetManager.UnconnectedMessagesEnabled = true;
+        Server.NetListener.NetworkReceiveUnconnectedEvent -= OnServerUnconnected;
+        Server.NetListener.NetworkReceiveUnconnectedEvent += OnServerUnconnected;
+    }
+
     private static void OnServerUnconnected(IPEndPoint remote, NetPacketReader reader, UnconnectedMessageType type) {
         try {
             if (reader.AvailableBytes <= 0 || reader.GetString() != ASK)

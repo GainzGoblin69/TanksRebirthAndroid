@@ -329,7 +329,7 @@ public static class TroveGen {
     private static void BuildRooms(TroveFloor f, int seed) {
         f.BossTier = TroveBosses.PickFor(f.Number, seed).Tier;
         f.Theme = TroveThemes.PickFor(f.Number, seed);
-        if (TroveThemes.Def(f.Theme) is { } theme)
+        if (TroveThemes.Def(f.Theme, f.Number) is { } theme)
             f.Name = theme.Name;
         bool campaign = SeedUsesCampaign(seed) && CampaignAvailable;
         // level styles (rolled separately, so they don't change the rest of the layout):

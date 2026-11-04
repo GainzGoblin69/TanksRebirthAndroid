@@ -42,14 +42,46 @@ public static class GameplayLights {
         return particle;
     }
 
-    public static void AddHeadlight(Vector3 relativePosition, Vector2 forward, bool isLocalPlayer) {
+    public static readonly Color DefaultHeadlight = new(255, 236, 196);
+
+    public static void AddHeadlight(Vector3 relativePosition, Vector2 forward, bool isLocalPlayer) => AddHeadlight(relativePosition, forward, isLocalPlayer, DefaultHeadlight);
+
+    /// <summary>A soft coloured glow (floor themes: crystals, alarm lights).</summary>
+    public static void AddGlow(Vector3 position, Color color, float intensity, float range) {
+        var light = NextPoint();
+        light.Position = position;
+        light.Color = color;
+        light.Intensity = intensity * MathF.Max(Brightness, 1f);
+        light.Range = range;
+        light.Wrap = 0.4f;
+        light.CastsShadows = false;
+        light.Priority = 3;
+        LightingSystem.AddFrameLight(light);
+    }
+
+    /// <summary>A spinning alarm light: a coloured beam sweeping around <paramref name="position"/>.</summary>
+    public static void AddBeacon(Vector3 position, Color color, float angle) {
+        var spot = NextSpot();
+        spot.Position = position;
+        spot.Direction = new Vector3(MathF.Cos(angle), -0.35f, MathF.Sin(angle));
+        spot.Color = color;
+        spot.Intensity = 2.4f * MathF.Max(Brightness, 1f);
+        spot.Range = 420f;
+        spot.InnerAngle = MathHelper.ToRadians(8f);
+        spot.OuterAngle = MathHelper.ToRadians(28f);
+        spot.CastsShadows = false;
+        spot.Priority = 4;
+        LightingSystem.AddFrameLight(spot);
+    }
+
+    public static void AddHeadlight(Vector3 relativePosition, Vector2 forward, bool isLocalPlayer, Color color) {
         forward.Normalize();
         var forward3 = new Vector3(forward.X, 0f, forward.Y);
 
         var head = NextSpot();
         head.Position = relativePosition;
         head.Direction = forward3 + new Vector3(0f, -0.32f, 0f);
-        head.Color = new Color(255, 236, 196);
+        head.Color = color;
         head.Intensity = 1.7f * Brightness;
         head.Range = 250f;
         head.InnerAngle = MathHelper.ToRadians(10f);

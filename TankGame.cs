@@ -945,6 +945,7 @@ public class TankGame : Game {
         SpriteRenderer.End();
         LocalCoop.DrawAim(SpriteRenderer); // same-device co-op: each controller player's aim
         ReviveSystem.Draw(SpriteRenderer); // Gears of War: revive rings
+        HiddenTankOutlines.Draw(SpriteRenderer); // tanks hidden behind blocks: a faint dotted outline (under the fog)
         TroveHud.Draw(SpriteRenderer); // Tank Troves: doors, minimap, room fades, end screen
         BattleHud.DrawSetup(SpriteRenderer); // the Battle options screen
         MPEndScreen.Draw(SpriteRenderer); // multiplayer game over: Restart / Quit

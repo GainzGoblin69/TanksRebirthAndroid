@@ -90,22 +90,35 @@ public static class OnlineSession {
 
     // ------------------------------------------------------------------ host
 
+    /// <summary>The list of open games everyone can see (a room code that's never handed out: codes are 100000-999999).</summary>
+    public const string Directory = "rooms/000000/g";
+    /// <summary>Hosting worked on the Wi-Fi, but the online service couldn't be reached (no code, not in the online list).</summary>
+    public static bool WifiOnly { get; private set; }
+
+    /// <summary>Host a game: on the Wi-Fi (phones nearby find it and connect directly) and online (listed for everyone, with a code).</summary>
     public static void Host() {
         Begin(host: true);
-        Status = "Getting a code...";
+        WifiOnly = false;
+        _port = LanSession.Port; // the Wi-Fi port, so phones on the same network find this game
+        Status = "Starting...";
         var ct = _cts!.Token;
+        bool serverUp = false;
         _ = Task.Run(async () => {
             try {
-                var pub = await Stun.QueryAsync(_port);
+                IPEndPoint? pub = null;
+                try { pub = await Stun.QueryAsync(_port); } catch { }
                 await OnMain(() => {
                     Server.CreateServer();
                     Server.NetManager.UnconnectedMessagesEnabled = true;
                     NetPlay.ServerName = $"{LanSession.PlayerName}'s game";
                     Server.StartServer(NetPlay.ServerName, _port, "0.0.0.0", string.Empty);
+                    LanSession.EnableDiscovery();
                     Client.CreateClient(LanSession.PlayerName);
                     Client.AttemptConnectionTo("127.0.0.1", _port, string.Empty);
                     Server.ConnectedClients[0] = NetPlay.CurrentClient;
                 });
+                serverUp = true;
+                Status = "Getting a code...";
 
                 for (int attempt = 0; attempt < 6 && Code is null; attempt++) {
                     var code = Random.Shared.Next(100000, 1000000).ToString();
@@ -114,7 +127,7 @@ public static class OnlineSession {
                         Code = code;
                 }
                 if (Code is null) {
-                    Fail("Couldn't get a code. Try again.");
+                    WifiOnlyFallback("couldn't get a code");
                     return;
                 }
                 await _fb!.PutAsync(Room, $"{{\"host\":{J(LanSession.PlayerName)},\"pub\":{J(Ep(pub))},\"lan\":{J(LanEp())},\"v\":1,\"t\":{{\".sv\":\"timestamp\"}}}}", ct);
@@ -122,13 +135,42 @@ public static class OnlineSession {
                 Busy = false;
                 Connection = Link.Direct;
                 _ = _fb.StreamAsync($"{Room}/j", OnJoinerChange, ct);
+                // listed in the Join screen for everyone: refreshed while the game is open
+                var listed = Code;
+                var fb = _fb;
+                _ = Task.Run(async () => {
+                    while (!ct.IsCancellationRequested) {
+                        try {
+                            bool playing = TanksRebirth.GameContent.UI.MainMenu.MainMenuUI.IsActive == false;
+                            await fb.PutAsync($"{Directory}/{listed}", $"{{\"host\":{J(NetPlay.ServerName ?? LanSession.PlayerName)},\"n\":{Math.Max(1, Server.CurrentClientCount)},"
+                                + $"\"max\":{Server.MaxClients},\"p\":{(playing ? "true" : "false")},\"lan\":{J(LanEp())},\"t\":{{\".sv\":\"timestamp\"}}}}", ct);
+                        }
+                        catch (OperationCanceledException) { return; }
+                        catch { }
+                        try { await Task.Delay(12000, ct); } catch { return; }
+                    }
+                }, ct);
             }
             catch (OperationCanceledException) { }
             catch (Exception e) {
-                Fail("Couldn't reach the online service. Check your internet connection.");
-                TankGame.ClientLog.Write($"Online host failed: {e}", LogType.Warn);
+                if (serverUp)
+                    WifiOnlyFallback(e.Message);
+                else {
+                    Fail("Couldn't start hosting. Is Wi-Fi on?");
+                    TankGame.ClientLog.Write($"Online host failed: {e}", LogType.Warn);
+                }
             }
         }, ct);
+    }
+
+    /// <summary>The game is up on the Wi-Fi but not online: keep it going for phones on the same network.</summary>
+    private static void WifiOnlyFallback(string why) {
+        WifiOnly = true;
+        Code = null;
+        Busy = false;
+        Connection = Link.Direct;
+        Status = "Wi-Fi only (couldn't reach the internet)";
+        TankGame.ClientLog.Write($"Online: hosting on Wi-Fi only ({why})", LogType.Info);
     }
 
     private static void OnJoinerChange(string path, JsonElement data) {
@@ -285,6 +327,7 @@ public static class OnlineSession {
         if (fb is not null && room is not null)
             _ = Task.Run(async () => {
                 try {
+                    if (host && room.StartsWith("rooms/")) await fb.DeleteAsync($"{Directory}/{room[6..]}");
                     if (host) await fb.DeleteAsync(room);
                     else if (joiner is not null) await fb.DeleteAsync($"{room}/j/{joiner}");
                     if (!host && joiner is not null) await fb.DeleteAsync($"{room}/r/{joiner}");

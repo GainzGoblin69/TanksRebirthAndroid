@@ -126,7 +126,7 @@ public static class TroveRun {
         Hook();
         ReviveSystem.Clear();
         PlayerTank.StartingLives = Difficulties.Types["GearsOfWar"] ? 1 : STARTING_LIVES;
-        IntermissionSystem.BannerColor = TroveThemes.Def(Floor.Theme)?.Banner ?? new Color(92, 60, 140);
+        IntermissionSystem.BannerColor = TroveThemes.Def(Floor.Theme, Floor.Number)?.Banner ?? new Color(92, 60, 140);
         IntermissionSystem.BackgroundColor = new Color(222, 210, 182);
 
         MainMenuUI.LaunchCustomGame();
@@ -234,7 +234,7 @@ public static class TroveRun {
         new(0.55f, 0.44f, 0.72f), // The Vault: deep violet
     ];
     private static void SetFloorTint() {
-        var theme = Floor is { } f ? TroveThemes.Def(f.Theme) : null;
+        var theme = Floor is { } f ? TroveThemes.Def(f.Theme, f.Number) : null;
         Graphics.GameScene.FloorTint = theme?.FloorTint ?? FloorTints[Math.Clamp(FloorNumber - 1, 0, FloorTints.Length - 1)];
         Block.Tint = theme?.BlockTint ?? Vector3.One;
     }
@@ -760,7 +760,7 @@ public static class TroveRun {
         ReviveSystem.Clear();
         // the campaign's own "next mission" sequence shows the floor banner and sets the new room up
         CampaignGlobals.LoadedCampaign.CachedMissions[FloorNumber - 1] = TroveGen.BuildMission(Floor, Room!, null);
-        IntermissionSystem.BannerColor = TroveThemes.Def(Floor.Theme)?.Banner ?? new Color(92, 60, 140);
+        IntermissionSystem.BannerColor = TroveThemes.Def(Floor.Theme, Floor.Number)?.Banner ?? new Color(92, 60, 140);
         IntermissionHandler.PrepareIntermission(true);
     }
 

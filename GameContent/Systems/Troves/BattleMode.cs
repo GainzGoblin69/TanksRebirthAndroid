@@ -146,6 +146,7 @@ public static class BattleMode {
         var looks = new List<(FloorTheme, bool)> {
             (FloorTheme.Normal, false), (FloorTheme.Forest, false), (FloorTheme.Desert, false), (FloorTheme.IceCave, false),
             (FloorTheme.Volcano, false), (FloorTheme.Haunted, false), (FloorTheme.Normal, true),
+            (FloorTheme.Factory, false), (FloorTheme.Swamp, false), (FloorTheme.Crystal, false), (FloorTheme.Blizzard, false),
         };
         var rng = new Random(unchecked(seed * 613 + 17));
         for (int i = looks.Count - 1; i > 0; i--) {

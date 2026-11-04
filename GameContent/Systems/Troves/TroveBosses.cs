@@ -103,6 +103,32 @@ public static class TroveBosses {
         _dashStart = _dashEnd = -1;
     }
 
+    /// <summary>A boss's headlights: its own colour, flashing red while it winds up an attack (orange when enraged).</summary>
+    public static Color HeadlightColor(Tank t) {
+        bool attacking = Lines.Count > 0 || Targets.Count > 0 || _scheduledShots.Count > 0 || (_dashStart >= 0 && Now < _dashEnd) || MagnetCharged || _burrowed;
+        if (attacking) {
+            float f = 0.5f + 0.5f * MathF.Sin((float)Now * 16f);
+            return Color.Lerp(new Color(120, 10, 10), new Color(255, 40, 30), f);
+        }
+        if (_enraged)
+            return new Color(255, 110, 40);
+        var baseCol = Current?.Kind switch {
+            BossKind.CaptainMarine => new Color(80, 220, 255),
+            BossKind.VioletViper or BossKind.ShieldCommander or BossKind.MagnetMaster => new Color(200, 110, 255),
+            BossKind.GreenGoliath => new Color(120, 255, 120),
+            BossKind.BlackBaron or BossKind.MirrorTank => new Color(255, 60, 60),
+            BossKind.ObsidianOverlord or BossKind.VaultKeeper => new Color(180, 80, 255),
+            BossKind.GoldHoarder => new Color(255, 215, 80),
+            BossKind.PepperPot => new Color(255, 240, 90),
+            BossKind.JellyRoller or BossKind.DrillSergeant => new Color(255, 140, 200),
+            BossKind.LaserLathe => new Color(255, 90, 60),
+            _ => (Color?)null,
+        };
+        if (baseCol is { } bc)
+            return bc;
+        return t is AITank ai && AITank.TankDestructionColors.TryGetValue(ai.AiTankType, out var dc) ? Color.Lerp(dc, Color.White, 0.35f) : new Color(255, 200, 150);
+    }
+
     /// <summary>Is this tank (one of) the boss(es) of this room?</summary>
     public static bool IsBoss(Tank t) => t is not null && (ReferenceEquals(t, Boss) || ReferenceEquals(t, Twin));
 

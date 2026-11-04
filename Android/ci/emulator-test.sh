@@ -66,23 +66,21 @@ adb exec-out screencap -p > diag/run2-after-play.png
 tapy 525 4
 adb exec-out screencap -p > diag/run2-tankcolor.png
 tapy 666
-# Multiplayer -> Same Device (screenshot) -> Back; Host on Wi-Fi (lobby screenshot) -> Leave; Back
+# Multiplayer (Same Device, Host, Join, Back): Host -> lobby with a code (and listed online) -> Leave;
+# Join -> the list screen -> Back; Same Device -> Back; Back
 tapy 384 3
 adb exec-out screencap -p > diag/run2-mp.png
-tapy 666 3
-adb exec-out screencap -p > diag/run2-mp-online.png
-# Host Online: the lobby should show a 6-digit code from Firebase; then Leave and Back
-tapy 384 10
+tapy 455 12
 adb exec-out screencap -p > diag/run2-online-lobby.png
+curl -s -m 10 "https://tanks-rebirth-default-rtdb.firebaseio.com/rooms/000000/g.json" > diag/online-directory.txt || true
 tapy 736 4
-tapy 666 3
-tapy 244 3
+tapy 595 8
+adb exec-out screencap -p > diag/run2-mp-join.png
+tapy 595 3
+tapy 314 3
 adb exec-out screencap -p > diag/run2-mp-local.png
 tapy 736
-tapy 384 5
-adb exec-out screencap -p > diag/run2-mp-lobby.png
-tapy 736 4
-tapy 806 3
+tapy 736 3
 # Single Player -> campaign screen (Campaign, Level Select, Tank Troves, Battle, Difficulties, Update Campaign, Back)
 tapy 244 5
 adb exec-out screencap -p > diag/run2-singleplayer.png

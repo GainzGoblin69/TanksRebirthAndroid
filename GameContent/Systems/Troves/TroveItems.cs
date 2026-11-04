@@ -484,12 +484,49 @@ public static class TroveItems {
 
     private static bool IsEnemy(Tank t) => t.Team != TeamID.Red;
 
+    /// <summary>A tank's headlight colour from its items (null = the normal warm white).</summary>
+    public static Color? HeadlightColor(Tank t) {
+        if (!TroveRun.Active)
+            return null;
+        if (TroveBosses.IsBoss(t))
+            return TroveBosses.HeadlightColor(t);
+        if (t is not PlayerTank pt || pt.PlayerId is < 0 or > 3)
+            return null;
+        var p = Players[pt.PlayerId];
+        float now = (float)Now;
+        if (Now < p.InvincibleUntil) // a rainbow while invincible
+            return new Color(0.5f + 0.5f * MathF.Sin(now * 5f), 0.5f + 0.5f * MathF.Sin(now * 5f + 2.1f), 0.5f + 0.5f * MathF.Sin(now * 5f + 4.2f));
+        if (Now < p.MirrorUntil) return new Color(200, 235, 255);
+        if (Now < p.SmokeUntil) return new Color(120, 120, 135);
+        if (p.Has(TroveItemId.SacredHeart)) return new Color(255, 70, 90);
+        if (p.Has(TroveItemId.MegaShell)) return new Color(255, 80, 50);
+        if (p.Has(TroveItemId.GlassCannon)) return new Color(150, 235, 255);
+        if (p.Has(TroveItemId.Pyromaniac)) return new Color(255, 150, 50);
+        if (p.Has(TroveItemId.HolyMantle) && p.Shields > 0) return new Color(255, 245, 180);
+        if (p.Has(TroveItemId.GhostShells) || p.Has(TroveItemId.GhostTreads)) return new Color(190, 170, 255);
+        if (p.Has(TroveItemId.MagicMushroom)) return new Color(255, 130, 210);
+        if (p.Has(TroveItemId.CupidsArrow)) return new Color(255, 150, 190);
+        if (p.Has(TroveItemId.Wraparound)) return new Color(110, 240, 210);
+        // Battle: your own colour
+        if (TroveRun.Battle && BattleMode.Fighters.FirstOrDefault(f => f.PlayerId == pt.PlayerId) is { } fi)
+            return Color.Lerp(Color.White, fi.Color, 0.55f);
+        return null;
+    }
+
     /// <summary>The ways Tank Troves reaches into the rest of the game (once).</summary>
     private static void InstallHooks() {
         if (_hooked)
             return;
         _hooked = true;
         Block.OnDestroy += TroveRun.OnBlockBroken; // items hidden in cork
+        // headlights take on the colour of what you're carrying (and bosses get their own)
+        Graphics.DynamicLighting.LightManager.HeadlightTint = HeadlightColor;
+        Graphics.DynamicLighting.LightManager.ExtraHeadlightTanks = () => !TroveRun.Active || TroveBosses.Boss is not { } bt ? []
+            : TroveBosses.Twin is { } tw ? [bt, tw] : [bt];
+        Graphics.DynamicLighting.LightManager.ExtraLights = TroveThemes.AddLights;
+        Graphics.DynamicLighting.LightManager.SceneDarkness = () => !TroveRun.Active || !CampaignGlobals.InMission ? 0f : TroveThemes.Current switch {
+            FloorTheme.Haunted => 0.65f, FloorTheme.Crystal => 0.75f, FloorTheme.Factory => 0.5f, FloorTheme.Swamp => 0.3f, FloorTheme.Volcano => 0.35f, _ => 0f,
+        };
         AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady || IcedUntil.TryGetValue(t, out var iu) && Now < iu;
         // Smoke Bomb: enemies can't see you
         AITank.IsHidden = t => TroveRun.Active && t is PlayerTank pt && pt.PlayerId is >= 0 and < 4

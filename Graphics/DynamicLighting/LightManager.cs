@@ -2,6 +2,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
+using System.Collections.Generic;
 using TanksRebirth.GameContent;
 using TanksRebirth.GameContent.Systems;
 using TanksRebirth.GameContent.Systems.CommandsSystem;
@@ -277,15 +278,25 @@ public static class LightManager {
     public static float LightningIntensity = 1.5f;
 
     static bool _storm, _lantern, _filtering;
+    /// <summary>How dark gameplay wants the scene (0 = normal, 1 = very dark; e.g. a haunted or factory floor). Dark scenes switch the headlights on.</summary>
+    public static Func<float>? SceneDarkness;
+    static float _dark;
     static Vector3 _strikeDirection = Vector3.Down;
 
     static void UpdateModifierLooks() {
         _storm = Difficulties.Types["ThunderMode"] && !MainMenuUI.IsActive;
         _lantern = Difficulties.Types["LanternMode"] && !MainMenuUI.IsActive;
 
-        var filtering = _storm || _lantern;
-        if (!filtering && !_filtering)
+        float dark = 0f;
+        try { dark = MainMenuUI.IsActive ? 0f : MathHelper.Clamp(SceneDarkness?.Invoke() ?? 0f, 0f, 1f); }
+        catch { SceneDarkness = null; }
+        bool darkChanged = MathF.Abs(dark - _dark) > 0.01f;
+        _dark = dark;
+        var filtering = _storm || _lantern || _dark > 0f;
+        if (!filtering && !_filtering && !darkChanged)
             return;
+        if (filtering == _filtering && !darkChanged && !_storm && !_lantern && _dark > 0f)
+            return; // (nothing new: the dark look is already applied)
         _filtering = filtering;
         LightingPresets.Filter = filtering ? FilterLook : null;
 
@@ -296,6 +307,21 @@ public static class LightManager {
     }
 
     static void FilterLook(ref LightingPresets.TimeOfDay time) {
+        if (_dark > 0f) {
+            // a darker room for moody floors; the tanks' headlights come on
+            float keep = 1f - _dark * 0.75f;
+            time.Ambient *= keep;
+            time.Background *= keep;
+            time.SunIntensity *= 1f - _dark;
+            time.ShaftDensity *= 1f - _dark;
+            time.Sky = Color.Lerp(time.Sky, new Color(20, 22, 40), _dark * 0.7f);
+            time.Ground = Color.Lerp(time.Ground, new Color(10, 10, 16), _dark * 0.7f);
+            time.TableLamp *= keep; time.DeskLamp *= keep; time.ClockLight *= keep; time.FloorLamp *= keep;
+            if (_dark > 0.3f) {
+                time.Headlights = 1f;
+                time.DynamicBrightness = MathF.Max(time.DynamicBrightness, 1.2f);
+            }
+        }
         if (_lantern) {
             // everything is dark, only the lanterns light the board
             time.Sky = new Color(22, 24, 38);
@@ -365,9 +391,18 @@ public static class LightManager {
         }
     }
 
+    /// <summary>A tank's headlight colour (items, bosses); null = the normal warm white.</summary>
+    public static Func<Tank, Color?>? HeadlightTint;
+    /// <summary>Tanks other than the players that get headlights too (bosses).</summary>
+    public static Func<IEnumerable<Tank>>? ExtraHeadlightTanks;
+    /// <summary>More lights from gameplay (floor themes: alarm lights, crystals).</summary>
+    public static Action? ExtraLights;
+
     static void CollectLights() {
         GameplayLights.BeginFrame();
         GameplayLights.AddFlashes();
+        try { ExtraLights?.Invoke(); }
+        catch (Exception e) { TankGame.ClientLog.Write($"Extra lights: {e.Message}", TanksRebirth.Internals.LogType.Warn); ExtraLights = null; }
 
         var anySortOfTankLighting = LightingPresets.HeadlightsEnabled || _lantern;
         if (anySortOfTankLighting) {
@@ -375,13 +410,19 @@ public static class LightManager {
             foreach (var tank in GameHandler.AllPlayerTanks) {
                 if (tank is null || tank.IsDestroyed) continue;
 
-                if (lights) GameplayLights.AddHeadlight(tank.TurretPosition3D - new Vector3(0, 5, 0), tank.TurretPosition - tank.Position, tank == PlayerTank.ClientTank);
+                if (lights) GameplayLights.AddHeadlight(tank.TurretPosition3D - new Vector3(0, 5, 0), tank.TurretPosition - tank.Position, tank == PlayerTank.ClientTank,
+                    HeadlightTint?.Invoke(tank) ?? GameplayLights.DefaultHeadlight);
                 if (_lantern) {
                     // RuntimeData.RunTime produces weird results
                     var time = (float)RuntimeData.RunTime / 60f;
                     GameplayLights.AddLantern(tank.Position3D + new Vector3(0, LanternHeight, 0), time + tank.PlayerId * 1.7f, tank == PlayerTank.ClientTank);
                 }
             }
+            if (lights && ExtraHeadlightTanks is { } extra)
+                foreach (var tank in extra())
+                    if (tank is { IsDestroyed: false })
+                        GameplayLights.AddHeadlight(tank.TurretPosition3D - new Vector3(0, 5, 0), tank.TurretPosition - tank.Position, false,
+                            HeadlightTint?.Invoke(tank) ?? GameplayLights.DefaultHeadlight);
         }
 
         if (ShellLights) {
