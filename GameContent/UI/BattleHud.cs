@@ -34,18 +34,37 @@ public static class BattleHud {
 
         // the hill: a ring in the middle, in the colour of whoever holds it alone
         if (BattleMode.Match == BattleMatch.KingOfTheHill) {
-            var c = TroveHud.ToScreen(Vector2.Zero);
-            float r = Vector2.Distance(c, TroveHud.ToScreen(new Vector2(BattleMode.HILL_RADIUS, 0)));
-            var on = fighters.Where(f => f.Alive && Vector2.Distance(f.Tank!.Position, Vector2.Zero) < BattleMode.HILL_RADIUS).ToList();
-            var col = on.Count == 1 ? on[0].Color : on.Count > 1 ? Color.White : new Color(255, 230, 140);
-            float pulse = 0.85f + 0.15f * MathF.Sin((float)Now * 4f);
-            ToggleSwitch.DrawDisc(sb, c, r, col * (0.18f * pulse));
-            for (int i = 0; i < 40; i++) {
-                float a0 = i * MathHelper.TwoPi / 40, a1 = (i + 0.6f) * MathHelper.TwoPi / 40;
-                ToggleSwitch.DrawLine(sb, c + new Vector2(MathF.Cos(a0), MathF.Sin(a0) * 0.8f) * r, c + new Vector2(MathF.Cos(a1), MathF.Sin(a1) * 0.8f) * r, 4 * s, col * 0.8f);
+            var hill = BattleMode.HillAt;
+            var c = TroveHud.ToScreen(hill);
+            float r = Vector2.Distance(c, TroveHud.ToScreen(hill + new Vector2(BattleMode.HILL_RADIUS, 0)));
+            // where a jumping hill goes next: a blinking dashed ring
+            if (BattleMode.HillNext is { } next && (int)(Now * 6) % 2 == 0)
+                DrawRing(sb, TroveHud.ToScreen(next), r, 3 * s, Color.White * 0.7f, 18);
+            var on = fighters.Where(f => f.Alive && Vector2.Distance(f.Tank!.Position, hill) < BattleMode.HILL_RADIUS).ToList();
+            float t = (float)Now;
+            if (on.Count > 1) {
+                // contested: pulses red
+                float p = 0.5f + 0.5f * MathF.Sin(t * 10f);
+                var red = new Color(255, 40, 30);
+                ToggleSwitch.DrawDisc(sb, c, r * 1.35f, red * (0.15f + 0.2f * p));
+                ToggleSwitch.DrawDisc(sb, c, r, red * (0.3f + 0.3f * p));
+                DrawRing(sb, c, r, 5 * s, red, 40);
+                TroveHud.Text(sb, "CONTESTED", c - new Vector2(0, r + 20 * s), 0.5f * s, red, border: true);
             }
-            if (on.Count > 1)
-                TroveHud.Text(sb, "CONTESTED", c - new Vector2(0, r + 18 * s), 0.5f * s, Color.White, border: true);
+            else if (on.Count == 1) {
+                // held: glows in the holder's colour
+                var col = on[0].Color;
+                float p = 0.85f + 0.15f * MathF.Sin(t * 4f);
+                ToggleSwitch.DrawDisc(sb, c, r * 1.6f, col * (0.12f * p));
+                ToggleSwitch.DrawDisc(sb, c, r * 1.3f, col * (0.2f * p));
+                ToggleSwitch.DrawDisc(sb, c, r, col * (0.45f * p));
+                DrawRing(sb, c, r, 5 * s, Color.Lerp(col, Color.White, 0.3f), 40);
+            }
+            else {
+                float p = 0.85f + 0.15f * MathF.Sin(t * 3f);
+                ToggleSwitch.DrawDisc(sb, c, r, new Color(255, 230, 140) * (0.18f * p));
+                DrawRing(sb, c, r, 4 * s, new Color(255, 230, 140) * 0.85f, 24);
+            }
         }
 
         // capture the flag: each corner is someone's base; the flag sits in the middle until it's taken
@@ -75,6 +94,15 @@ public static class BattleHud {
 
         if (BattleMode.RoundOver)
             DrawStandings(sb, s);
+    }
+
+    private static void DrawRing(SpriteBatch sb, Vector2 c, float r, float thick, Color col, int dashes) {
+        bool solid = dashes >= 40;
+        int n = solid ? 48 : dashes;
+        for (int i = 0; i < n; i++) {
+            float a0 = i * MathHelper.TwoPi / n, a1 = (i + (solid ? 1.05f : 0.55f)) * MathHelper.TwoPi / n;
+            ToggleSwitch.DrawLine(sb, c + new Vector2(MathF.Cos(a0), MathF.Sin(a0)) * r, c + new Vector2(MathF.Cos(a1), MathF.Sin(a1)) * r, thick, col);
+        }
     }
 
     private static void DrawFlag(SpriteBatch sb, Vector2 foot, float s, Color cloth) {
@@ -294,7 +322,7 @@ public static class BattleHud {
         }
         string tip = BattleMode.Match switch {
             BattleMatch.CaptureTheFlag => "Grab the flag from the middle and bring it to your corner",
-            BattleMatch.KingOfTheHill => $"Stay alone on the hill in the middle for {(int)BattleMode.HILL_SECONDS} seconds",
+            BattleMatch.KingOfTheHill => $"Stay alone on the hill for {(int)BattleMode.HILL_SECONDS} seconds (it moves!)",
             _ => "Be the last tank standing",
         };
         TroveHud.Text(sb, tip + (BattleMode.Match == BattleMatch.Deathmatch ? "" : " (or be the last tank standing)"),

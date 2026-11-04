@@ -31,7 +31,16 @@ public static class BattleMode {
     /// <summary>CPU tanks (offline only).</summary>
     public static int Cpus = 1;
 
-    public const float HILL_RADIUS = 58f, HILL_SECONDS = 12f;
+    public const float HILL_RADIUS = 29f, HILL_SECONDS = 12f;
+    /// <summary>King of the Hill: the hill teleports this often (seconds), or drifts at this speed (units per second).</summary>
+    public const float HILL_JUMP_EVERY = 16f, HILL_DRIFT_SPEED = 14f, HILL_WARN = 3f;
+    public static Vector2 HillAt { get; private set; }
+    /// <summary>Where a teleporting hill goes next (shown a few seconds before it jumps), or null.</summary>
+    public static Vector2? HillNext { get; private set; }
+    public static bool HillDrifts { get; private set; }
+    private static readonly List<Vector2> _hillSpots = [];
+    private static double _roundGo;
+    private static int _hillJump;
     public const float FLAG_REACH = 24f, BASE_REACH = 34f;
     public const double STANDINGS_SECONDS = 4.5;
 
@@ -328,6 +337,71 @@ public static class BattleMode {
         for (int i = 0; i < PlayerTank.Lives.Length; i++)
             PlayerTank.Lives[i] = 99;
         TroveRun.ReadyUntil = TroveRun.PlayTime + TroveRun.READY_SECONDS;
+        _roundGo = TroveRun.ReadyUntil;
+        PlanHill();
+    }
+
+    /// <summary>The hill's stops this round (the same on every phone): it starts in the middle, then moves between open spots,
+    /// either jumping every few seconds or drifting slowly from one to the next.</summary>
+    private static void PlanHill() {
+        _hillSpots.Clear();
+        _hillJump = 0;
+        HillNext = null;
+        var rng = new Random(unchecked(TroveRun.Seed * 389 + Round * 7741));
+        HillDrifts = rng.Next(2) == 0;
+        var blocked = new HashSet<Point>();
+        if (TroveRun.Room is { } room)
+            foreach (var b in room.Blocks)
+                blocked.Add(new Point(b.X, b.Y));
+        var open = new List<Point>();
+        for (int x = 3; x <= TroveGen.GW - 4; x++)
+            for (int y = 2; y <= TroveGen.GH - 3; y++)
+                if (!InCornerZone(x, y) && !blocked.Contains(new Point(x, y)) && !blocked.Contains(new Point(x + 1, y)) && !blocked.Contains(new Point(x, y + 1)))
+                    open.Add(new Point(x, y));
+        _hillSpots.Add(Vector2.Zero);
+        var last = new Point(10, 8);
+        for (int i = 0; i < 6 && open.Count > 0; i++) {
+            var far = open.Where(p => Math.Abs(p.X - last.X) + Math.Abs(p.Y - last.Y) >= 6).ToList();
+            var pick = (far.Count > 0 ? far : open)[rng.Next(far.Count > 0 ? far.Count : open.Count)];
+            _hillSpots.Add(new BlockMapPosition(pick.X, pick.Y));
+            last = pick;
+        }
+        HillAt = Vector2.Zero;
+    }
+
+    /// <summary>Where the hill is now (worked out from the round's clock, so every phone agrees).</summary>
+    private static void UpdateHill() {
+        if (Match != BattleMatch.KingOfTheHill || _hillSpots.Count < 2)
+            return;
+        float t = (float)Math.Max(0, TroveRun.PlayTime - _roundGo);
+        if (HillDrifts) {
+            // slowly along the loop of stops (a short rest at the start)
+            float d = Math.Max(0, t - 4f) * HILL_DRIFT_SPEED;
+            float total = 0;
+            for (int i = 0; i < _hillSpots.Count; i++)
+                total += Vector2.Distance(_hillSpots[i], _hillSpots[(i + 1) % _hillSpots.Count]);
+            d %= Math.Max(1f, total);
+            for (int i = 0; i < _hillSpots.Count; i++) {
+                var a = _hillSpots[i];
+                var b = _hillSpots[(i + 1) % _hillSpots.Count];
+                float len = Vector2.Distance(a, b);
+                if (d <= len) {
+                    HillAt = Vector2.Lerp(a, b, len < 0.01f ? 0 : d / len);
+                    break;
+                }
+                d -= len;
+            }
+            HillNext = null;
+            return;
+        }
+        int jump = (int)(t / HILL_JUMP_EVERY);
+        if (jump != _hillJump) {
+            _hillJump = jump;
+            SoundPlayer.PlaySoundInstance("Assets/sounds/menu/client_join.ogg", SoundContext.Effect, 0.6f, pitchOverride: 0.6f);
+            GameHandler.Particles.MakeShineSpot(new Vector3(HillAt.X, 10, HillAt.Y), Color.White, 1.2f);
+        }
+        HillAt = _hillSpots[jump % _hillSpots.Count];
+        HillNext = t % HILL_JUMP_EVERY > HILL_JUMP_EVERY - HILL_WARN ? _hillSpots[(jump + 1) % _hillSpots.Count] : null;
     }
 
     // ------------------------------------------------------------------ every update (in a round)
@@ -351,13 +425,14 @@ public static class BattleMode {
         }
         if (TroveRun.InReady)
             return;
+        UpdateHill();
 
         var alive = Enumerable.Range(0, Fighters.Count).Where(i => Fighters[i].Alive).ToList();
         int winner = -2; // -2 = still going
 
         if (Match == BattleMatch.KingOfTheHill) {
             // only a tank alone on the hill counts
-            var on = alive.Where(i => Vector2.Distance(Fighters[i].Tank!.Position, Vector2.Zero) < HILL_RADIUS).ToList();
+            var on = alive.Where(i => Vector2.Distance(Fighters[i].Tank!.Position, HillAt) < HILL_RADIUS).ToList();
             if (on.Count == 1) {
                 var f = Fighters[on[0]];
                 int before = (int)f.Hill;

@@ -86,7 +86,9 @@ public static class TroveHud {
             for (int y = 0; y < N; y++)
                 for (int x = 0; x < N; x++) {
                     float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), new Vector2(N / 2f)) / (N / 2f);
-                    float a = Math.Clamp((d - 0.55f) / 0.45f, 0, 1);
+                    // a soft, natural falloff (smoothstep) that reaches full dark well inside the square
+                    float a = Math.Clamp((d - 0.25f) / 0.65f, 0, 1);
+                    a = a * a * (3 - 2 * a);
                     px[y * N + x] = new Color(0, 0, 0, (int)(a * 255));
                 }
             _fogHole = new Texture2D(sb.GraphicsDevice, N, N);
@@ -94,16 +96,19 @@ public static class TroveHud {
         }
         float s = S;
         var c = ToScreen(tank.Position);
-        float r = 330 * s * (1f + 0.03f * MathF.Sin((float)TroveRun.PlayTime * 2f));
+        float r = 420 * s * (1f + 0.03f * MathF.Sin((float)TroveRun.PlayTime * 2f));
         var dark = new Color(10, 5, 20) * 0.88f;
         var hole = new Rectangle((int)(c.X - r), (int)(c.Y - r), (int)(r * 2), (int)(r * 2));
         sb.Draw(_fogHole, hole, new Color(10, 5, 20) * 0.88f);
         var px1 = TextureGlobals.Pixels[Color.White];
         int W = WindowUtils.WindowWidth, H = WindowUtils.WindowHeight;
-        sb.Draw(px1, new Rectangle(0, 0, W, Math.Max(0, hole.Top)), dark);
-        sb.Draw(px1, new Rectangle(0, hole.Bottom, W, Math.Max(0, H - hole.Bottom)), dark);
-        sb.Draw(px1, new Rectangle(0, hole.Top, Math.Max(0, hole.Left), hole.Height), dark);
-        sb.Draw(px1, new Rectangle(hole.Right, hole.Top, Math.Max(0, W - hole.Right), hole.Height), dark);
+        // the rest of the screen uses the same texture's fully dark corner texel, so it matches the edge of the hole exactly
+        // (a plain white pixel came out a different shade on some phones, leaving a lighter square around the tank)
+        var corner = new Rectangle(0, 0, 1, 1);
+        sb.Draw(_fogHole, new Rectangle(0, 0, W, Math.Max(0, hole.Top)), corner, dark);
+        sb.Draw(_fogHole, new Rectangle(0, hole.Bottom, W, Math.Max(0, H - hole.Bottom)), corner, dark);
+        sb.Draw(_fogHole, new Rectangle(0, hole.Top, Math.Max(0, hole.Left), hole.Height), corner, dark);
+        sb.Draw(_fogHole, new Rectangle(hole.Right, hole.Top, Math.Max(0, W - hole.Right), hole.Height), corner, dark);
     }
 
     // ---- things in the room: the item on the floor, orbiters, buddy/decoy tags, the Stopwatch freeze
