@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xna.Framework;
@@ -20,6 +20,8 @@ public enum BossKind {
     GreenGoliath, DrillSergeant, MagnetMaster, LaserLathe,
     BlackBaron, ArtilleryMajor, ShieldCommander,
     ObsidianOverlord, VaultKeeper, MirrorTank, GoldHoarder,
+    // batch 2
+    Hive, SplitterKing, BigBertha, PyroBaron, ChronoTank, Juggernaut, Phantom, ShadowClones,
 }
 
 public sealed record BossDef(BossKind Kind, int Floor, string Name, int Tier, string Blurb);
@@ -50,6 +52,14 @@ public static class TroveBosses {
         new(BossKind.VaultKeeper, 5, "The Vault Keeper", TankID.Amethyst, "Teleports, leaves mines, and copies one of your item tricks"),
         new(BossKind.MirrorTank, 5, "Mirror Tank", TankID.Black, "A dark copy of you with your shell items"),
         new(BossKind.GoldHoarder, 5, "Gold Hoarder", TankID.Gold, "Gold shells split when they bounce; drops an item when hurt"),
+        new(BossKind.Hive, 1, "The Hive", TankID.Ash, "Keeps releasing swarms of tiny, fast scouts"),
+        new(BossKind.SplitterKing, 1, "Splitter King", TankID.Pink, "Splits into two when destroyed, and those split again"),
+        new(BossKind.BigBertha, 2, "Big Bertha", TankID.Yellow, "Leaps across the room and lands with a shockwave and a ring of shells"),
+        new(BossKind.PyroBaron, 2, "Pyro Baron", TankID.Ruby, "Leaves burning trails and sweeps flame bursts across the room"),
+        new(BossKind.ChronoTank, 3, "Chrono Tank", TankID.Sapphire, "Drops time bubbles that slow you and your shells"),
+        new(BossKind.Juggernaut, 3, "The Juggernaut", TankID.Silver, "Charges through blocks; dazed when it hits a wall"),
+        new(BossKind.Phantom, 4, "The Phantom", TankID.White, "Turns invisible; only its laser sight gives it away"),
+        new(BossKind.ShadowClones, 5, "Shadow Master", TankID.Emerald, "Makes shadow copies of itself; only the real one can be hurt"),
     ];
     public static BossDef Def(BossKind k) => All[(int)k];
 
@@ -79,6 +89,25 @@ public static class TroveBosses {
     private static Vector2 _dashFrom, _dashTo;
     private static double _dashStart = -1, _dashEnd = -1;
     private static Vector2 _bounceVel;
+    // batch 2 bosses
+    /// <summary>Pyro Baron's burning trail and Chrono Tank's time bubbles (every phone).</summary>
+    public static readonly List<(Vector2 At, double Until)> Fires = [], Bubbles = [];
+    public const float FIRE_RADIUS = 14f, BUBBLE_RADIUS = 66f;
+    private static readonly Dictionary<Tank, double> _burned = [];
+    private static readonly HashSet<Shell> _slowed = [];
+    private static readonly Dictionary<AITank, int> _splits = [];
+    private static readonly HashSet<AITank> _splitDone = [];
+    private static double _lastSplitDeath = -10;
+    private static Vector2 _leapFrom, _leapTo;
+    private static double _leapStart = -10;
+    private const double LEAP_TIME = 1.1;
+    private static float _baseScale = 1f;
+    private static bool _charging;
+    private static Vector2 _chargeDir;
+    private static double _windupUntil = -1, _stunUntil = -1;
+    /// <summary>The Phantom is invisible right now (its laser sight shows where it aims).</summary>
+    public static bool PhantomHidden { get; private set; }
+    private static readonly Dictionary<AITank, double> _decoys = [];
 
     /// <summary>Red warning lines (Laser Lathe): from, angle, when it fires.</summary>
     public static readonly List<(Vector2 From, float Angle, double FireAt)> Lines = [];
@@ -101,11 +130,26 @@ public static class TroveBosses {
         Targets.Clear();
         _enraged = _halfDone = _burrowed = false;
         _dashStart = _dashEnd = -1;
+        Fires.Clear();
+        Bubbles.Clear();
+        _burned.Clear();
+        _slowed.Clear();
+        _splits.Clear();
+        _splitDone.Clear();
+        _lastSplitDeath = -10;
+        _leapStart = -10;
+        _charging = false;
+        _windupUntil = _stunUntil = -1;
+        PhantomHidden = false;
+        _decoys.Clear();
     }
+
+    /// <summary>The Splitter King just split: keep the room from counting as cleared until its pieces appear.</summary>
+    public static bool HoldsRoom => Current?.Kind == BossKind.SplitterKing && Now - _lastSplitDeath < 1.5;
 
     /// <summary>A boss's headlights: its own colour, flashing red while it winds up an attack (orange when enraged).</summary>
     public static Color HeadlightColor(Tank t) {
-        bool attacking = Lines.Count > 0 || Targets.Count > 0 || _scheduledShots.Count > 0 || (_dashStart >= 0 && Now < _dashEnd) || MagnetCharged || _burrowed;
+        bool attacking = Lines.Count > 0 || Targets.Count > 0 || _scheduledShots.Count > 0 || (_dashStart >= 0 && Now < _dashEnd) || MagnetCharged || _burrowed || BigMove;
         if (attacking) {
             float f = 0.5f + 0.5f * MathF.Sin((float)Now * 16f);
             return Color.Lerp(new Color(120, 10, 10), new Color(255, 40, 30), f);
@@ -122,6 +166,14 @@ public static class TroveBosses {
             BossKind.PepperPot => new Color(255, 240, 90),
             BossKind.JellyRoller or BossKind.DrillSergeant => new Color(255, 140, 200),
             BossKind.LaserLathe => new Color(255, 90, 60),
+            BossKind.Hive => new Color(255, 200, 60),
+            BossKind.SplitterKing => new Color(255, 150, 220),
+            BossKind.BigBertha => new Color(255, 235, 120),
+            BossKind.PyroBaron => new Color(255, 110, 30),
+            BossKind.ChronoTank => new Color(110, 170, 255),
+            BossKind.Juggernaut => new Color(220, 225, 235),
+            BossKind.Phantom => new Color(235, 240, 255),
+            BossKind.ShadowClones => new Color(90, 255, 150),
             _ => (Color?)null,
         };
         if (baseCol is { } bc)
@@ -135,6 +187,13 @@ public static class TroveBosses {
     /// <summary>Hits left across the boss (and its twin), for the bar at the top.</summary>
     public static int HitsLeft() {
         int h = 0;
+        if (Current?.Kind == BossKind.SplitterKing) {
+            // every piece still around, plus the pieces it will still split into
+            foreach (var (t, gen) in _splits)
+                if (!t.IsDestroyed)
+                    h += (t.Properties.Armor?.HitPoints ?? 0) + 1 + (gen == 0 ? 10 : gen == 1 ? 2 : 0);
+            return h;
+        }
         foreach (var t in new[] { Boss, Twin })
             if (t is { IsDestroyed: false })
                 h += (t.Properties.Armor?.HitPoints ?? 0) + 1;
@@ -189,6 +248,26 @@ public static class TroveBosses {
                 Twin = t;
                 break;
             }
+            case BossKind.Hive:
+                boss.Scaling = new Vector3(1.6f);
+                props.MaxSpeed *= 0.6f;
+                break;
+            case BossKind.SplitterKing:
+                boss.Scaling = new Vector3(1.6f);
+                _splits[boss] = 0;
+                break;
+            case BossKind.BigBertha:
+                boss.Scaling = new Vector3(2.0f);
+                props.Stationary = true; // it gets around by leaping
+                break;
+            case BossKind.Juggernaut:
+                boss.Scaling = new Vector3(1.55f);
+                props.Stationary = true; // it moves the way its fight says
+                props.ShellLimit = 2;
+                break;
+            case BossKind.Phantom:
+                props.Invisible = false; // (white tanks start invisible: this one fades in and out)
+                break;
             case BossKind.VaultKeeper:
                 _trick = rng.Next(3);
                 if (_trick == 0) {
@@ -198,6 +277,7 @@ public static class TroveBosses {
                 }
                 break;
         }
+        _baseScale = boss.Scaling.X;
         MaxHits = HitsLeft();
     }
 
@@ -217,8 +297,11 @@ public static class TroveBosses {
     public static void Update() {
         if (!TroveRun.Active || !CampaignGlobals.InMission || Boss is null)
             return;
+        EveryPhone();
         // the boss is gone: its helpers go with it (the host clears them out so the room can finish)
         bool bossDown = Boss.IsDestroyed && Twin is not { IsDestroyed: false };
+        if (Current?.Kind == BossKind.SplitterKing)
+            bossDown = !_splits.Any(k => !k.Key.IsDestroyed) && Now - _lastSplitDeath > 1.0;
         if (bossDown) {
             if (Authority)
                 foreach (var m in _minions)
@@ -259,9 +342,98 @@ public static class TroveBosses {
             return;
         if (_mini)
             MiniTrick();
-        else if (Current is { } def)
+        else if (Current is { } def && !Boss.IsDestroyed)
             Brain(def.Kind);
     }
+
+    /// <summary>What every phone does the same way for the newer bosses: splits, leaps, fire, time bubbles, the charge, decoys.</summary>
+    private static void EveryPhone() {
+        // Splitter King: a piece that's down splits in two (the host says so)
+        if (Current?.Kind == BossKind.SplitterKing)
+            foreach (var (t, gen) in _splits.ToArray())
+                if (t.IsDestroyed && _splitDone.Add(t)) {
+                    _lastSplitDeath = Now;
+                    if (Authority && gen < 2)
+                        SendAct(ACT_SPLITK, t.Position, gen + 1);
+                }
+        // Big Bertha in the air: up and over to where it lands (bigger while high up, can't be hurt)
+        if (Current?.Kind == BossKind.BigBertha && Boss is { IsDestroyed: false } bb) {
+            double lt = (Now - _leapStart) / LEAP_TIME;
+            if (lt >= 0 && lt < 1) {
+                bb.Position = Vector2.Lerp(_leapFrom, _leapTo, (float)lt);
+                bb.Scaling = new Vector3(_baseScale * (1f + 0.55f * MathF.Sin(MathF.PI * (float)lt)));
+                bb.Properties.Immortal = true;
+            }
+            else if (lt >= 1 && bb.Properties.Immortal) {
+                bb.Position = _leapTo;
+                bb.Scaling = new Vector3(_baseScale);
+                bb.Properties.Immortal = false;
+                SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_destroy.ogg", SoundContext.Effect, 0.5f, pitchOverride: -0.8f);
+                if (Authority)
+                    Ring(bb, Fraction <= 0.5f ? 12 : 8, (float)Now, 5);
+            }
+        }
+        // Pyro Baron's fire burns your tank (each phone burns its own players)
+        Fires.RemoveAll(f => Now > f.Until);
+        if (Fires.Count > 0) {
+            if (Random.Shared.NextDouble() < 0.5 * Dt) {
+                var f = Fires[Random.Shared.Next(Fires.Count)];
+                GameHandler.Particles.MakeShineSpot(new Vector3(f.At.X, 6, f.At.Y), new Color(255, 120, 30), 0.5f);
+            }
+            foreach (var pl in GameHandler.AllPlayerTanks) {
+                if (pl is not { IsDestroyed: false } || !TroveItems.IsLocal(pl.PlayerId) || pl.Properties.Immortal)
+                    continue;
+                if (!Fires.Any(f => Vector2.Distance(f.At, pl.Position) < FIRE_RADIUS + 8f))
+                    continue;
+                if (_burned.TryGetValue(pl, out var last) && Now - last < 1.5)
+                    continue;
+                _burned[pl] = Now;
+                pl.Damage(new TankHurtContextOther(Boss, TankHurtContextOther.HurtContext.FromIngame, "Burned"), true);
+            }
+        }
+        // Chrono Tank's time bubbles slow shells inside them (tanks are slowed by the velocity filter)
+        Bubbles.RemoveAll(bu => Now > bu.Until);
+        if (Bubbles.Count > 0 || _slowed.Count > 0) {
+            foreach (var sh in Shell.AllShells) {
+                if (sh is null)
+                    continue;
+                bool inside = Bubbles.Any(bu => Vector2.Distance(bu.At, sh.Position) < BUBBLE_RADIUS);
+                if (inside && _slowed.Add(sh))
+                    sh.Velocity *= 0.4f;
+                else if (!inside && _slowed.Remove(sh))
+                    sh.Velocity /= 0.4f;
+            }
+            _slowed.RemoveWhere(sh => Array.IndexOf(Shell.AllShells, sh) < 0); // (gone)
+        }
+        // the Juggernaut smashes breakable blocks while it charges
+        if (Current?.Kind == BossKind.Juggernaut && _charging && Boss is { IsDestroyed: false } jg)
+            foreach (var bl in Block.AllBlocks)
+                if (bl is not null && bl.Properties.IsDestructible && Vector2.Distance(bl.Position, jg.Position) < 28f * jg.Scaling.X / 1.55f)
+                    bl.Destroy();
+        if (Now < _stunUntil && Boss is { IsDestroyed: false } st && Random.Shared.NextDouble() < 0.4 * Dt)
+            GameHandler.Particles.MakeShineSpot(st.Position3D + new Vector3(0, 24, 0), Color.Yellow, 0.5f);
+        // shadow decoys fade away after a while
+        foreach (var (d, until) in _decoys.ToArray())
+            if (d.IsDestroyed)
+                _decoys.Remove(d);
+            else if (Now > until) {
+                _decoys.Remove(d);
+                d.Properties.Immortal = false;
+                GameHandler.Particles.MakeSmallExplosion(d.Position3D, 6, 6, 0.8f, 6);
+                d.Remove(true);
+            }
+    }
+
+    /// <summary>Chrono Tank: players in a time bubble move slowly.</summary>
+    public static Vector2 SlowFilter(Tank t, Vector2 v) =>
+        Bubbles.Count > 0 && t is PlayerTank && Bubbles.Any(bu => Vector2.Distance(bu.At, t.Position) < BUBBLE_RADIUS) ? v * 0.45f : v;
+
+    /// <summary>The Phantom's laser sight: from the hidden Phantom toward the player it aims at.</summary>
+    public static (Vector2 From, Vector2 To)? PhantomSight =>
+        Current?.Kind == BossKind.Phantom && PhantomHidden && Boss is { IsDestroyed: false } ph && NearestPlayer(ph.Position) is { } pt ? (ph.Position, pt.Position) : null;
+
+    /// <summary>The boss is winding up or in the middle of a big move (headlights flash red).</summary>
+    private static bool BigMove => _charging || Now < _windupUntil || Now - _leapStart < LEAP_TIME + 0.2;
 
     private static bool Frozen => TroveItems.Frozen;
 
@@ -459,6 +631,100 @@ public static class TroveBosses {
                 b.ChassisRotation = target.ChassisRotation;
                 break;
             }
+            case BossKind.Hive:
+                if (Every("swarm", hurt ? 3.5 : 5) && _minions.Count(m => !m.IsDestroyed) < 6) {
+                    SendAct(ACT_SPAWN_SCOUT, FreeSpotNear(b.Position, 45f));
+                    SendAct(ACT_SPAWN_SCOUT, FreeSpotNear(b.Position + new Vector2(0, 20), 50f));
+                    if (hurt)
+                        SendAct(ACT_SPAWN_SCOUT, FreeSpotNear(b.Position - new Vector2(0, 20), 55f));
+                }
+                if (Every("hivespread", 4))
+                    Spread(b, aim, 3, 0.25f, 5);
+                break;
+            case BossKind.SplitterKing:
+                if (Every("kspread", hurt ? 3 : 4))
+                    Spread(b, aim, 3, 0.2f, 6);
+                break;
+            case BossKind.BigBertha:
+                if (Now - _leapStart > LEAP_TIME && Every("leap", hurt ? 3.2 : 4.2)) {
+                    var land = FreeSpotNear(target.Position + target.Velocity * 20f, 0f);
+                    if (Solid(land, 18f))
+                        land = FreeSpotNear(target.Position, 50f);
+                    SendAct(ACT_LEAP, land);
+                }
+                break;
+            case BossKind.PyroBaron:
+                if (b.Velocity.LengthSquared() > 0.15f && Every("fire", 0.35) && Fires.Count < 45)
+                    SendAct(ACT_FIRE, b.Position, hurt ? 2 : 1);
+                if (Every("sweep", hurt ? 4 : 6))
+                    for (int i = 0; i < 12; i++)
+                        _scheduledShots.Add((Now + i * 0.08, aim - 0.6f + i * 0.11f, SHOT_FLAME));
+                break;
+            case BossKind.ChronoTank:
+                if (Every("bubble", hurt ? 3.5 : 5.5)) {
+                    SendAct(ACT_BUBBLE, target.Position);
+                    if (hurt)
+                        SendAct(ACT_BUBBLE, b.Position + (target.Position - b.Position) * 0.5f);
+                }
+                break;
+            case BossKind.Juggernaut: {
+                if (_charging) {
+                    float speed = (hurt ? 5.2f : 4.4f) * Dt * 0.62f;
+                    var next = b.Position + _chargeDir * speed;
+                    bool edge = next.X < GameScene.TANKS_MIN_X + 14 || next.X > GameScene.TANKS_MAX_X - 14 || next.Y < GameScene.TANKS_MIN_Y + 14 || next.Y > GameScene.TANKS_MAX_Y - 14;
+                    if (edge || SolidHard(next, 14f)) {
+                        SendAct(ACT_STUN, b.Position);
+                        break;
+                    }
+                    b.Position = next;
+                    b.ChassisRotation = MathF.Atan2(_chargeDir.Y, _chargeDir.X) - MathHelper.PiOver2;
+                    foreach (var pl in GameHandler.AllPlayerTanks)
+                        if (pl is { IsDestroyed: false } && Vector2.Distance(pl.Position, b.Position) < 30f * b.Scaling.X / 1.55f && Every("jram" + pl.PlayerId, 1.0))
+                            pl.Damage(new TankHurtContextOther(b, TankHurtContextOther.HurtContext.FromIngame, "Run over by the Juggernaut"), true);
+                    break;
+                }
+                if (Now < _stunUntil)
+                    break; // dazed
+                if (_windupUntil > 0 && Now >= _windupUntil) {
+                    _windupUntil = -1;
+                    SendAct(ACT_CHARGE, b.Position, AngleCode(aim) + 1);
+                    break;
+                }
+                if (_windupUntil < 0 && Every("charge", hurt ? 3.5 : 5)) {
+                    _windupUntil = Now + 0.9;
+                    SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.9f, pitchOverride: -0.8f);
+                    break;
+                }
+                // slowly turns and rolls toward you between charges
+                var dir = Vector2.Normalize(target.Position - b.Position);
+                if (Vector2.Distance(b.Position, target.Position) > 60f) {
+                    var step = b.Position + dir * 0.5f * Dt * 0.62f;
+                    if (!Solid(step, 16f))
+                        b.Position = step;
+                }
+                b.ChassisRotation = MathF.Atan2(dir.Y, dir.X) - MathHelper.PiOver2;
+                if (Every("jshot", 2.5))
+                    Fire(b, aim, 6);
+                break;
+            }
+            case BossKind.Phantom:
+                if (Every("phase", PhantomHidden ? (hurt ? 2.5 : 2.2) : (hurt ? 3 : 4)))
+                    SendAct(ACT_PHANTOM, b.Position, PhantomHidden ? 2 : 1);
+                if (!PhantomHidden && Every("pspread", hurt ? 0.9 : 1.3))
+                    Spread(b, aim, 3, 0.18f, 7);
+                break;
+            case BossKind.ShadowClones:
+                if (Every("clones", hurt ? 6 : 8) && _decoys.Count == 0) {
+                    SendAct(ACT_CLONES, b.Position, hurt ? 4 : 3);
+                    // the real one ends up at one of the spots, so you lose track of it
+                    var spots = CloneSpots(b.Position, hurt ? 4 : 3);
+                    var pick = spots[Random.Shared.Next(spots.Count)];
+                    if (Random.Shared.Next(spots.Count + 1) > 0)
+                        b.Position = pick;
+                }
+                if (Every("sspread", hurt ? 2 : 3))
+                    Spread(b, aim, 2, 0.2f, 6);
+                break;
             case BossKind.GoldHoarder:
                 if (hurt && !_halfDone) {
                     _halfDone = true;
@@ -585,7 +851,7 @@ public static class TroveBosses {
     // ------------------------------------------------------------------ attacks (made on the host, sent to the others)
 
     // shot codes: 0..11 = speed 1 + code*0.5; special codes below
-    private const int SHOT_HOMING = 12, SHOT_LASER = 13, SHOT_GOLD = 14;
+    private const int SHOT_HOMING = 12, SHOT_LASER = 13, SHOT_GOLD = 14, SHOT_FLAME = 15;
 
     private static void Spread(AITank b, float aim, int n, float spread, int code) {
         for (int i = 0; i < n; i++)
@@ -608,9 +874,9 @@ public static class TroveBosses {
         if (b is null)
             return;
         var dir = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
-        float speed = code switch { SHOT_HOMING => 1.6f, SHOT_LASER => 8f, SHOT_GOLD => 3.2f, _ => 1f + code * 0.5f };
+        float speed = code switch { SHOT_HOMING => 1.6f, SHOT_LASER => 8f, SHOT_GOLD => 3.2f, SHOT_FLAME => 2.4f, _ => 1f + code * 0.5f };
         int type = code == SHOT_LASER ? ShellID.TrailedRocket : b.Properties.ShellType;
-        uint ric = code == SHOT_LASER ? 0u : Math.Max(1u, b.Properties.RicochetCount);
+        uint ric = code is SHOT_LASER or SHOT_FLAME ? 0u : Math.Max(1u, b.Properties.RicochetCount);
         var homing = code == SHOT_HOMING ? new Shell.HomingProperties { Radius = 260f, Speed = speed, Power = 0.06f * speed } : default;
         var s = new Shell(from, dir * speed, type, b, ric, homing);
         if (code == SHOT_LASER) {
@@ -620,6 +886,10 @@ public static class TroveBosses {
         }
         if (code == SHOT_GOLD)
             s.SplitsOnBounce = true;
+        if (code == SHOT_FLAME) {
+            s.Tint = new Color(255, 120, 30);
+            s.VisualScale = 0.9f;
+        }
     }
 
     private static void PlaceMine(Vector2 at) {
@@ -648,7 +918,16 @@ public static class TroveBosses {
 
     // other things everyone must do together: act * 1,000,000 + packed position (and an extra number for some)
     private const int ACT_SPAWN_BROWN = 1, ACT_SPAWN_TURRET = 2, ACT_SPAWN_BLACK = 3, ACT_BURROW = 4, ACT_POPUP = 5,
-        ACT_LASER_LINE = 6, ACT_ARTILLERY = 7, ACT_GOLD_DROP = 8, ACT_SPARKLE = 9;
+        ACT_LASER_LINE = 6, ACT_ARTILLERY = 7, ACT_GOLD_DROP = 8, ACT_SPARKLE = 9,
+        ACT_SPAWN_SCOUT = 10, ACT_SPLITK = 11, ACT_LEAP = 12, ACT_FIRE = 13, ACT_BUBBLE = 14, ACT_CHARGE = 15, ACT_STUN = 16,
+        ACT_PHANTOM = 17, ACT_CLONES = 18;
+
+    private static List<Vector2> CloneSpots(Vector2 at, int n) {
+        var list = new List<Vector2>();
+        for (int i = 0; i < n; i++)
+            list.Add(FreeSpotNear(at + Vector2.UnitX.Rotate(i * MathHelper.TwoPi / n + 0.4f) * 80f, 20f));
+        return list;
+    }
 
     private static void SendAct(int act, Vector2 at, int extra = 0) {
         DoAct(act, at, extra);
@@ -716,6 +995,86 @@ public static class TroveBosses {
             case ACT_SPARKLE:
                 GameHandler.Particles.MakeShineSpot(new Vector3(at.X, 12, at.Y), Color.MediumPurple, 1.5f);
                 break;
+            case ACT_SPAWN_SCOUT: {
+                var t = new TankTemplate { IsPlayer = false, AiTier = TankID.Brown, Position = at, Team = TeamID.Blue }.GetAiTank();
+                t.Team = TeamID.Blue;
+                TroveEnemies.MakeScout(t);
+                _minions.Add(t);
+                GameHandler.Particles.MakeShineSpot(new Vector3(at.X, 8, at.Y), Color.Gold, 0.8f);
+                break;
+            }
+            case ACT_SPLITK: {
+                _lastSplitDeath = Now;
+                int gen = Math.Clamp(extra, 1, 2);
+                int tier = Current?.Tier ?? TankID.Pink;
+                for (int k = 0; k < 2; k++) {
+                    var p = FreeSpotNear(at + new Vector2(k == 0 ? -22 : 22, 0), 0f);
+                    if (Solid(p, 10f)) p = at;
+                    var t = new TankTemplate { IsPlayer = false, AiTier = tier, Position = p, Team = TeamID.Blue }.GetAiTank();
+                    t.Team = TeamID.Blue;
+                    t.Scaling = new Vector3(gen == 1 ? 1.15f : 0.75f);
+                    if (gen == 1)
+                        t.Properties.Armor = new TankArmor(t, 2);
+                    else
+                        t.Properties.MaxSpeed *= 1.4f;
+                    _splits[t] = gen;
+                }
+                GameHandler.Particles.MakeSmallExplosion(new Vector3(at.X, 6, at.Y), 12, 8, 1.2f, 10);
+                break;
+            }
+            case ACT_LEAP:
+                if (Boss is { } lb) {
+                    _leapFrom = lb.Position;
+                    _leapTo = at;
+                    _leapStart = Now;
+                    Targets.Add((at, Now + LEAP_TIME)); // the red circle where it lands; the shockwave goes off there
+                    SoundPlayer.PlaySoundInstance("Assets/sounds/menu/client_join.ogg", SoundContext.Effect, 0.7f, pitchOverride: -0.6f);
+                }
+                break;
+            case ACT_FIRE:
+                Fires.Add((at, Now + (extra >= 2 ? 7 : 5)));
+                break;
+            case ACT_BUBBLE:
+                Bubbles.Add((at, Now + 7));
+                SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.8f, pitchOverride: -0.9f);
+                break;
+            case ACT_CHARGE: {
+                float ang = (extra - 1) / 360f * MathHelper.TwoPi;
+                _chargeDir = new Vector2(MathF.Cos(ang), MathF.Sin(ang));
+                _charging = true;
+                SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_destroy.ogg", SoundContext.Effect, 0.3f, pitchOverride: -0.9f);
+                break;
+            }
+            case ACT_STUN:
+                _charging = false;
+                _stunUntil = Now + 2.0;
+                if (Boss is { } sb) {
+                    GameHandler.Particles.MakeSmallExplosion(sb.Position3D, 10, 8, 1.2f, 10);
+                    SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_destroy.ogg", SoundContext.Effect, 0.5f, pitchOverride: -0.5f);
+                }
+                break;
+            case ACT_PHANTOM:
+                PhantomHidden = extra == 1;
+                if (Boss is { } pb) {
+                    pb.Properties.Invisible = PhantomHidden;
+                    pb.Properties.ShellLimit = PhantomHidden ? 0 : 3;
+                    GameHandler.Particles.MakeShineSpot(pb.Position3D + new Vector3(0, 10, 0), Color.White, 1.0f);
+                }
+                break;
+            case ACT_CLONES:
+                if (Boss is { } cb) {
+                    foreach (var p in CloneSpots(at, Math.Max(3, extra))) {
+                        var t = new TankTemplate { IsPlayer = false, AiTier = cb.AiTankType, Position = p, Team = TeamID.Blue }.GetAiTank();
+                        t.Team = TeamID.Blue;
+                        t.Scaling = cb.Scaling;
+                        t.Properties.Immortal = true; // only the real one can be hurt
+                        _decoys[t] = Now + 6;
+                        _minions.Add(t);
+                        GameHandler.Particles.MakeSmallExplosion(new Vector3(p.X, 5, p.Y), 6, 6, 0.8f, 6);
+                    }
+                    GameHandler.Particles.MakeSmallExplosion(cb.Position3D, 6, 6, 0.8f, 6);
+                }
+                break;
         }
     }
 
@@ -732,7 +1091,7 @@ public static class TroveBosses {
             if (Now >= Targets[i].LandAt) {
                 var t = Targets[i];
                 Targets.RemoveAt(i);
-                new Explosion(t.At, 5f, Boss, 0.4f);
+                new Explosion(t.At, 5f, Boss, 0.4f) { SparesOwner = true };
             }
         if (!Authority)
             return;

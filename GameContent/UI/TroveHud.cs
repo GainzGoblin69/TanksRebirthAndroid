@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using FontStashSharp;
@@ -199,6 +199,59 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, c, rr, new Color(200, 210, 230));
                 ToggleSwitch.DrawDisc(sb, c - new Vector2(rr * 0.25f), rr * 0.4f, Color.White);
             }
+        // Pyro Baron's fire, Chrono Tank's time bubbles, the Phantom's laser sight
+        float tnow = (float)TroveRun.PlayTime;
+        foreach (var (at, until) in TroveBosses.Fires) {
+            var c = ToScreen(at);
+            float rr = Math.Max(6f, Vector2.Distance(c, ToScreen(at + new Vector2(TroveBosses.FIRE_RADIUS, 0))));
+            float fade = (float)Math.Clamp(until - TroveRun.PlayTime, 0, 1);
+            float fl = 0.8f + 0.2f * MathF.Sin(tnow * 13f + at.X);
+            ToggleSwitch.DrawDisc(sb, c, rr * 1.3f, new Color(255, 80, 20) * (0.25f * fade));
+            ToggleSwitch.DrawDisc(sb, c, rr * fl, new Color(255, 140, 30) * (0.55f * fade));
+            ToggleSwitch.DrawDisc(sb, c - new Vector2(0, rr * 0.2f), rr * 0.45f * fl, new Color(255, 230, 120) * (0.7f * fade));
+        }
+        foreach (var (at, until) in TroveBosses.Bubbles) {
+            var c = ToScreen(at);
+            float rr = Vector2.Distance(c, ToScreen(at + new Vector2(TroveBosses.BUBBLE_RADIUS, 0)));
+            float fade = (float)Math.Clamp(until - TroveRun.PlayTime, 0, 1);
+            ToggleSwitch.DrawDisc(sb, c, rr, new Color(90, 150, 255) * (0.18f * fade));
+            for (int i = 0; i < 36; i++) {
+                float a0 = i * MathHelper.TwoPi / 36, a1 = (i + 1.05f) * MathHelper.TwoPi / 36;
+                ToggleSwitch.DrawLine(sb, c + new Vector2(MathF.Cos(a0), MathF.Sin(a0)) * rr, c + new Vector2(MathF.Cos(a1), MathF.Sin(a1)) * rr, 3 * s, new Color(150, 200, 255) * (0.7f * fade));
+            }
+            // a slow clock hand
+            float hand = tnow * 0.8f;
+            ToggleSwitch.DrawLine(sb, c, c + new Vector2(MathF.Cos(hand), MathF.Sin(hand)) * rr * 0.6f, 3 * s, new Color(200, 225, 255) * (0.6f * fade));
+        }
+        if (TroveBosses.PhantomSight is { } sight) {
+            var a0 = ToScreen(sight.From);
+            var a1 = ToScreen(sight.To);
+            float len = Vector2.Distance(a0, a1);
+            var dir = len > 1 ? (a1 - a0) / len : Vector2.Zero;
+            for (float dd = 0; dd < len; dd += 18 * s)
+                ToggleSwitch.DrawLine(sb, a0 + dir * dd, a0 + dir * Math.Min(len, dd + 9 * s), 2.5f * s, new Color(255, 40, 40) * 0.75f);
+        }
+        foreach (var (sn, angle, fireAt) in TroveEnemies.SniperLines) {
+            var a0 = ToScreen(sn.Position);
+            var a1 = ToScreen(sn.Position + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 500f);
+            float k = (float)Math.Clamp(1 - (fireAt - TroveRun.PlayTime) / 1.1, 0, 1);
+            ToggleSwitch.DrawLine(sb, a0, a1, (1.5f + 3 * k) * s, new Color(255, 40, 30) * (0.3f + 0.5f * k));
+        }
+        // special enemies: a small tag for the ones you'd want to know about
+        foreach (var (et, ev) in TroveEnemies.All) {
+            if (et.Properties.Invisible)
+                continue;
+            (string label, Color col)? tag = ev switch {
+                EnemyVariant.Medic => ("+ MEDIC", new Color(90, 230, 110)),
+                EnemyVariant.Sniper => ("SNIPER", new Color(255, 90, 80)),
+                EnemyVariant.Kamikaze => ((int)(tnow * 4) % 2 == 0 ? "! ! !" : "", new Color(255, 70, 40)),
+                EnemyVariant.Splitter => ("SPLITTER", new Color(255, 170, 230)),
+                _ => null,
+            };
+            if (tag is { } tg && tg.label.Length > 0)
+                Text(sb, tg.label, ToScreen(et.Position) - new Vector2(0, 44 * s * et.Scaling.X), 0.36f * s, tg.col, border: true);
+        }
+
         // boss warnings: red laser lines, artillery targets; the Shield Commander's shield; the Vault Keeper's orbiters
         foreach (var (from, angle, fireAt) in TroveBosses.Lines) {
             var a0 = ToScreen(from);

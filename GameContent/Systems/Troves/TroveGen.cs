@@ -42,6 +42,8 @@ public sealed class TroveRoom {
     public HashSet<Point> CorkRolled = [];
     /// <summary>Battle: items hidden inside cork blocks (found when the block breaks).</summary>
     public Dictionary<Point, TroveItemId> Hidden = [];
+    /// <summary>Special enemies: index into <see cref="Enemies"/> -> what kind.</summary>
+    public Dictionary<int, EnemyVariant> Variants = [];
     /// <summary>A cork room: every wall and piece of cover is breakable cork, with extra cork about.</summary>
     public bool CorkStyle;
     public bool PickupVisible => Pickup is not null && !PickupTaken && (Kind is TroveRoomKind.Item or TroveRoomKind.Secret || Cleared || ForcePickup);
@@ -346,6 +348,9 @@ public static class TroveGen {
                 continue;
             BuildRoom(f, room, rng);
         }
+        // some enemies are special (scouts, brutes, splitters...): rolled separately, so the layouts stay the same
+        foreach (var room in f.Rooms.Values)
+            TroveEnemies.AssignVariants(f, room, seed);
         f.Rooms[f.Start].Cleared = true;
         f.Rooms[f.Start].Visited = true;
     }

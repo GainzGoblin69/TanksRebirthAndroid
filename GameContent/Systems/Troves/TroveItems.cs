@@ -521,7 +521,7 @@ public static class TroveItems {
         Block.OnDestroy += TroveRun.OnBlockBroken; // items hidden in cork
         // headlights take on the colour of what you're carrying (and bosses get their own)
         Graphics.DynamicLighting.LightManager.HeadlightTint = HeadlightColor;
-        Graphics.DynamicLighting.LightManager.ExtraHeadlightTanks = () => !TroveRun.Active || TroveBosses.Boss is not { } bt ? []
+        Graphics.DynamicLighting.LightManager.ExtraHeadlightTanks = () => !TroveRun.Active || TroveBosses.Boss is not { } bt || bt.Properties.Invisible ? []
             : TroveBosses.Twin is { } tw ? [bt, tw] : [bt];
         Graphics.DynamicLighting.LightManager.ExtraLights = TroveThemes.AddLights;
         Graphics.DynamicLighting.LightManager.SceneDarkness = () => !TroveRun.Active || !CampaignGlobals.InMission ? 0f : TroveThemes.Current switch {
@@ -532,7 +532,7 @@ public static class TroveItems {
         AITank.IsHidden = t => TroveRun.Active && t is PlayerTank pt && pt.PlayerId is >= 0 and < 4
             && (Now < P(pt.PlayerId).SmokeUntil || TroveThemes.HiddenInBush(t));
         // floor themes: quicksand slows, ice slides
-        Tank.VelocityFilter = (t, v) => TroveRun.Active ? OilFilter(t, TroveThemes.FilterVelocity(t, v) ?? v) : null;
+        Tank.VelocityFilter = (t, v) => TroveRun.Active ? TroveBosses.SlowFilter(t, OilFilter(t, TroveThemes.FilterVelocity(t, v) ?? v)) : null;
         // Pyromaniac: explosions give you a shield instead of hurting you
         Explosion.Absorbs = (tank, _) => {
             if (!TroveRun.Active || tank is not PlayerTank pt || pt.PlayerId is < 0 or >= 4 || !P(pt.PlayerId).Has(TroveItemId.Pyromaniac))
@@ -630,6 +630,7 @@ public static class TroveItems {
         // bosses: Shield Commander's shield, and boss shells' special touches
         Shell.Blocks = TroveBosses.ShieldBlocks;
         Tank.OnShoot += TroveBosses.OnBossShoot;
+        Tank.OnShoot += TroveEnemies.OnShoot;
         // EMP: enemies can't shoot
         Tank.ShootBlocked = t => TroveRun.Active && (Now < EmpUntil && t is AITank && IsEnemy(t) || TroveRun.InReady);
         // Second Wind: once a floor, a hit that would destroy you doesn't

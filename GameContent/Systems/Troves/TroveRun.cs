@@ -30,7 +30,7 @@ public static class TroveRun {
         EV_CLONE = 21, EV_EMP = 22, EV_TURRET = 23, EV_MIRROR = 24, EV_GIVE = 25,
         EV_BOSS_SHOT = 26, EV_BOSS_MINE = 27, EV_BOSS_ACT = 28, EV_BOSS_EXTRA = 29,
         EV_WELL = 30, EV_SMOKE = 31, EV_FLAG = 32, EV_SHOCK = 33, EV_FREEZE_BOMB = 34, EV_GROUND_ITEM = 35, EV_FRIENDS = 36, EV_OIL = 37, EV_PAD = 38,
-        EV_BATTLE_START = 39, EV_ROUND_END = 40, EV_ROUND_NEXT = 41, EV_BFLAG_TAKE = 42, EV_BFLAG_DROP = 43;
+        EV_BATTLE_START = 39, EV_ROUND_END = 40, EV_ROUND_NEXT = 41, EV_BFLAG_TAKE = 42, EV_BFLAG_DROP = 43, EV_ENEMY = 44;
     /// <summary>How close (game units) a tank has to get to an item to pick it up.</summary>
     public const float PICKUP_REACH = 26f;
     public static Vector2 PickupPoint => new Coordinates.BlockMapPosition(10, 8);
@@ -212,6 +212,8 @@ public static class TroveRun {
                 ApplyItems();
                 if (!Battle && Room is { Kind: TroveRoomKind.Boss or TroveRoomKind.MiniBoss, Cleared: false } br)
                     BuffBoss(br); // (only happens when a floor starts in a boss room: testing)
+                if (!Battle && Room is { } er)
+                    TroveEnemies.SetupRoom(er);
             };
             // the new floor's colour appears when its first room is set up (behind the floor banner), not when the boss falls
             Campaign.OnMissionLoad += (_, _) => {
@@ -452,6 +454,7 @@ public static class TroveRun {
             TourStep();
         TroveBosses.Update();
         TroveBosses.UpdateBossOrbiters();
+        TroveEnemies.Update();
         TroveThemes.Update();
         if (!CampaignGlobals.InMission || Ended != EndKind.None || GameUI.Paused || Room is not { } room)
             return;
@@ -474,7 +477,7 @@ public static class TroveRun {
                 SpawnWave2(room);
             }
         }
-        else if (!room.Cleared && !enemies && _roomTime > 0.6f && _fadeDir == 0) {
+        else if (!room.Cleared && !enemies && _roomTime > 0.6f && _fadeDir == 0 && !TroveEnemies.HoldsRoom && !TroveBosses.HoldsRoom) {
             room.Cleared = true;
             TroveItems.OnRoomCleared();
             RoomsCleared++;
@@ -645,6 +648,10 @@ public static class TroveRun {
             if (t is not null && !t.IsDestroyed)
                 t.DoInvisibilityGFXandSFX();
         BuffBoss(room);
+        if (!Battle)
+            TroveEnemies.SetupRoom(room);
+        else
+            TroveEnemies.Clear();
     }
 
     private static void ApplyItems() {
@@ -833,6 +840,9 @@ public static class TroveRun {
     /// <summary>Joined players: an event from the host.</summary>
     public static void OnEvent(int ev, int a) {
         switch (ev) {
+            case EV_ENEMY:
+                if (Active && CampaignGlobals.InMission) TroveEnemies.OnEvent(a);
+                break;
             case EV_BATTLE_START:
                 if (!MainMenuUI.IsActive) {
                     Stop();
