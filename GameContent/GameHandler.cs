@@ -1,4 +1,4 @@
-using TanksRebirth.Internals.UI;
+﻿using TanksRebirth.Internals.UI;
 using TanksRebirth.Internals.Common;
 using TanksRebirth.Internals.Common.Utilities;
 using Microsoft.Xna.Framework;
@@ -113,6 +113,7 @@ public class GameHandler {
 
         VanillaAchievements.Repository.UpdateCompletions(TankGame.VanillaAchievementPopupHandler);
         AchievementStore.Tick();
+        Unlocks.Tick();
 
         if (RuntimeData.RunTime % 30 < RuntimeData.DeltaTime) {
             Client.SendLives();

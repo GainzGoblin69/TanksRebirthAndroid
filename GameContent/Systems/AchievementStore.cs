@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -108,6 +108,7 @@ public static class AchievementStore {
             return;
         if (LevelProgress.CurrentCampaignKey == "Vanilla" && LevelProgress.Run is null) {
             Unlock("A winner is you");
+            Unlocks.Grant("campaign");
             if (Difficulties.Types["POV"])
                 Unlock("See through the dragon's eyes");
         }

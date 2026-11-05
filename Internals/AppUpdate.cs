@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -128,29 +128,83 @@ public static class AppUpdate {
         _down = InputUtils.CurrentMouseSnapshot.LeftButton == ButtonState.Pressed;
         if (_down && !_wasDown)
             _press = MouseUtils.MousePosition;
-        string? text = Now switch {
-            Stage.Available => $"Update to Build {LatestBuild}",
-            Stage.Downloading => $"Downloading... {(int)(Progress * 100)}%",
-            Stage.Installing => "Installing...",
-            Stage.NeedsPermission => "Allow installs, then tap here",
-            Stage.Failed => "Update failed - tap to retry",
+        (string Title, string Sub)? text = Now switch {
+            Stage.Available => ("Update available", $"Tap to install Build {LatestBuild}"),
+            Stage.Downloading => ($"Downloading  {(int)(Progress * 100)}%", $"Build {LatestBuild}"),
+            Stage.Installing => ("Installing...", "Android will ask to confirm"),
+            Stage.NeedsPermission => ("Allow installs", "Then come back and tap here"),
+            Stage.Failed => ("Update failed", "Tap to try again"),
             _ => null,
         };
         if (text is null)
             return;
         float s = WindowUtils.WindowHeight / 1080f;
-        var r = new Rectangle((int)(24 * s), (int)(WindowUtils.WindowHeight - 140 * s), (int)(470 * s), (int)(84 * s));
+        var r = new Rectangle((int)(28 * s), (int)(WindowUtils.WindowHeight - 150 * s), (int)(500 * s), (int)(104 * s));
         bool pressing = _down && r.Contains(_press) && r.Contains(MouseUtils.MousePosition);
-        float pulse = Now == Stage.Available ? 0.85f + 0.15f * MathF.Sin((float)DateTime.UtcNow.TimeOfDay.TotalSeconds * 4f) : 1f;
-        ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X, r.Y + (int)(6 * s), r.Width, r.Height), 22 * s, new Color(40, 90, 30));
-        ToggleSwitch.DrawRoundedRect(sb, pressing ? new Rectangle(r.X, r.Y + (int)(4 * s), r.Width, r.Height - (int)(4 * s)) : r, 22 * s,
-            Color.Lerp(new Color(90, 200, 80), Color.White, pressing ? 0.3f : 0f) * pulse);
-        if (Now == Stage.Downloading)
-            ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X + (int)(10 * s), r.Bottom - (int)(16 * s), (int)((r.Width - 20 * s) * Progress), (int)(8 * s)), 4 * s, Color.White);
+        bool failed = Now == Stage.Failed;
+        var accent = failed ? new Color(232, 84, 72) : new Color(64, 196, 104);
+        float t = (float)DateTime.UtcNow.TimeOfDay.TotalSeconds;
+        float radius = r.Height / 2f;
+        var body = pressing ? new Rectangle(r.X, r.Y + (int)(3 * s), r.Width, r.Height) : r;
+
+        // (the menu's batch is premultiplied; the rounded shapes are straight alpha)
+        sb.End();
+        sb.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.LinearClamp, null, null);
+        // soft shadow, then a dark card with a colored edge
+        ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X + (int)(2 * s), r.Y + (int)(10 * s), r.Width, r.Height), radius, new Color(0, 0, 0, 70));
+        if (Now == Stage.Available) {
+            // a gentle glow breathing around it
+            float g = 0.5f + 0.5f * MathF.Sin(t * 3f);
+            int grow = (int)((4 + 6 * g) * s);
+            ToggleSwitch.DrawRoundedRect(sb, new Rectangle(body.X - grow, body.Y - grow, body.Width + grow * 2, body.Height + grow * 2), radius + grow, accent * (0.18f + 0.12f * g));
+        }
+        ToggleSwitch.DrawRoundedRect(sb, body, radius, accent);
+        int edge = (int)MathF.Max(2, 3 * s);
+        var inner = new Rectangle(body.X + edge, body.Y + edge, body.Width - edge * 2, body.Height - edge * 2);
+        ToggleSwitch.DrawRoundedRect(sb, inner, radius - edge, pressing ? new Color(44, 48, 58) : new Color(30, 33, 42));
+        if (Now == Stage.Downloading && Progress > 0) {
+            // the card fills up as the download goes
+            int w = Math.Max(inner.Height, (int)(inner.Width * Progress));
+            ToggleSwitch.DrawRoundedRect(sb, new Rectangle(inner.X, inner.Y, w, inner.Height), radius - edge, accent * 0.35f);
+        }
+
+        // icon: a round badge with a down arrow (or a spinner while installing)
+        float iconR = inner.Height * 0.34f;
+        var ic = new Vector2(inner.X + inner.Height * 0.5f, inner.Center.Y);
+        ToggleSwitch.DrawDisc(sb, ic, iconR, accent);
+        float th = MathF.Max(2.5f, iconR * 0.2f);
+        if (Now == Stage.Installing) {
+            for (int i = 0; i < 8; i++) {
+                float ang = t * 6f + i * MathHelper.TwoPi / 8f;
+                var d = new Vector2(MathF.Cos(ang), MathF.Sin(ang));
+                ToggleSwitch.DrawDisc(sb, ic + d * iconR * 0.55f, th * 0.6f, Color.White * (0.25f + 0.75f * i / 7f));
+            }
+        }
+        else if (failed) {
+            ToggleSwitch.DrawLine(sb, ic + new Vector2(0, -iconR * 0.5f), ic + new Vector2(0, iconR * 0.15f), th, Color.White);
+            ToggleSwitch.DrawDisc(sb, ic + new Vector2(0, iconR * 0.45f), th * 0.6f, Color.White);
+        }
+        else {
+            float bob = Now == Stage.Downloading ? MathF.Sin(t * 8f) * iconR * 0.08f : 0f;
+            var top = ic + new Vector2(0, -iconR * 0.5f + bob);
+            var tip = ic + new Vector2(0, iconR * 0.42f + bob);
+            ToggleSwitch.DrawLine(sb, top, tip, th, Color.White);
+            ToggleSwitch.DrawLine(sb, tip + new Vector2(-iconR * 0.38f, -iconR * 0.38f), tip + new Vector2(th * 0.3f, th * 0.3f), th, Color.White);
+            ToggleSwitch.DrawLine(sb, tip + new Vector2(iconR * 0.38f, -iconR * 0.38f), tip + new Vector2(-th * 0.3f, th * 0.3f), th, Color.White);
+        }
+
+        sb.End();
+        sb.Begin();
+
+        // title and subtitle
         var font = FontGlobals.RebirthFont;
-        var m = font.MeasureString(text);
-        float sc = Math.Min(0.62f * s, (r.Width - 30 * s) / Math.Max(1f, m.X));
-        sb.DrawString(font, text, r.Center.ToVector2() - new Vector2(0, 4 * s), new Color(20, 40, 15), new Vector2(sc), 0f, m / 2f);
+        float textX = ic.X + iconR + 22 * s, maxW = inner.Right - textX - 24 * s;
+        var mt = font.MeasureString(text.Value.Title);
+        float st = Math.Min(0.6f * s, maxW / Math.Max(1f, mt.X));
+        sb.DrawString(font, text.Value.Title, new Vector2(textX, inner.Center.Y - 14 * s), Color.White, new Vector2(st), 0f, new Vector2(0, mt.Y / 2f));
+        var ms = font.MeasureString(text.Value.Sub);
+        float ss = Math.Min(0.42f * s, maxW / Math.Max(1f, ms.X));
+        sb.DrawString(font, text.Value.Sub, new Vector2(textX, inner.Center.Y + 20 * s), new Color(170, 178, 190), new Vector2(ss), 0f, new Vector2(0, ms.Y / 2f));
         bool tapped = !_down && _wasDown && r.Contains(_press) && r.Contains(MouseUtils.MousePosition);
         if (tapped && Now is Stage.Available or Stage.NeedsPermission or Stage.Failed) {
             SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect);

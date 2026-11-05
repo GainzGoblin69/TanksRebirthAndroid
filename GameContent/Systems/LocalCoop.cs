@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -151,7 +151,7 @@ public static class LocalCoop {
                 continue;
             var aim = AimScreen(i);
             var tankPos = MatrixUtils.ConvertWorldToScreen(new Vector3(0, 11, 0), tank.World, CameraGlobals.GameView, CameraGlobals.GameProjection);
-            var col = PlayerColors.Palette[PlayerColors.GetChoice(i)].Main;
+            var col = PlayerColors.MainOf(PlayerColors.GetChoice(i));
             for (int d = 1; d < 10; d++)
                 sb.Draw(dot, Vector2.Lerp(tankPos, aim, d / 10f), null, Color.Lerp(Color.White, col, 0.5f), 0f, dot.Size() / 2f, new Vector2(0.35f).ToResolution(), default, default);
             if (!_slots[i].Touch)

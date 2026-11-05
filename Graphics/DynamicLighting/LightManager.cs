@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
@@ -24,6 +24,8 @@ public static class LightManager {
     public static bool ShellLights = true;
     public static bool ExplosionLights = true;
     public static bool MineLights = true;
+    /// <summary>How bright an explosion's light still is when the explosion ends (0-1).</summary>
+    public const float ExplosionEndLife = 0.6f;
 
     /// <summary>Lets the room cast sun shadows.</summary>
     public static bool RoomCastsShadows {
@@ -446,13 +448,24 @@ public static class LightManager {
             }
         }
 
+        // neon and rainbow tank skins light up around them in the dark
+        if (darkScene) {
+            foreach (var t in GameContent.GameHandler.AllPlayerTanks) {
+                if (t is not { } pt || pt.IsDestroyed || pt.ColorIndex < 0)
+                    continue;
+                if (GameContent.Systems.PlayerColors.GlowOf(pt.ColorIndex) is { } glow)
+                    GameplayLights.AddGlow(pt.Position3D + new Vector3(0f, 6f, 0f), glow, 0.9f, 60f);
+            }
+        }
+
         if (MineLights) {
             foreach (var mine in Mine.AllMines) {
                 if (mine is null) continue;
-                if (mine.DetonateTime >= Mine.TICKS_OF_FLASHING || (int)(mine.DetonateTime / 8f) % 2 != 0) continue; // flashing red
-
-                // only creates a light when flashing red
-                GameplayLights.AddMineLight(mine);
+                bool flashingRed = mine.DetonateTime < Mine.TICKS_OF_FLASHING && (int)(mine.DetonateTime / 8f) % 2 == 0;
+                if (flashingRed)
+                    GameplayLights.AddMineLight(mine);
+                else // a steady soft yellow glow
+                    GameplayLights.AddGlow(mine.Position3D + new Vector3(0f, 7f, 0f), new Color(255, 214, 70), 0.9f, 44f);
             }
         }
 
@@ -460,7 +473,10 @@ public static class LightManager {
             foreach (var explosion in Explosion.Explosions) {
                 if (explosion is null)
                     continue;
-                var life = 1f - explosion.LifeTime / MathF.Max(explosion.LingerDuration, 1f);
+                // full brightness for as long as the fireball is up, only easing off at the very end
+                // (Explosion.Remove hands over to a short flash that covers the last flames)
+                var t = explosion.LifeTime / MathF.Max(explosion.LingerDuration, 1f);
+                var life = t < 0.7f ? 1f : MathHelper.Lerp(1f, ExplosionEndLife, MathHelper.SmoothStep(0f, 1f, (t - 0.7f) / 0.3f));
                 GameplayLights.AddExplosionLight(explosion.Position3D, explosion.DamageRadiusScale * Explosion.MAGIC_EXPLOSION_NUMBER, life);
             }
         }

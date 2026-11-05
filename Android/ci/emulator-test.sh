@@ -29,6 +29,9 @@ adb logcat -d -v threadtime > diag/logcat-run1.txt
 adb shell 'cat /data/anr/* 2>/dev/null' > diag/anr-traces.txt
 adb shell am force-stop $PKG
 sleep 3
+# some skins unlocked (and progress on others) so the Tank Color screen's Special tab shows both kinds
+printf '%s' '{"Unlocked":["campaign","troves","bosses10","battle","secret"],"Counters":{"rooms100":37,"levels25":12,"troves3":1}}' > /tmp/unlocks.json
+adb push /tmp/unlocks.json "/sdcard/Android/data/$PKG/files/Tanks Rebirth/unlocks.json" || true
 # simulate a second screen (like the AYN Thor's lower display) for the second launch
 adb shell settings put global overlay_display_devices "1240x1080/240"
 sleep 4
@@ -51,6 +54,10 @@ tapy() { adb shell input tap $CX $((H * $1 / 1000)); sleep ${2:-3}; }
 # Options and back: the main menu buttons must keep their size
 tapy 455 4
 adb exec-out screencap -p > diag/run2-options.png
+# Graphics (the on/off switches), then back to Options
+adb shell input tap $((W * 494 / 1000)) $((H * 393 / 1000)); sleep 3
+adb exec-out screencap -p > diag/run2-graphics.png
+adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 3
 adb shell input tap $((W * 494 / 1000)) $((H * 856 / 1000)); sleep 3
 adb exec-out screencap -p > diag/run2-options-back.png
 # Game Stats: stats tab, achievements tab, then Back
@@ -65,6 +72,10 @@ adb exec-out screencap -p > diag/run2-after-play.png
 # Tank Color, then Back (slot 3 of 3)
 tapy 525 4
 adb exec-out screencap -p > diag/run2-tankcolor.png
+# the Special tab (unlockable skins), then back to Colors
+adb shell input tap $((W / 2 + H * 515 / 1080)) $((H * 118 / 1000)); sleep 3
+adb exec-out screencap -p > diag/run2-tankcolor-special.png
+adb shell input tap $((W / 2 + H * 171 / 1080)) $((H * 118 / 1000)); sleep 2
 tapy 666
 # Multiplayer (Same Device, Host, Join, Back): Host -> lobby with a code (and listed online) -> Leave;
 # Join -> the list screen -> Back; Same Device -> Back; Back

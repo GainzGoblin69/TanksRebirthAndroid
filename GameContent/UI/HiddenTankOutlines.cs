@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -82,8 +82,8 @@ public static class HiddenTankOutlines {
     private static Color ColorOf(Tank tank) {
         if (tank is PlayerTank pt) {
             int ci = PlayerColors.ColorIndexFor(pt.PlayerId);
-            if (ci >= 0 && ci < PlayerColors.Palette.Length)
-                return PlayerColors.Palette[ci].Main;
+            if (ci >= 0 && ci < PlayerColors.Count)
+                return PlayerColors.MainOf(ci);
             return PlayerID.PlayerTankColors.TryGetValue(pt.PlayerId, out var c) ? c : Color.White;
         }
         if (tank is AITank ai && AITank.TankDestructionColors.TryGetValue(ai.AiTankType, out var dc))

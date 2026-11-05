@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -191,6 +191,7 @@ public static class LevelProgress {
             if (Run is { Modifier: { } mod } && !rec.Modifiers.Contains(mod.Key))
                 rec.Modifiers.Add(mod.Key);
             Save();
+            Unlocks.SetAtLeast("levels25", Data.Campaigns.Values.Sum(m => m.Count(x => x.Value.Completed)));
         }
 
         // level-select runs go back to the grid after a moment, win or lose

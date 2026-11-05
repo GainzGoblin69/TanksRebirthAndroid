@@ -198,6 +198,26 @@ public static class TroveHud {
             ToggleSwitch.DrawDisc(sb, c, 9 * s, col * 0.16f);
             ToggleSwitch.DrawDisc(sb, c, 5 * s, col * 0.28f);
         }
+        // mines glow yellow (red while about to go off), explosions light up the dark while they burn
+        foreach (var mine in Mine.AllMines) {
+            if (mine is null)
+                continue;
+            bool red = mine.DetonateTime < Mine.TICKS_OF_FLASHING && (int)(mine.DetonateTime / 8f) % 2 == 0;
+            var col = red ? new Color(255, 60, 40) : new Color(255, 214, 70);
+            var c = ToScreen(mine.Position);
+            ToggleSwitch.DrawDisc(sb, c, 22 * s, col * 0.10f);
+            ToggleSwitch.DrawDisc(sb, c, 13 * s, col * 0.16f);
+        }
+        foreach (var ex in Explosion.Explosions) {
+            if (ex is null)
+                continue;
+            float t = ex.LifeTime / MathF.Max(ex.LingerDuration, 1f);
+            float a = t < 0.7f ? 1f : MathHelper.Lerp(1f, 0.4f, (t - 0.7f) / 0.3f);
+            var c = ToScreen(ex.Position);
+            float r = ex.DamageRadiusScale * Explosion.MAGIC_EXPLOSION_NUMBER * s * 1.6f;
+            ToggleSwitch.DrawDisc(sb, c, r * 1.6f, new Color(255, 150, 60) * (0.10f * a));
+            ToggleSwitch.DrawDisc(sb, c, r, new Color(255, 190, 90) * (0.14f * a));
+        }
     }
 
     private static void EnsureFogTextures(GraphicsDevice gd) {

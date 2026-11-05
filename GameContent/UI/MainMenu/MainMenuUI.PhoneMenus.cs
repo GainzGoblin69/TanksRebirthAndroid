@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using FontStashSharp;
@@ -68,12 +68,12 @@ public static partial class MainMenuUI {
         return tapped;
     }
 
-    private static void PText(SpriteBatch sb, string text, Vector2 pos, float scale, Color color, bool center = true) {
+    private static void PText(SpriteBatch sb, string text, Vector2 pos, float scale, Color color, bool center = true, float maxWidth = 0) {
         var font = FontGlobals.RebirthFont;
         var m = font.MeasureString(text);
         // a bit larger than the desktop text for phones, but always fitting inside the right-hand panel
         float sc = scale * 1.35f * PhoneScale;
-        float maxW = RightPanel().Width * 0.92f;
+        float maxW = maxWidth > 0 ? maxWidth : RightPanel().Width * 0.92f;
         if (m.X * sc > maxW)
             sc = maxW / Math.Max(1f, m.X);
         sb.DrawString(font, text, pos, color, new Vector2(sc), 0f, center ? m / 2f : new Vector2(0, m.Y / 2f));
@@ -690,44 +690,140 @@ public static partial class MainMenuUI {
 
         var panel = RightPanel(70, 40);
         DrawPanel(sb, panel);
-        PText(sb, twoPlayers ? $"Player {_colorSlot + 1}'s tank color" : "Your tank color", new Vector2(panel.Center.X, panel.Y + 50 * s), 1.0f, Ink);
-
         var gd = TankGame.Instance.GraphicsDevice;
-        if (_colorTex.Length != PlayerColors.Palette.Length || _colorTex.Any(t => t is null || t.IsDisposed))
-            _colorTex = PlayerColors.Palette.Select(c => (Texture2D?)PlayerColors.MakeTexture(gd, c)).ToArray();
-
-        int cols = 4, rows = (PlayerColors.Palette.Length + cols - 1) / cols;
-        float gap = 18 * s, top = panel.Y + 95 * s;
-        float tw = (panel.Width - 40 * s - gap * (cols - 1)) / cols;
-        float th = (panel.Bottom - 20 * s - top - gap * (rows - 1)) / rows;
         int chosen = PlayerColors.GetChoice(_colorSlot);
-        var tiles = new Rectangle[PlayerColors.Palette.Length];
-        for (int i = 0; i < tiles.Length; i++) {
-            var r = new Rectangle((int)(panel.X + 20 * s + (i % cols) * (tw + gap)), (int)(top + (i / cols) * (th + gap)), (int)tw, (int)th);
-            tiles[i] = r;
-            bool sel = i == chosen;
-            if (sel)
-                ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X - (int)(6 * s), r.Y - (int)(6 * s), r.Width + (int)(12 * s), r.Height + (int)(12 * s)), 26 * s, new Color(52, 199, 89));
-            ToggleSwitch.DrawRoundedRect(sb, r, 22 * s, sel ? new Color(255, 250, 238) : new Color(232, 226, 214));
-            var name = PlayerColors.Palette[i].Name;
-            PText(sb, name, new Vector2(r.Center.X, r.Bottom - 26 * s), 0.6f, Ink);
-            if (!_pmDown && _pmWasDown && r.Contains(_pmPress) && r.Contains(MouseUtils.MousePosition) && !_pmEnteredThisFrame) {
-                PlayerColors.SetChoice(_colorSlot, i);
+
+        // tabs: plain colors / special skins (unlocked by beating things)
+        bool Tapped(Rectangle r) => !_pmDown && _pmWasDown && r.Contains(_pmPress) && r.Contains(MouseUtils.MousePosition) && !_pmEnteredThisFrame;
+        string whose = twoPlayers ? $"P{_colorSlot + 1} " : "";
+        string[] tabNames = [whose + "Colors", $"Special  {Unlocks.UnlockedCount}/{PlayerColors.Skins.Length}"];
+        float tabW = 330 * s, tabH = 64 * s, tabGap = 14 * s;
+        float tabX = panel.Center.X - tabW - tabGap / 2f;
+        var track = new Rectangle((int)(tabX - 8 * s), (int)(panel.Y + 18 * s), (int)(tabW * 2 + tabGap + 16 * s), (int)(tabH + 16 * s));
+        ToggleSwitch.DrawRoundedRect(sb, track, track.Height / 2f, new Color(222, 214, 198));
+        for (int t = 0; t < 2; t++) {
+            var tr = new Rectangle((int)(tabX + t * (tabW + tabGap)), (int)(panel.Y + 26 * s), (int)tabW, (int)tabH);
+            bool on = _colorTab == t;
+            if (on) {
+                ToggleSwitch.DrawRoundedRect(sb, new Rectangle(tr.X, tr.Y + (int)(4 * s), tr.Width, tr.Height), tr.Height / 2f, new Color(0, 0, 0, 40));
+                ToggleSwitch.DrawRoundedRect(sb, tr, tr.Height / 2f, t == 1 ? new Color(255, 206, 84) : new Color(255, 250, 238));
+            }
+            PText(sb, tabNames[t], tr.Center.ToVector2(), 0.7f, on ? Ink : Ink * 0.6f, maxWidth: tr.Width - 24 * s);
+            if (Tapped(tr) && _colorTab != t) {
+                _colorTab = t;
                 SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
+                Internals.Common.Framework.Input.Haptics.Tap();
             }
         }
-        // the tanks themselves (3D), then the check on the chosen one
+
+        int count = PlayerColors.Count;
+        if (_colorTex.Length != count)
+            _colorTex = new Texture2D?[count];
+        for (int i = 0; i < count; i++) {
+            if (_colorTex[i] is null || _colorTex[i]!.IsDisposed)
+                _colorTex[i] = PlayerColors.MakeTexture(gd, i);
+            else if (PlayerColors.IsAnimated(i))
+                PlayerColors.Animate(_colorTex[i]!, i);
+        }
+        if (_lockedTex is null || _lockedTex.IsDisposed) {
+            _lockedTex = new Texture2D(gd, 32, 32);
+            _lockedTex.SetData(Enumerable.Repeat(new Color(58, 56, 62), 32 * 32).ToArray());
+        }
+
+        bool special = _colorTab == 1;
+        int first = special ? PlayerColors.Palette.Length : 0;
+        int tileCount = special ? PlayerColors.Skins.Length : PlayerColors.Palette.Length;
+        int cols = special ? 5 : 4, rows = (tileCount + cols - 1) / cols;
+        float gap = 18 * s, top = panel.Y + 118 * s;
+        float tw = (panel.Width - 40 * s - gap * (cols - 1)) / cols;
+        float th = (panel.Bottom - 20 * s - top - gap * (rows - 1)) / rows;
+        var tiles = new Rectangle[tileCount];
+        for (int k = 0; k < tileCount; k++) {
+            int i = first + k;
+            var r = new Rectangle((int)(panel.X + 20 * s + (k % cols) * (tw + gap)), (int)(top + (k / cols) * (th + gap)), (int)tw, (int)th);
+            tiles[k] = r;
+            bool sel = i == chosen;
+            bool open = PlayerColors.IsUnlocked(i);
+            if (sel)
+                ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X - (int)(6 * s), r.Y - (int)(6 * s), r.Width + (int)(12 * s), r.Height + (int)(12 * s)), 26 * s, new Color(52, 199, 89));
+            ToggleSwitch.DrawRoundedRect(sb, r, 22 * s, !open ? new Color(214, 208, 198) : sel ? new Color(255, 250, 238) : new Color(232, 226, 214));
+            if (open) {
+                PText(sb, PlayerColors.NameOf(i), new Vector2(r.Center.X, r.Bottom - 26 * s), 0.6f, Ink, maxWidth: r.Width - 20 * s);
+            }
+            else {
+                // what to beat for it, and how far along you are
+                var goal = PlayerColors.SkinAt(i) is { } sk ? Unlocks.GoalFor(sk.Unlock) : null;
+                var task = goal?.Task ?? "";
+                var lines = WrapTwo(task, 16);
+                float ly = r.Bottom - (goal is { Target: > 1 } ? 74 : 54) * s;
+                foreach (var line in lines) {
+                    PText(sb, line, new Vector2(r.Center.X, ly), 0.48f, Ink * 0.85f, maxWidth: r.Width - 20 * s);
+                    ly += 22 * s;
+                }
+                if (goal is { Target: > 1 }) {
+                    int have = Math.Min(Unlocks.Progress(goal.Key), goal.Target);
+                    var bar = new Rectangle(r.X + (int)(18 * s), r.Bottom - (int)(22 * s), r.Width - (int)(36 * s), (int)(10 * s));
+                    ToggleSwitch.DrawRoundedRect(sb, bar, 5 * s, new Color(190, 182, 170));
+                    if (have > 0)
+                        ToggleSwitch.DrawRoundedRect(sb, new Rectangle(bar.X, bar.Y, Math.Max(bar.Height, bar.Width * have / goal.Target), bar.Height), 5 * s, new Color(255, 180, 60));
+                }
+            }
+            if (Tapped(r)) {
+                if (open) {
+                    PlayerColors.SetChoice(_colorSlot, i);
+                    SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
+                }
+                else {
+                    SoundPlayer.SoundError();
+                    Internals.Common.Framework.Input.Haptics.Pulse(60, 80);
+                }
+            }
+        }
+        // the tanks themselves (3D), then the check on the chosen one and padlocks on the locked ones
         sb.End();
         float yaw = (float)(DateTime.UtcNow.TimeOfDay.TotalSeconds * 0.8 % (Math.PI * 2));
         gd.Clear(ClearOptions.DepthBuffer, Color.Black, 1f, 0);
-        for (int i = 0; i < tiles.Length; i++) {
-            var r = tiles[i];
-            var modelRect = new Rectangle(r.X, r.Y + (int)(4 * s), r.Width, r.Height - (int)(52 * s));
-            DrawTankPreview(gd, modelRect, _colorTex[i]!, i == chosen ? yaw : 0.6f);
+        for (int k = 0; k < tileCount; k++) {
+            int i = first + k;
+            var r = tiles[k];
+            bool open = PlayerColors.IsUnlocked(i);
+            int textRoom = open ? 52 : 92;
+            var modelRect = new Rectangle(r.X, r.Y + (int)(4 * s), r.Width, r.Height - (int)(textRoom * s));
+            DrawTankPreview(gd, modelRect, open ? _colorTex[i]! : _lockedTex, i == chosen || (special && open) ? yaw : 0.6f);
         }
         sb.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.LinearClamp, null, null);
-        var cr = tiles[chosen];
-        ToggleSwitch.DrawCheckBadge(sb, new Vector2(cr.Right - 26 * s, cr.Y + 26 * s), 20 * s, new Color(52, 199, 89));
+        for (int k = 0; k < tileCount; k++) {
+            int i = first + k;
+            var r = tiles[k];
+            if (i == chosen)
+                ToggleSwitch.DrawCheckBadge(sb, new Vector2(r.Right - 26 * s, r.Y + 26 * s), 20 * s, new Color(52, 199, 89));
+            else if (!PlayerColors.IsUnlocked(i))
+                DrawPadlock(sb, new Vector2(r.Right - 28 * s, r.Y + 30 * s), 18 * s);
+        }
+    }
+
+    private static int _colorTab;
+    private static Texture2D? _lockedTex;
+
+    /// <summary>Splits a short sentence into at most two lines of about <paramref name="width"/> characters.</summary>
+    private static string[] WrapTwo(string text, int width) {
+        if (text.Length <= width)
+            return [text];
+        int cut = text.LastIndexOf(' ', Math.Min(text.Length - 1, width + 4));
+        if (cut <= 0)
+            cut = text.IndexOf(' ');
+        return cut <= 0 ? [text] : [text[..cut], text[(cut + 1)..]];
+    }
+
+    /// <summary>A little padlock (body + shackle).</summary>
+    private static void DrawPadlock(SpriteBatch sb, Vector2 c, float size) {
+        var dark = new Color(70, 62, 54);
+        // shackle: a thick ring, its lower half hidden by the body
+        ToggleSwitch.DrawDisc(sb, c - new Vector2(0, size * 0.35f), size * 0.62f, dark);
+        ToggleSwitch.DrawDisc(sb, c - new Vector2(0, size * 0.35f), size * 0.36f, new Color(214, 208, 198));
+        var body = new Rectangle((int)(c.X - size * 0.8f), (int)(c.Y - size * 0.25f), (int)(size * 1.6f), (int)(size * 1.2f));
+        ToggleSwitch.DrawRoundedRect(sb, body, size * 0.25f, dark);
+        ToggleSwitch.DrawDisc(sb, new Vector2(body.Center.X, body.Center.Y - size * 0.05f), size * 0.18f, new Color(214, 208, 198));
     }
 
     private static Matrix[] _previewBones = [];

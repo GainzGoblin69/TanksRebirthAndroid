@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xna.Framework;
@@ -126,7 +126,7 @@ public static class BattleMode {
             string name = Client.IsConnected() && Server.ConnectedClients is { } cc && i < cc.Length && cc[i] is { } c && !string.IsNullOrWhiteSpace(c.Name)
                 ? c.Name : $"Player {i + 1}";
             int ci = PlayerColors.ColorIndexFor(i);
-            var col = ci >= 0 && ci < PlayerColors.Palette.Length ? PlayerColors.Palette[ci].Main : HumanColors[i];
+            var col = ci >= 0 && ci < PlayerColors.Count ? PlayerColors.MainOf(ci) : HumanColors[i];
             Fighters.Add(new Fighter { Name = name, Color = col, PlayerId = i });
         }
         for (int i = 0; i < cpus; i++) {
@@ -511,6 +511,15 @@ public static class BattleMode {
             + string.Join(", ", Fighters.Select(f => $"{f.Name}={f.Wins}")), Internals.LogType.Info);
         SoundPlayer.PlaySoundInstance(LastWinner >= 0 ? "Assets/music/fanfares/mission_complete.ogg" : "Assets/music/fanfares/gameover_playerdeath.ogg",
             SoundContext.Effect, 0.45f);
+    }
+
+    /// <summary>A player on this phone finished first (ties count) with at least one round won.</summary>
+    public static bool LocalPlayerWon() {
+        if (Fighters.Count == 0)
+            return false;
+        int top = Fighters.Max(f => f.Wins);
+        return top > 0 && Fighters.Any(f => f.Wins == top && !f.IsCpu
+            && (Net.Client.IsConnected() ? Net.NetPlay.IsClientMatched(f.PlayerId) : true));
     }
 
     /// <summary>Fighters from first to last place.</summary>

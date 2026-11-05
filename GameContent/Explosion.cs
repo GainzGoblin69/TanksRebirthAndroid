@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
@@ -179,6 +179,10 @@ public class Explosion : IAITankDanger {
     }
 
     public void Remove() {
+        // the last flames are still on screen for a moment: keep lighting them while they burn out
+        if (Explosions[Id] == this && global::TanksRebirth.Graphics.DynamicLighting.LightManager.ExplosionLights)
+            global::TanksRebirth.Graphics.DynamicLighting.GameplayLights.Flash(Position3D + new Vector3(0f, 14f, 0f), new Color(255, 168, 82),
+                3.2f * MathF.Pow(global::TanksRebirth.Graphics.DynamicLighting.LightManager.ExplosionEndLife, 1.5f), 110f + DamageRadiusScale * MAGIC_EXPLOSION_NUMBER * 3.5f, 0.35f, true, 9);
         AITank.Dangers.Remove(this);
         Explosions[Id] = null;
     }

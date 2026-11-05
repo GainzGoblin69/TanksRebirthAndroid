@@ -112,6 +112,8 @@ public class PlayerTank : Tank {
     }
     public void SwapTankTexture(Texture2D texture) => _tankTexture = texture;
     private int _colorIndex = -1;
+    /// <summary>The Tank Color pick this tank wears (-1 = its standard texture).</summary>
+    public int ColorIndex => _colorIndex;
     public PlayerTank(int playerType, bool isPlayerModel = true, int copyTier = -1) {
         Model = isPlayerModel ? ModelGlobals.TankPlayer.Asset : ModelGlobals.TankEnemy.Asset;
 
@@ -120,7 +122,7 @@ public class PlayerTank : Tank {
         // the tank color picked in the Tank Color screen (if any) replaces the standard player texture
         int colorIndex = copyTier == -1 && isPlayerModel ? PlayerColors.ColorIndexFor(playerType) : -1;
         if (colorIndex >= 0)
-            texAsset = PlayerColors.MakeTexture(TankGame.Instance.GraphicsDevice, PlayerColors.Palette[colorIndex]);
+            texAsset = PlayerColors.MakeTexture(TankGame.Instance.GraphicsDevice, colorIndex);
         else if (copyTier == -1)
             texAsset = Assets[$"plrtank_" + PlayerID.Collection.GetKey(playerType)!.ToLower()];
         else {
@@ -186,7 +188,7 @@ public class PlayerTank : Tank {
             _ => throw new Exception($"The player type with number \"{PlayerType}\" is not mapped to a color!"),
         };
         if (_colorIndex >= 0)
-            properties.DestructionColor = PlayerColors.Palette[_colorIndex].Main;
+            properties.DestructionColor = PlayerColors.MainOf(_colorIndex);
 
         base.ApplyDefaults(ref properties);
 
@@ -197,6 +199,9 @@ public class PlayerTank : Tank {
         }
     }
     public override void Update() {
+        // rainbow / neon / gold / chrome skins move
+        if (_colorIndex >= 0 && _tankTexture is not null && PlayerColors.IsAnimated(_colorIndex))
+            PlayerColors.Animate(_tankTexture, _colorIndex);
         /*if (Input.KeyJustPressed(Keys.P))
             foreach (var m in TankDeathMark.deathMarks)
                 m?.ResurrectTank();*/

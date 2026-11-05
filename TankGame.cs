@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text.Json;
 using System.Reflection;
@@ -894,6 +894,9 @@ public class TankGame : Game {
         if (IsCrashInfoVisible) DrawErrorScreen();
 
         SpriteRenderer.End();
+
+        // "new tank skin unlocked" popups, over everything
+        GameContent.Systems.Unlocks.DrawToast(SpriteRenderer);
     }
     public void DrawNonInteractiveUI() {
         // holy balls this sucks.

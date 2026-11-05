@@ -1,4 +1,4 @@
-using TanksRebirth;
+﻿using TanksRebirth;
 using System;
 using System.Linq;
 using TanksRebirth.Internals.Core.Interfaces;
@@ -112,7 +112,9 @@ public static class TankMusicSystem
         foreach (var song in Audio.ToList())
             song.Value?.SetVolume(0f);
 
-        if (MainMenuUI.IsActive && AIManager.CountAll() == 0 || TierHighest == TankID.None) {
+        // Tank Troves: a room with no enemy tanks (cleared, a shop, an empty room) keeps the last song going
+        bool fallback = TierHighest == TankID.None && !MainMenuUI.IsActive && Troves.TroveRun.Active && !Troves.TroveRun.ShowingEnd;
+        if (!fallback && (MainMenuUI.IsActive && AIManager.CountAll() == 0 || TierHighest == TankID.None)) {
             return;
         }
 
@@ -122,6 +124,15 @@ public static class TankMusicSystem
         }
 
         var musicVolume = TankGame.Settings.MusicVolume * VolumeMultiplier;
+
+        if (fallback) {
+            var fb = FallbackSong();
+            if (fb is not null) {
+                fb.SetVolume(musicVolume);
+                CurrentSong = fb;
+            }
+            return;
+        }
 
         var tierHighestName = TankID.Collection.GetKey(TierHighest);
         // only count the tanks that exist and are below the highest tier.
@@ -134,6 +145,7 @@ public static class TankMusicSystem
         var name = tierHighestName!.ToLower() + num;
 
         Audio[name].SetVolume(musicVolume);
+        LastSongName = name;
 
         int index = Audio.Values.ToList().FindIndex(x => x.Volume > 0);
 
@@ -144,6 +156,21 @@ public static class TankMusicSystem
         }
     }
     public static OggMusic CurrentSong;
+    /// <summary>The last tank song heard (Tank Troves keeps it going in rooms without enemies).</summary>
+    public static string LastSongName = "brown";
+
+    /// <summary>The song for a room with no enemies: the last one heard if it's still going, otherwise Brown's.</summary>
+    static OggMusic? FallbackSong() {
+        if (Audio.TryGetValue(LastSongName, out var last) && last is not null && !last.IsStopped())
+            return last;
+        foreach (var key in new[] { "brown", LastSongName }) {
+            if (Audio.TryGetValue(key, out var song) && song is not null) {
+                if (song.IsStopped()) song.Play();
+                return song;
+            }
+        }
+        return null;
+    }
 
     //public static MidiPlayer MusicMidi;
     //public static MidiFile MusicSoundFont;
@@ -196,6 +223,10 @@ public static class TankMusicSystem
                 song.Value.Play();
             }
         }
+
+        // Tank Troves: rooms without enemies keep playing the last song
+        if (Troves.TroveRun.Active && Audio.TryGetValue(LastSongName, out var keep) && keep is not null && !keep.IsPlaying())
+            keep.Play();
 
         if (GameScene.Theme == MapTheme.Christmas)
             SnowLoop?.Play();
