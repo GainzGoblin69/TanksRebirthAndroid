@@ -8,6 +8,7 @@ using Microsoft.Xna.Framework.Input;
 using TanksRebirth.GameContent.Globals;
 using TanksRebirth.GameContent.Systems;
 using TanksRebirth.GameContent.Systems.Troves;
+using TanksRebirth.GameContent.Systems.AI;
 using TanksRebirth.Internals.Common;
 using TanksRebirth.Internals.Common.Framework.Audio;
 using TanksRebirth.Internals.Common.GameUI;
@@ -199,6 +200,62 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, c, rr, new Color(200, 210, 230));
                 ToggleSwitch.DrawDisc(sb, c - new Vector2(rr * 0.25f), rr * 0.4f, Color.White);
             }
+        // tanks on parachutes: a warning ring and a growing shadow where each will land, the tank swaying down under its chute
+        foreach (var drop in TroveDrops.Pending) {
+            if (TroveRun.PlayTime < drop.Start)
+                continue;
+            float p = TroveDrops.Progress(drop);
+            var g = ToScreen(drop.At);
+            float ring = 22 * s * (1f + 0.15f * MathF.Sin((float)TroveRun.PlayTime * 10f));
+            for (int i = 0; i < 24; i++) {
+                float a0 = i * MathHelper.TwoPi / 24, a1 = a0 + MathHelper.TwoPi / 24 * 0.6f;
+                ToggleSwitch.DrawLine(sb, g + new Vector2(MathF.Cos(a0), MathF.Sin(a0)) * ring, g + new Vector2(MathF.Cos(a1), MathF.Sin(a1)) * ring, 3 * s, new Color(255, 60, 40) * 0.8f);
+            }
+            ToggleSwitch.DrawDisc(sb, g, (5 + 13 * p) * s, Color.Black * (0.15f + 0.35f * p));
+            float sway = MathF.Sin((float)TroveRun.PlayTime * 2.5f + drop.At.X) * 10 * s * (1 - p);
+            var body = g - new Vector2(-sway, (1 - p) * 330 * s + 6 * s);
+            var canopy = body - new Vector2(0, 46 * s);
+            float cr = 30 * s;
+            // the chute: red and white panels in a dome
+            for (int i = 0; i < 8; i++) {
+                float a0 = MathHelper.Pi + i * MathHelper.Pi / 8, a1 = a0 + MathHelper.Pi / 8;
+                var e0 = canopy + new Vector2(MathF.Cos(a0), MathF.Sin(a0) * 0.75f) * cr;
+                var e1 = canopy + new Vector2(MathF.Cos(a1), MathF.Sin(a1) * 0.75f) * cr;
+                var col = i % 2 == 0 ? new Color(230, 60, 50) : new Color(245, 240, 235);
+                for (float k = 0.15f; k <= 1.01f; k += 0.17f)
+                    ToggleSwitch.DrawLine(sb, Vector2.Lerp(canopy, e0, k), Vector2.Lerp(canopy, e1, k), 6 * s, col);
+            }
+            // strings, and the tank hanging under it
+            var col2 = AITank.TankDestructionColors.TryGetValue(drop.Tier, out var tc) ? tc : Color.Gray;
+            ToggleSwitch.DrawLine(sb, canopy + new Vector2(-cr, 0), body + new Vector2(-8 * s, -5 * s), 1.5f * s, Color.White * 0.8f);
+            ToggleSwitch.DrawLine(sb, canopy + new Vector2(cr, 0), body + new Vector2(8 * s, -5 * s), 1.5f * s, Color.White * 0.8f);
+            ToggleSwitch.DrawLine(sb, canopy, body + new Vector2(0, -5 * s), 1.5f * s, Color.White * 0.6f);
+            ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(body.X - 11 * s), (int)(body.Y - 6 * s), (int)(22 * s), (int)(13 * s)), 3 * s, Color.Black * 0.7f);
+            ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(body.X - 10 * s), (int)(body.Y - 5 * s), (int)(20 * s), (int)(11 * s)), 3 * s, col2);
+            ToggleSwitch.DrawDisc(sb, body, 4 * s, Color.Lerp(col2, Color.Black, 0.3f));
+        }
+
+        // Charge Shot: a small ring next to the tank fills up while you hold fire
+        foreach (var pt in GameHandler.AllPlayerTanks) {
+            if (pt is not { IsDestroyed: false } || pt.ChargeFraction < 0)
+                continue;
+            float f = pt.ChargeFraction;
+            var cc = ToScreen(pt.Position) + new Vector2(42 * s, -34 * s);
+            float rr = 15 * s;
+            bool full = f >= 1f;
+            float pulse = full ? 0.75f + 0.25f * MathF.Sin((float)TroveRun.PlayTime * 18f) : 1f;
+            ToggleSwitch.DrawDisc(sb, cc, rr + 3 * s, Color.Black * 0.5f);
+            int segs = 28;
+            for (int i = 0; i < segs; i++) {
+                float a0 = -MathHelper.PiOver2 + i * MathHelper.TwoPi / segs, a1 = a0 + MathHelper.TwoPi / segs * 1.15f;
+                bool on = i < (int)MathF.Ceiling(f * segs);
+                var col = on ? (full ? Color.White : new Color(120, 200, 255)) : new Color(60, 70, 90);
+                ToggleSwitch.DrawLine(sb, cc + new Vector2(MathF.Cos(a0), MathF.Sin(a0)) * rr, cc + new Vector2(MathF.Cos(a1), MathF.Sin(a1)) * rr, 5 * s, col * pulse);
+            }
+            if (full)
+                ToggleSwitch.DrawDisc(sb, cc, rr * 0.55f, new Color(170, 230, 255) * pulse);
+        }
+
         // Pyro Baron's fire, Chrono Tank's time bubbles, the Phantom's laser sight
         float tnow = (float)TroveRun.PlayTime;
         foreach (var (at, until) in TroveBosses.Fires) {
@@ -1097,6 +1154,16 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.12f, -r * 0.05f), r * 0.17f, new Color(220, 40, 90));
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.1f), r * 0.17f, new Color(220, 40, 90));
                 break;
+            case TroveItemId.ChargeShot: {
+                // a ring filling up around a glowing shell
+                for (int i = 0; i < 24; i++) {
+                    float a0 = -MathHelper.PiOver2 + i * MathHelper.TwoPi / 24, a1 = a0 + MathHelper.TwoPi / 24 * 1.1f;
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(MathF.Cos(a0), MathF.Sin(a0)) * r * 0.5f, c + new Vector2(MathF.Cos(a1), MathF.Sin(a1)) * r * 0.5f,
+                        t * 0.6f, i < 17 ? new Color(150, 220, 255) : new Color(60, 70, 90));
+                }
+                ToggleSwitch.DrawDisc(sb, c, r * 0.22f, Color.White);
+                break;
+            }
             case TroveItemId.SacredHeart:
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.18f, -r * 0.08f), r * 0.24f, w);
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.18f, -r * 0.08f), r * 0.24f, w);

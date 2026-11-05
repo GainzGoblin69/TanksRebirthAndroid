@@ -245,6 +245,7 @@ public static class TroveRun {
         Graphics.GameScene.FloorTint = Vector3.One;
         Block.Tint = Vector3.One;
         TroveThemes.ClearRoom();
+        TroveDrops.Clear();
         Active = false;
         Battle = false;
         _starting = false;
@@ -383,23 +384,21 @@ public static class TroveRun {
         ChatSystem.SendMessage("You found a secret room!", Color.Gold);
     }
 
-    /// <summary>Challenge rooms: the second wave arrives.</summary>
-    private static void SpawnWave2(TroveRoom room) {
-        if (room.Wave2Spawned)
+    /// <summary>Challenge rooms: the next wave parachutes in (you see where each tank will land before it does).</summary>
+    private static void SpawnWave(TroveRoom room, int wave) {
+        var list = wave >= 3 ? room.Wave3 : room.Wave2;
+        if (wave >= 3 ? room.Wave3Spawned : room.Wave2Spawned)
             return;
-        room.Wave2Spawned = true;
-        foreach (var e in room.Wave2) {
-            var t = new TankTemplate {
-                IsPlayer = false, AiTier = e.Tier, Rotation = e.Rotation, Team = TeamID.Blue,
-                Position = new Coordinates.BlockMapPosition(e.X, e.Y),
-            }.GetAiTank();
-            t.Team = TeamID.Blue;
-            GameHandler.Particles.MakeShineSpot(t.Position3D + new Vector3(0, 10, 0), Color.Red, 1.2f);
+        if (wave >= 3) room.Wave3Spawned = true;
+        else room.Wave2Spawned = true;
+        for (int i = 0; i < list.Count; i++) {
+            var e = list[i];
+            TroveDrops.Add(new Coordinates.BlockMapPosition(e.X, e.Y), e.Tier, delay: i * 0.25);
         }
         _roomTime = 0;
         RestartMusic();
         SoundPlayer.PlaySoundInstance("Assets/sounds/menu/client_join.ogg", SoundContext.Effect, 0.8f, pitchOverride: -0.5f);
-        ChatSystem.SendMessage("Wave 2!", Color.OrangeRed);
+        ChatSystem.SendMessage($"Wave {wave}! Incoming!", Color.OrangeRed);
     }
 
     private static void MarkSeen() {
@@ -455,6 +454,7 @@ public static class TroveRun {
         TroveBosses.Update();
         TroveBosses.UpdateBossOrbiters();
         TroveEnemies.Update();
+        TroveDrops.Update();
         TroveThemes.Update();
         if (!CampaignGlobals.InMission || Ended != EndKind.None || GameUI.Paused || Room is not { } room)
             return;
@@ -469,19 +469,20 @@ public static class TroveRun {
         }
 
         // a room is cleared when its enemies are gone
-        bool enemies = GameHandler.AllAITanks.Any(t => t is not null && !t.IsDestroyed && t.Team != TeamID.Red);
-        if (!room.Cleared && !enemies && _roomTime > 0.6f && _fadeDir == 0 && room.Kind == TroveRoomKind.Challenge && !room.Wave2Spawned) {
-            // a challenge room's first wave is down: the host sends in the second
+        bool enemies = GameHandler.AllAITanks.Any(t => t is not null && !t.IsDestroyed && t.Team != TeamID.Red) || TroveDrops.Any;
+        int nextWave = room.Kind != TroveRoomKind.Challenge ? 0 : !room.Wave2Spawned ? 2 : room.Wave3.Count > 0 && !room.Wave3Spawned ? 3 : 0;
+        if (!room.Cleared && !enemies && _roomTime > 0.6f && _fadeDir == 0 && nextWave > 0) {
+            // a challenge room's wave is down: the host sends in the next one
             if (Authority) {
-                Send(EV_WAVE2);
-                SpawnWave2(room);
+                Send(EV_WAVE2, nextWave);
+                SpawnWave(room, nextWave);
             }
         }
         else if (!room.Cleared && !enemies && _roomTime > 0.6f && _fadeDir == 0 && !TroveEnemies.HoldsRoom && !TroveBosses.HoldsRoom) {
             room.Cleared = true;
             TroveItems.OnRoomCleared();
             RoomsCleared++;
-            TanksDestroyed += room.Enemies.Count + room.Wave2.Count;
+            TanksDestroyed += room.Enemies.Count + room.Wave2.Count + room.Wave3.Count;
             SoundPlayer.PlaySoundInstance("Assets/sounds/menu/client_join.ogg", SoundContext.Effect, 0.8f);
             if (room.Kind == TroveRoomKind.Boss)
                 _bossTimer = 2.5f;
@@ -626,10 +627,11 @@ public static class TroveRun {
         _entry = entry;
         _roomTime = 0;
         _deadTimer = 0;
+        TroveDrops.Clear();
         MarkSeen();
         ReviveSystem.Clear();
         if (!room.Cleared) {
-            room.Wave2Spawned = false; // a challenge starts over from wave 1
+            room.Wave2Spawned = room.Wave3Spawned = false; // a challenge starts over from wave 1
             ReadyUntil = PlayTime + READY_SECONDS;
             SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.8f, pitchOverride: -0.3f);
         }
@@ -898,7 +900,7 @@ public static class TroveRun {
                 if (Active) RevealSecret();
                 break;
             case EV_WAVE2:
-                if (Active && CampaignGlobals.InMission && Room is { } wr) SpawnWave2(wr);
+                if (Active && CampaignGlobals.InMission && Room is { } wr) SpawnWave(wr, a >= 3 ? 3 : 2);
                 break;
             case EV_STOPWATCH:
                 if (Active) TroveItems.StartFreeze(a);

@@ -29,6 +29,7 @@ public enum TroveItemId {
     // batch 6 (Isaac-inspired)
     BoomerangShells, MortarShells, Wraparound, MegaShell, HolyMantle, Pyromaniac, MineDrone, LuckyFoot,
     BoxOfFriends, OilSlick, TeleportPads, Battery, MysteryPill, CupidsArrow, SacredHeart,
+    ChargeShot,
 }
 
 /// <summary>How an item works: used with the ITEM button, takes effect when picked up, or lasts the whole run.</summary>
@@ -150,6 +151,7 @@ public static class TroveItems {
         new(TroveItemId.MysteryPill, "Mystery Pill", "A random stat change for this floor (usually good)", TroveItemKind.Instant, new Color(225, 225, 240)),
         new(TroveItemId.CupidsArrow, "Cupid's Arrow", "Your shells go through every enemy they hit", TroveItemKind.Passive, new Color(255, 120, 170)),
         new(TroveItemId.SacredHeart, "Sacred Heart", "Homing shells and damage up, fire rate a little down", TroveItemKind.Passive, new Color(225, 40, 60)),
+        new(TroveItemId.ChargeShot, "Charge Shot", "Hold fire for 2 seconds, then let go: a super-fast shot that goes through enemies (let go early to cancel)", TroveItemKind.Passive, new Color(120, 200, 255)),
     ];
     public static TroveItemDef Def(TroveItemId id) => All[(int)id];
 
@@ -236,6 +238,7 @@ public static class TroveItems {
 
     // item rooms draw from nearly everything; challenge and secret rooms have stronger pools; rooms mostly drop small stuff
     public static readonly TroveItemId[] PedestalPool = [
+        TroveItemId.ChargeShot,
         TroveItemId.Rocket, TroveItemId.Homing, TroveItemId.SliderBomb, TroveItemId.BlockBust, TroveItemId.Stopwatch, TroveItemId.ShellBurst,
         TroveItemId.Decoy, TroveItemId.Reroll, TroveItemId.SpeedTreads, TroveItemId.BouncyShells, TroveItemId.ExtraShell, TroveItemId.MinePack,
         TroveItemId.Detonator, TroveItemId.BigMines, TroveItemId.TripleShot, TroveItemId.QuickReload, TroveItemId.OrbitGuard, TroveItemId.TreasureMap,
@@ -288,7 +291,7 @@ public static class TroveItems {
         TroveItemId.BoomerangShells, TroveItemId.MortarShells, TroveItemId.Wraparound, TroveItemId.MegaShell, TroveItemId.HolyMantle,
         TroveItemId.Pyromaniac, TroveItemId.CupidsArrow, TroveItemId.Battery, TroveItemId.MysteryPill,
         TroveItemId.Rocket, TroveItemId.Dash, TroveItemId.Teleport, TroveItemId.WallBuilder, TroveItemId.Invincibility,
-        TroveItemId.RepairKit, TroveItemId.TeleportPads,
+        TroveItemId.RepairKit, TroveItemId.TeleportPads, TroveItemId.ChargeShot,
     ];
     public static readonly TroveItemId[] DropPool = [
         TroveItemId.ExtraLife, TroveItemId.ExtraLife, TroveItemId.Shield, TroveItemId.Shield, TroveItemId.Shield,
@@ -1562,6 +1565,24 @@ public static class TroveItems {
     /// <summary>Blasts (shell explosions, slider bombs, the Nuke) are 1.5x with Big Mines.</summary>
     public static float BlastSize(int playerId) => playerId is >= 0 and < 4 && Players[playerId].Has(TroveItemId.BigMines) ? 1.5f : 1f;
     public static bool BlastProof(int playerId) => Has(playerId, Syn("Blast Proof"));
+
+    public const double CHARGE_SECONDS = 2.0;
+    public static bool HasChargeShot(int playerId) => TroveRun.Active && playerId is >= 0 and < 4 && Players[playerId].Has(TroveItemId.ChargeShot);
+
+    /// <summary>A fully charged shot: the shells it made fly much faster, pierce and break cork.</summary>
+    public static void SuperCharge(PlayerTank tank, HashSet<Shell> before) {
+        foreach (var s in Shell.AllShells) {
+            if (s is null || !ReferenceEquals(s.Owner, tank) || before.Contains(s))
+                continue;
+            s.Velocity *= 3.2f;
+            s.Pierce += 2;
+            s.BreaksCork = true;
+            s.VisualScale *= 1.3f;
+            s.Tint = new Color(150, 220, 255);
+        }
+        GameHandler.Particles.MakeShineSpot(tank.TurretPosition3D, new Color(150, 220, 255), 1.4f);
+        SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_shoot_regular_1.ogg", SoundContext.Effect, 0.8f, pitchOverride: -0.4f);
+    }
 
     public static HashSet<Shell> MyShells(Tank tank) => Shell.AllShells.Where(s => s is not null && ReferenceEquals(s.Owner, tank)).ToHashSet();
 

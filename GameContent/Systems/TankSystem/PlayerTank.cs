@@ -266,6 +266,7 @@ public class PlayerTank : Tank {
                     Shoot(false);
                 }
             }
+            UpdateCharge();
         }
 
         oldPosition = Position;
@@ -316,12 +317,50 @@ public class PlayerTank : Tank {
         }
         base.Remove(nullifyMe);
     }
+    /// <summary>Tank Troves Charge Shot: when the fire button went down (play time), or -1 while not charging.</summary>
+    public double ChargeStart = -1;
+    private bool _chargeFiring;
+    /// <summary>How full the Charge Shot is (0..1), or -1 while not charging.</summary>
+    public float ChargeFraction => ChargeStart < 0 ? -1f : (float)Math.Clamp((Systems.Troves.TroveRun.PlayTime - ChargeStart) / Systems.Troves.TroveItems.CHARGE_SECONDS, 0, 1);
+
     public override void Shoot(bool fxOnly, bool netSend = true) {
+        // Tank Troves Charge Shot: pressing fire starts charging instead (the shot goes when the button is let go)
+        if (!fxOnly && !ReplayingNetShot && !_chargeFiring && Systems.Troves.TroveItems.HasChargeShot(PlayerId)
+            && TanksRebirth.Internals.Common.Framework.Input.Haptics.IsLocal(this) && !LocalCoop.ControlsPlayer(PlayerId)) {
+            if (ChargeStart < 0 && !Systems.Troves.TroveRun.InReady)
+                ChargeStart = Systems.Troves.TroveRun.PlayTime;
+            return;
+        }
         // Tank Troves: every shell this shot makes gets this player's items (whatever the shot was)
         var before = Systems.Troves.TroveRun.Active ? Systems.Troves.TroveItems.MyShells(this) : null;
         ShootInner(fxOnly, netSend);
-        if (before is not null)
+        if (before is not null) {
             Systems.Troves.TroveItems.AfterShot(this, before);
+            if (_chargeFiring)
+                Systems.Troves.TroveItems.SuperCharge(this, before);
+        }
+    }
+
+    /// <summary>Charge Shot: while charging, watch for the fire button to be let go (full: fire; early: cancel).</summary>
+    private void UpdateCharge() {
+        if (ChargeStart < 0)
+            return;
+        if (IsDestroyed || !CampaignGlobals.InMission || !Systems.Troves.TroveItems.HasChargeShot(PlayerId)) {
+            ChargeStart = -1;
+            return;
+        }
+        var pad = InputUtils.CurrentGamePadSnapshot;
+        bool held = InputUtils.CurrentMouseSnapshot.LeftButton == ButtonState.Pressed || FireBullet.IsPressed
+            || pad.IsButtonDown(Buttons.RightShoulder) || pad.Triggers.Right > 0.4f;
+        if (held || GameUI.Paused)
+            return;
+        bool full = ChargeFraction >= 1f;
+        ChargeStart = -1;
+        if (full && CurShootCooldown <= 0) {
+            _chargeFiring = true;
+            try { Shoot(false); }
+            finally { _chargeFiring = false; }
+        }
     }
     private void ShootInner(bool fxOnly, bool netSend) {
         if (!ReplayingNetShot) PlayerStatistics.ShellsShot++; // another player's shot isn't yours

@@ -142,6 +142,7 @@ public static class TroveBosses {
         _windupUntil = _stunUntil = -1;
         PhantomHidden = false;
         _decoys.Clear();
+        _reinforced = false;
     }
 
     /// <summary>The Splitter King just split: keep the room from counting as cleared until its pieces appear.</summary>
@@ -310,6 +311,7 @@ public static class TroveBosses {
             _minions.Clear();
             Lines.Clear();
             Targets.Clear();
+            TroveDrops.Clear();
             return;
         }
         _minions.RemoveAll(m => m.IsDestroyed);
@@ -342,8 +344,17 @@ public static class TroveBosses {
             return;
         if (_mini)
             MiniTrick();
-        else if (Current is { } def && !Boss.IsDestroyed)
+        else if (Current is { } def && !Boss.IsDestroyed) {
             Brain(def.Kind);
+            // bosses with helpers call in more by parachute when they're hurt
+            if (!_reinforced && Fraction <= 0.5f && def.Kind is BossKind.MamaBrown or BossKind.Hive or BossKind.GreenGoliath or BossKind.ObsidianOverlord or BossKind.ShadowClones) {
+                _reinforced = true;
+                var tiers = ReinforceTiers[Math.Clamp(_floor - 1, 0, ReinforceTiers.Length - 1)];
+                var target = NearestPlayer(Boss.Position);
+                for (int i = 0; i < 2; i++)
+                    SendAct(ACT_REINFORCE, RandomFreeSpot(target?.Position ?? Vector2.Zero, 100f), tiers[i % tiers.Length]);
+            }
+        }
     }
 
     /// <summary>What every phone does the same way for the newer bosses: splits, leaps, fire, time bubbles, the charge, decoys.</summary>
@@ -596,7 +607,7 @@ public static class TroveBosses {
                     if (Every("summon", 9)) {
                         for (int i = 0; i < 8; i++)
                             PlaceMine(b.Position + Vector2.UnitX.Rotate(i * MathHelper.TwoPi / 8f) * 55f);
-                        for (int i = 0; i < 2 && _minions.Count + i < 3; i++)
+                        for (int i = 0; i < 2 && _minions.Count + TroveDrops.Pending.Count + i < 3; i++)
                             SendAct(ACT_SPAWN_BLACK, FreeSpotNear(b.Position, 70f));
                     }
                 }
@@ -920,7 +931,13 @@ public static class TroveBosses {
     private const int ACT_SPAWN_BROWN = 1, ACT_SPAWN_TURRET = 2, ACT_SPAWN_BLACK = 3, ACT_BURROW = 4, ACT_POPUP = 5,
         ACT_LASER_LINE = 6, ACT_ARTILLERY = 7, ACT_GOLD_DROP = 8, ACT_SPARKLE = 9,
         ACT_SPAWN_SCOUT = 10, ACT_SPLITK = 11, ACT_LEAP = 12, ACT_FIRE = 13, ACT_BUBBLE = 14, ACT_CHARGE = 15, ACT_STUN = 16,
-        ACT_PHANTOM = 17, ACT_CLONES = 18;
+        ACT_PHANTOM = 17, ACT_CLONES = 18, ACT_REINFORCE = 19;
+
+    /// <summary>Tanks that parachute in to help a boss, by floor.</summary>
+    private static readonly int[][] ReinforceTiers = [
+        [TankID.Brown, TankID.Ash], [TankID.Marine, TankID.Yellow], [TankID.Pink, TankID.Violet], [TankID.Green, TankID.White], [TankID.Black, TankID.Violet],
+    ];
+    private static bool _reinforced;
 
     private static List<Vector2> CloneSpots(Vector2 at, int n) {
         var list = new List<Vector2>();
@@ -942,18 +959,29 @@ public static class TroveBosses {
 
     private static void DoAct(int act, Vector2 at, int extra) {
         switch (act) {
-            case ACT_SPAWN_BROWN:
-            case ACT_SPAWN_TURRET:
-            case ACT_SPAWN_BLACK: {
-                int tier = act == ACT_SPAWN_BROWN ? TankID.Brown : act == ACT_SPAWN_TURRET ? TankID.Green : TankID.Black;
-                var t = new TankTemplate { IsPlayer = false, AiTier = tier, Position = at, Team = TeamID.Blue }.GetAiTank();
+            case ACT_SPAWN_BROWN: {
+                // Mama Brown's little ones come straight out of her
+                var t = new TankTemplate { IsPlayer = false, AiTier = TankID.Brown, Position = at, Team = TeamID.Blue }.GetAiTank();
                 t.Team = TeamID.Blue;
-                if (act == ACT_SPAWN_BROWN)
-                    t.Scaling = new Vector3(0.7f);
-                if (act == ACT_SPAWN_TURRET)
-                    t.Properties.Armor = new TankArmor(t, 2);
+                t.Scaling = new Vector3(0.7f);
                 _minions.Add(t);
                 GameHandler.Particles.MakeSmallExplosion(new Vector3(at.X, 5, at.Y), 6, 6, 1f, 8);
+                break;
+            }
+            case ACT_SPAWN_TURRET:
+            case ACT_SPAWN_BLACK:
+            case ACT_REINFORCE: {
+                // helpers parachute in: you see where they'll land first
+                int tier = act == ACT_SPAWN_TURRET ? TankID.Green : act == ACT_SPAWN_BLACK ? TankID.Black : Math.Max(TankID.Brown, extra);
+                bool turret = act == ACT_SPAWN_TURRET;
+                TroveDrops.Add(at, tier, t => {
+                    if (turret)
+                        t.Properties.Armor = new TankArmor(t, 2);
+                    if (Boss is { IsDestroyed: false })
+                        _minions.Add(t);
+                    else
+                        t.Remove(true); // the fight is already over
+                });
                 break;
             }
             case ACT_BURROW:

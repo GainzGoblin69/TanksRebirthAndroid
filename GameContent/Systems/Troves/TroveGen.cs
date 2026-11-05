@@ -28,6 +28,9 @@ public sealed class TroveRoom {
     /// <summary>Challenge rooms: the second wave (comes in once the first is beaten).</summary>
     public List<(int X, int Y, int Tier, float Rotation)> Wave2 = [];
     public bool Wave2Spawned;
+    /// <summary>Challenge rooms: sometimes a third wave (always from floor 3 on).</summary>
+    public List<(int X, int Y, int Tier, float Rotation)> Wave3 = [];
+    public bool Wave3Spawned;
     /// <summary>An item in the middle of the room: on a pedestal in item rooms, or left behind once a fight room is cleared.</summary>
     public TroveItemId? Pickup;
     public bool PickupTaken;
@@ -741,6 +744,14 @@ public static class TroveGen {
             for (int i = 0; i < count + 1; i++)
                 if ((Pick(6) ?? Pick(3)) is { } wp)
                     room.Wave2.Add((wp.X, wp.Y, pool[rng.Next(pool.Length)], rng.NextSingle() * MathHelper.TwoPi));
+            // a third wave (its own dice, so nothing above changes): half the time, always from floor 3
+            var r3 = new Random(unchecked(room.Cell.X * 7349 + room.Cell.Y * 3203 + f.Number * 97 + count));
+            if (f.Number >= 3 || r3.NextDouble() < 0.5) {
+                taken.Clear();
+                for (int i = 0; i < count + 2; i++)
+                    if ((Pick(6) ?? Pick(3)) is { } w3)
+                        room.Wave3.Add((w3.X, w3.Y, pool[r3.Next(pool.Length)], r3.NextSingle() * MathHelper.TwoPi));
+            }
         }
     }
 
