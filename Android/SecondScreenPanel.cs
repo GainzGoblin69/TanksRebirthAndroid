@@ -18,6 +18,14 @@ namespace TanksRebirth.Droid;
 internal sealed class SecondScreenPanel : Presentation {
     private TextView? _mission, _lives, _enemies, _hint;
     private Button? _pause, _mine;
+    private LinearLayout? _buttons;
+    // Tank Troves: your items (the ITEM-button ones to pick from, and everything you've collected)
+    private LinearLayout? _troves, _activeRow, _passiveList;
+    private TextView? _itemsHeader, _activeHint;
+    private Button? _use;
+    private readonly System.Collections.Generic.List<Button> _activeButtons = [];
+    private string _itemsSig = "";
+    private bool? _trovesShown;
     private Handler? _handler;
     private bool _running;
 
@@ -75,7 +83,31 @@ internal sealed class SecondScreenPanel : Presentation {
         stats.AddView(_lives, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
         stats.AddView(_enemies, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
 
+        // Tank Troves: the items panel (hidden in other modes)
+        _troves = new LinearLayout(ctx) { Orientation = Orientation.Vertical, Visibility = ViewStates.Gone };
+        root.AddView(_troves, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f) { TopMargin = 12 });
+        _activeHint = new TextView(ctx) { TextSize = 13, Text = "ITEM BUTTON - tap one to pick it, then USE" };
+        _activeHint.SetTextColor(Android.Graphics.Color.Rgb(240, 180, 60));
+        _troves.AddView(_activeHint);
+        var activeArea = new LinearLayout(ctx) { Orientation = Orientation.Horizontal };
+        _troves.AddView(activeArea, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+        var hs = new HorizontalScrollView(ctx);
+        _activeRow = new LinearLayout(ctx) { Orientation = Orientation.Horizontal };
+        hs.AddView(_activeRow);
+        activeArea.AddView(hs, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+        _use = new Button(ctx) { Text = "USE", TextSize = 22 };
+        _use.Click += (_, _) => TanksRebirth.GameContent.Systems.Troves.TroveItems.RequestUse();
+        activeArea.AddView(_use, new LinearLayout.LayoutParams(260, 170) { LeftMargin = 12 });
+        _itemsHeader = new TextView(ctx) { TextSize = 13 };
+        _itemsHeader.SetTextColor(Android.Graphics.Color.Rgb(240, 180, 60));
+        _troves.AddView(_itemsHeader, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = 14 });
+        var scroll = new ScrollView(ctx);
+        _passiveList = new LinearLayout(ctx) { Orientation = Orientation.Vertical };
+        scroll.AddView(_passiveList);
+        _troves.AddView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
+
         var buttons = new LinearLayout(ctx) { Orientation = Orientation.Horizontal };
+        _buttons = buttons;
         var bp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f) { TopMargin = 24 };
         root.AddView(buttons, bp);
         _pause = new Button(ctx) { Text = "PAUSE", TextSize = 26 };
@@ -118,6 +150,8 @@ internal sealed class SecondScreenPanel : Presentation {
                 _enemies!.Text = $"Enemies: {TanksRebirth.GameContent.Systems.AI.AIManager.CountAll()}";
             }
 
+            RefreshTroves(!inMenu && TanksRebirth.GameContent.Systems.Troves.TroveRun.Active, paused);
+
             _pause!.Text = paused ? "RESUME" : "PAUSE";
             _pause.Enabled = !inMenu;
             _mine!.Enabled = !inMenu && !paused;
@@ -126,6 +160,81 @@ internal sealed class SecondScreenPanel : Presentation {
             // game state not ready yet; try again on the next tick
         }
         _handler?.PostDelayed(Refresh, 250);
+    }
+
+    private static Android.Graphics.Color Col(Microsoft.Xna.Framework.Color c) => Android.Graphics.Color.Rgb(c.R, c.G, c.B);
+
+    /// <summary>Tank Troves: show your items (and switch the layout when the mode changes).</summary>
+    private void RefreshTroves(bool troves, bool paused) {
+        if (_troves is null || _buttons is null || _activeRow is null || _passiveList is null)
+            return;
+        if (_trovesShown != troves) {
+            _trovesShown = troves;
+            _troves.Visibility = troves ? ViewStates.Visible : ViewStates.Gone;
+            _hint!.Visibility = troves ? ViewStates.Gone : ViewStates.Visible;
+            // the Pause / Mine buttons shrink to a strip at the bottom while the items show
+            _buttons.LayoutParameters = troves
+                ? new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 150) { TopMargin = 10 }
+                : new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f) { TopMargin = 24 };
+            _pause!.TextSize = _mine!.TextSize = troves ? 18 : 26;
+            _itemsSig = "";
+        }
+        if (!troves)
+            return;
+        var items = TanksRebirth.GameContent.Systems.Troves.TroveItems.Players[TanksRebirth.GameContent.Systems.Troves.TroveItems.MyPlayer];
+        string sig = string.Join(",", items.Actives) + "|" + string.Join(",", items.Passives.OrderBy(k => (int)k.Key).Select(k => $"{k.Key}:{k.Value}"));
+        if (sig != _itemsSig) {
+            _itemsSig = sig;
+            // the ITEM-button items: one big button each
+            _activeRow.RemoveAllViews();
+            _activeButtons.Clear();
+            for (int i = 0; i < items.Actives.Count; i++) {
+                int index = i;
+                var b = new Button(Context) { TextSize = 15, Gravity = GravityFlags.Center };
+                b.SetAllCaps(false);
+                b.Click += (_, _) => TanksRebirth.GameContent.Systems.Troves.TroveItems.RequestSelect(index);
+                _activeRow.AddView(b, new LinearLayout.LayoutParams(300, 170) { RightMargin = 10 });
+                _activeButtons.Add(b);
+            }
+            if (items.Actives.Count == 0) {
+                var none = new TextView(Context) { TextSize = 14, Text = "(none yet - item rooms have them)" };
+                none.SetTextColor(Android.Graphics.Color.Gray);
+                _activeRow.AddView(none);
+            }
+            // everything else you've collected, with what it does
+            _passiveList.RemoveAllViews();
+            foreach (var (id, count) in items.Passives.OrderBy(k => (int)k.Key)) {
+                var def = TanksRebirth.GameContent.Systems.Troves.TroveItems.Def(id);
+                var name = new TextView(Context) { TextSize = 17, Text = count > 1 ? $"{def.Name}  x{count}" : def.Name };
+                name.SetTextColor(Col(Microsoft.Xna.Framework.Color.Lerp(def.Color, Microsoft.Xna.Framework.Color.White, 0.25f)));
+                name.SetTypeface(null, Android.Graphics.TypefaceStyle.Bold);
+                _passiveList.AddView(name, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = 10 });
+                var desc = new TextView(Context) { TextSize = 13, Text = def.Description };
+                desc.SetTextColor(Android.Graphics.Color.Rgb(200, 192, 180));
+                _passiveList.AddView(desc);
+            }
+            if (items.Passives.Count == 0) {
+                var none = new TextView(Context) { TextSize = 14, Text = "Nothing collected yet." };
+                none.SetTextColor(Android.Graphics.Color.Gray);
+                _passiveList.AddView(none);
+            }
+            int total = items.Passives.Values.Sum();
+            _itemsHeader!.Text = $"COLLECTED ({total})" + (items.Shields > 0 ? $"   -   shields: {items.Shields}" : "");
+        }
+        // the ITEM-button items' state: which is picked, uses left, charging or ready
+        for (int i = 0; i < _activeButtons.Count && i < items.Actives.Count; i++) {
+            var id = items.Actives[i];
+            var def = TanksRebirth.GameContent.Systems.Troves.TroveItems.Def(id);
+            bool ready = items.IsReady(id);
+            string state = ready ? "READY" : def.RechargeSeconds > 0 ? "recharging..." : $"charging {items.ChargeOf(id)}/{def.Recharge}";
+            bool picked = i == Math.Clamp(items.Selected, 0, items.Actives.Count - 1);
+            _activeButtons[i].Text = $"{(picked ? "> " : "")}{def.Name}{(picked ? " <" : "")}\n{state}  -  {items.UsesOf(id)} use{(items.UsesOf(id) == 1 ? "" : "s")} left";
+            _activeButtons[i].Background?.SetTint(picked ? Android.Graphics.Color.Rgb(255, 214, 120) : Android.Graphics.Color.Rgb(225, 218, 205));
+        }
+        bool canUse = items.ActiveReady && !paused && TanksRebirth.GameContent.Globals.CampaignGlobals.InMission;
+        _use!.Enabled = canUse;
+        _use.Text = items.Active is null ? "USE" : canUse ? "USE" : "...";
+        _itemsHeader!.Text = $"COLLECTED ({items.Passives.Values.Sum()})" + (items.Shields > 0 ? $"   -   shields: {items.Shields}" : "");
     }
 
     public override void OnDetachedFromWindow() {

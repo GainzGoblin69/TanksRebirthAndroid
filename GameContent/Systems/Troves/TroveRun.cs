@@ -156,7 +156,7 @@ public static class TroveRun {
         Fade = 0;
         _atBlack = null;
         _deadTimer = _bossTimer = _roomTime = 0;
-        _testHoldPickup = _testTour = false;
+        _testHoldPickup = _testTour = _testDrops = false;
 
         var campaign = new Campaign();
         campaign.MetaData = campaign.MetaData with { Name = "Battle", StartingLives = 99 };
@@ -296,7 +296,8 @@ public static class TroveRun {
         return false;
     }
 
-    private static bool _testHoldPickup;
+    private static bool _testHoldPickup, _testDrops;
+    private static double _testDropAt;
     /// <summary>Testing ("tour" on the 4th line of troves_test.txt): every couple of seconds take a random item and go
     /// through a random door, to shake out crashes when moving between rooms with lots of items.</summary>
     private static bool _testTour;
@@ -324,6 +325,7 @@ public static class TroveRun {
     }
     private static void TestSetup() {
         _testHoldPickup = false;
+        _testDrops = false;
         _testTour = false;
         try {
             var path = System.IO.Path.Combine(TankGame.SaveDirectory, "troves_test.txt");
@@ -334,6 +336,7 @@ public static class TroveRun {
                 if (Enum.TryParse<TroveItemId>(name, out var id))
                     TroveItems.Give(0, id);
             _testTour = lines.ElementAtOrDefault(3)?.Trim() == "tour";
+            _testDrops = lines.ElementAtOrDefault(6)?.Trim() == "drops"; // 7th line: parachutes keep coming (to see them)
             _tourAt = 0;
             if (Enum.TryParse<TroveItemId>(lines.ElementAtOrDefault(1)?.Trim(), out var floorItem)) {
                 Floor.Rooms[Floor.Start].Pickup = floorItem;
@@ -451,6 +454,10 @@ public static class TroveRun {
         TroveItems.Update();
         if (CampaignGlobals.InMission && Ended == EndKind.None)
             TourStep();
+        if (_testDrops && CampaignGlobals.InMission && PlayTime > _testDropAt && TroveDrops.Pending.Count < 3) {
+            _testDropAt = PlayTime + 0.8;
+            TroveDrops.Add(new Coordinates.BlockMapPosition(Random.Shared.Next(4, 18), Random.Shared.Next(3, 14)), TankID.Marine + Random.Shared.Next(6));
+        }
         TroveBosses.Update();
         TroveBosses.UpdateBossOrbiters();
         TroveEnemies.Update();

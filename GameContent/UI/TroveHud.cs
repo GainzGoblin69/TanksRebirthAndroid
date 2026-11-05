@@ -225,14 +225,33 @@ public static class TroveHud {
                 for (float k = 0.15f; k <= 1.01f; k += 0.17f)
                     ToggleSwitch.DrawLine(sb, Vector2.Lerp(canopy, e0, k), Vector2.Lerp(canopy, e1, k), 6 * s, col);
             }
-            // strings, and the tank hanging under it
+            // strings, and the tank hanging under it: a little tank in its own colours, swinging gently
             var col2 = AITank.TankDestructionColors.TryGetValue(drop.Tier, out var tc) ? tc : Color.Gray;
-            ToggleSwitch.DrawLine(sb, canopy + new Vector2(-cr, 0), body + new Vector2(-8 * s, -5 * s), 1.5f * s, Color.White * 0.8f);
-            ToggleSwitch.DrawLine(sb, canopy + new Vector2(cr, 0), body + new Vector2(8 * s, -5 * s), 1.5f * s, Color.White * 0.8f);
-            ToggleSwitch.DrawLine(sb, canopy, body + new Vector2(0, -5 * s), 1.5f * s, Color.White * 0.6f);
-            ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(body.X - 11 * s), (int)(body.Y - 6 * s), (int)(22 * s), (int)(13 * s)), 3 * s, Color.Black * 0.7f);
-            ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(body.X - 10 * s), (int)(body.Y - 5 * s), (int)(20 * s), (int)(11 * s)), 3 * s, col2);
-            ToggleSwitch.DrawDisc(sb, body, 4 * s, Color.Lerp(col2, Color.Black, 0.3f));
+            float tilt = MathF.Sin((float)TroveRun.PlayTime * 2.5f + drop.At.X) * 0.18f * (1 - p);
+            float ts = (1.0f + 0.35f * (1 - p)) * s; // a bit bigger while it's high up (closer to the camera)
+            Vector2 R(float x, float y) => body + new Vector2(x * MathF.Cos(tilt) - y * MathF.Sin(tilt), x * MathF.Sin(tilt) + y * MathF.Cos(tilt)) * ts;
+            ToggleSwitch.DrawLine(sb, canopy + new Vector2(-cr, 0), R(-13, -9), 1.5f * s, Color.White * 0.8f);
+            ToggleSwitch.DrawLine(sb, canopy + new Vector2(cr, 0), R(13, -9), 1.5f * s, Color.White * 0.8f);
+            ToggleSwitch.DrawLine(sb, canopy + new Vector2(-cr * 0.4f, 0), R(-5, -9), 1.2f * s, Color.White * 0.6f);
+            ToggleSwitch.DrawLine(sb, canopy + new Vector2(cr * 0.4f, 0), R(5, -9), 1.2f * s, Color.White * 0.6f);
+            var dark = Color.Lerp(col2, Color.Black, 0.45f);
+            var light = Color.Lerp(col2, Color.White, 0.25f);
+            // treads, with tread marks
+            ToggleSwitch.DrawLine(sb, R(-14, -10), R(-14, 10), 7 * ts, new Color(40, 36, 32));
+            ToggleSwitch.DrawLine(sb, R(14, -10), R(14, 10), 7 * ts, new Color(40, 36, 32));
+            for (int k = -4; k <= 4; k++) {
+                ToggleSwitch.DrawLine(sb, R(-17, k * 2.3f), R(-11, k * 2.3f), 0.9f * ts, new Color(85, 80, 72));
+                ToggleSwitch.DrawLine(sb, R(11, k * 2.3f), R(17, k * 2.3f), 0.9f * ts, new Color(85, 80, 72));
+            }
+            // hull
+            ToggleSwitch.DrawLine(sb, R(0, -11), R(0, 11), 20 * ts, dark);
+            ToggleSwitch.DrawLine(sb, R(0, -10), R(0, 10), 18 * ts, col2);
+            ToggleSwitch.DrawLine(sb, R(-6, -8), R(-6, 6), 3 * ts, light * 0.6f);
+            // turret and barrel (pointing down at where it lands)
+            ToggleSwitch.DrawLine(sb, R(0, 2), R(0, 20), 4 * ts, dark);
+            ToggleSwitch.DrawDisc(sb, R(0, 0), 7.5f * ts, dark);
+            ToggleSwitch.DrawDisc(sb, R(0, 0), 6.2f * ts, col2);
+            ToggleSwitch.DrawDisc(sb, R(-1.5f, -1.5f), 2.2f * ts, light);
         }
 
         // Charge Shot: a small ring next to the tank fills up while you hold fire

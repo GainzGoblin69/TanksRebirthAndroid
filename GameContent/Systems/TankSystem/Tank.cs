@@ -508,7 +508,15 @@ public abstract class Tank {
         if (!MainMenuUI.IsActive && (!CampaignGlobals.InMission || IntermissionSystem.IsAwaitingNewMission))
             Velocity = Vector2.Zero;
 
-        if (!IsTurning) {
+        // players keep full speed through gentle turns (a slightly pushed stick wobbles its direction a little;
+        // that used to count as "turning" and slowed the tank right down). Only sharp turns slow a player down.
+        bool sharpTurn = IsTurning;
+        if (IsTurning && this is PlayerTank) {
+            float diff = MathF.Abs(MathHelper.WrapAngle(DesiredChassisRotation - ChassisRotation));
+            diff = MathF.Min(diff, MathHelper.Pi - diff); // (tanks can drive either way round)
+            sharpTurn = diff > 1.0f;
+        }
+        if (!sharpTurn) {
             Speed += Properties.Acceleration * RuntimeData.DeltaTime;
 
             if (Speed > Properties.MaxSpeed)

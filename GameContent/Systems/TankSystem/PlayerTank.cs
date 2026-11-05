@@ -521,7 +521,16 @@ public class PlayerTank : Tank {
         ChassisRotation %= MathHelper.Tau;
         if (move != Vector2.Zero) {
             playerControl_isBindPressed = true;
-            DesiredDirection = Vector2.Normalize(move);
+            // any push moves at full speed; only the direction counts. A light push wobbles more, so its
+            // direction is smoothed a little (a full push turns right away)
+            var dir = Vector2.Normalize(move);
+            float push = Math.Clamp(move.Length(), 0f, 1f);
+            if (push < 0.6f && DesiredDirection != Vector2.Zero && !float.IsNaN(DesiredDirection.X) && Vector2.Dot(Vector2.Normalize(DesiredDirection), dir) > 0.5f) {
+                var blended = Vector2.Lerp(Vector2.Normalize(DesiredDirection), dir, 0.25f + push);
+                if (blended.LengthSquared() > 1e-4f)
+                    dir = Vector2.Normalize(blended);
+            }
+            DesiredDirection = dir;
         }
 
         if (Difficulties.Types["POV"])

@@ -108,7 +108,7 @@ adb exec-out screencap -p > diag/run2-levelrun.png
 
 # Tank Troves: pause, Quit, then Play > Single Player > Tank Troves; the first room of floor 1
 # (test setup: start with a pile of items that make synergies, and an item on the floor of the first room)
-adb shell "printf 'MagicMushroom HighCaliber RapidBarrel NitroTreads ArmorPlating TripleShot\nGlassCannon\nHive\ntour\nBlizzard\ncork\n' > '$EXT/troves_test.txt'"
+adb shell "printf 'MagicMushroom HighCaliber RapidBarrel NitroTreads ArmorPlating TripleShot\nGlassCannon\nHive\ntour\nBlizzard\ncork\ndrops\n' > '$EXT/troves_test.txt'"
 # and dynamic lighting on for the run (1.9's lighting system)
 adb shell "printf '3\n3\n' > '$EXT/lighting_test.txt'"  # Ultra, everything lit (+ Window Sun)
 adb shell input keyevent KEYCODE_BACK; sleep 2

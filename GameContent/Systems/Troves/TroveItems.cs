@@ -786,6 +786,25 @@ public static class TroveItems {
         if (Players[playerId].Cycle())
             SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.8f);
     }
+    // the second screen's item panel asks for these; they happen on the next update
+    private static int _reqSelect = -1;
+    private static bool _reqUse;
+    public static void RequestSelect(int index) => _reqSelect = index;
+    public static void RequestUse() => _reqUse = true;
+    /// <summary>This phone's player (the one the second screen shows).</summary>
+    public static int MyPlayer => LocalCoop.Active ? 0 : Math.Clamp(NetPlay.GetMyClientId(), 0, 3);
+    private static void HandleRequests() {
+        if (_reqSelect >= 0) {
+            SelectActive(MyPlayer, _reqSelect);
+            _reqSelect = -1;
+        }
+        if (_reqUse) {
+            _reqUse = false;
+            if (CampaignGlobals.InMission && !TanksRebirth.GameContent.UI.GameUI.Paused && GameHandler.AllPlayerTanks[MyPlayer] is { IsDestroyed: false })
+                UseActive(MyPlayer);
+        }
+    }
+
     /// <summary>Selects a carried item directly (tapping its icon).</summary>
     public static void SelectActive(int playerId, int index) {
         if (!TroveRun.Active || playerId is < 0 or >= 4)
@@ -1866,6 +1885,7 @@ public static class TroveItems {
     public static void Update() {
         if (!TroveRun.Active)
             return;
+        HandleRequests();
         for (int i = 0; i < 4; i++) {
             var t = GameHandler.AllPlayerTanks[i];
             if (t is null)

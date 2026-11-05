@@ -70,7 +70,7 @@ public static class TouchControls {
 
     /// <summary>Fraction of the screen width, measured from the joystick's side, where a touch grabs the joystick.</summary>
     public static float JoystickZone { get; set; } = 0.45f;
-    public static float DeadZone { get; set; } = 0.2f;
+    public static float DeadZone { get; set; } = 0.12f;
     /// <summary>How long a touch on the shooting side must be held (seconds) before it becomes the joystick.</summary>
     public static float HoldToMoveTime { get; set; } = 0.2f;
 
