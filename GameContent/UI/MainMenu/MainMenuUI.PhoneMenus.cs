@@ -811,26 +811,41 @@ public static partial class MainMenuUI {
     private static void DrawSkinCard(SpriteBatch sb, Rectangle card, PlayerColors.Skin skin, bool open, float s) {
         ToggleSwitch.DrawRoundedRect(sb, card, 22 * s, new Color(255, 250, 238));
         var font = FontGlobals.RebirthFont;
-        float x = card.X + 26 * s, y = card.Y + 18 * s, maxW = card.Width - 52 * s;
-        float nameSc = 0.75f * s;
+        float k = 1.35f * PhoneScale; // (the same text size as the rest of the phone menus)
+        float pad = 24 * s;
+        float x = card.X + pad, y = card.Y + pad * 0.7f, maxW = card.Width - pad * 2;
+        bool locked = !open && Unlocks.GoalFor(skin.Unlock) is not null;
+
+        // name, then where and when it's from
+        float nameSc = 0.62f * k;
+        var nm = font.MeasureString(skin.Name) * nameSc;
         sb.DrawString(font, skin.Name, new Vector2(x, y), Ink, new Vector2(nameSc), 0f, Vector2.Zero);
         if (!string.IsNullOrEmpty(skin.Origin)) {
-            float nw = font.MeasureString(skin.Name).X * nameSc;
-            sb.DrawString(font, skin.Origin, new Vector2(x + nw + 18 * s, y + 10 * s), Ink * 0.55f, new Vector2(0.5f * s), 0f, Vector2.Zero);
+            float oSc = 0.42f * k;
+            var om = font.MeasureString(skin.Origin) * oSc;
+            sb.DrawString(font, skin.Origin, new Vector2(x + nm.X + 16 * s, y + nm.Y - om.Y - 2 * s), Ink * 0.55f, new Vector2(oSc), 0f, Vector2.Zero);
         }
-        y += 50 * s;
-        float bodySc = 0.46f * s;
+        y += nm.Y + 6 * s;
+
+        // the story, as many lines as fit above the unlock line
+        float bodySc = 0.4f * k;
+        float lineH = font.LineHeight * bodySc;
+        float bottom = card.Bottom - pad * 0.6f - (locked ? lineH + 10 * s : 0);
         var lines = WrapToWidth(skin.Blurb, bodySc, maxW);
-        int maxLines = open ? 3 : 2;
-        for (int l = 0; l < Math.Min(lines.Count, maxLines); l++) {
-            sb.DrawString(font, lines[l], new Vector2(x, y), Ink * 0.85f, new Vector2(bodySc), 0f, Vector2.Zero);
-            y += 32 * s;
+        for (int l = 0; l < lines.Count && y + lineH <= bottom; l++) {
+            bool last = l + 1 < lines.Count && y + lineH * 2 > bottom;
+            sb.DrawString(font, last ? lines[l] + "..." : lines[l], new Vector2(x, y), Ink * 0.85f, new Vector2(bodySc), 0f, Vector2.Zero);
+            y += lineH;
         }
-        if (!open && Unlocks.GoalFor(skin.Unlock) is { } goal) {
+
+        if (locked && Unlocks.GoalFor(skin.Unlock) is { } goal) {
             string need = goal.Target > 1 ? $"To unlock: {goal.Task}  ({Unlocks.Progress(goal.Key):N0} / {goal.Target:N0})" : $"To unlock: {goal.Task}";
-            float ny = card.Bottom - 46 * s;
-            DrawPadlock(sb, new Vector2(x + 12 * s, ny + 16 * s), 12 * s);
-            sb.DrawString(font, need, new Vector2(x + 34 * s, ny), new Color(196, 110, 20), new Vector2(Math.Min(0.5f * s, (maxW - 34 * s) / Math.Max(1f, font.MeasureString(need).X))), 0f, Vector2.Zero);
+            float lock_ = lineH * 0.42f;
+            float ny = card.Bottom - pad * 0.6f - lineH;
+            DrawPadlock(sb, new Vector2(x + lock_, ny + lineH * 0.55f), lock_);
+            float tx = x + lock_ * 2.6f;
+            float nSc = Math.Min(bodySc, (card.Right - pad - tx) / Math.Max(1f, font.MeasureString(need).X));
+            sb.DrawString(font, need, new Vector2(tx, ny), new Color(196, 110, 20), new Vector2(nSc), 0f, Vector2.Zero);
         }
     }
 
