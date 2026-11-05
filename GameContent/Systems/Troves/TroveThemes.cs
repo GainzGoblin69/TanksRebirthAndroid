@@ -12,7 +12,7 @@ using TanksRebirth.Net;
 
 namespace TanksRebirth.GameContent.Systems.Troves;
 
-public enum FloorTheme { Normal, Forest, Desert, IceCave, Volcano, Haunted, Factory, Swamp, Crystal, Blizzard }
+public enum FloorTheme { Normal, Forest, Desert, IceCave, Volcano, Haunted, Factory, Swamp, Crystal, Blizzard, NeonCity, Carnival, ToxicLab, SpaceStation }
 
 /// <summary>
 /// Special versions of Tank Troves floors: about 1 in 3 runs, a floor shows up themed (the same on every phone, from the
@@ -35,6 +35,10 @@ public static class TroveThemes {
         new(FloorTheme.Swamp, 2, "The Swamp", new(0.62f, 0.72f, 0.48f), new(0.6f, 0.68f, 0.5f), new Color(70, 95, 50), "Sticky mud pools slow tanks down"),
         new(FloorTheme.Factory, 3, "The Factory", new(0.62f, 0.66f, 0.72f), new(0.7f, 0.72f, 0.78f), new Color(150, 30, 30), "Red alert! Steam vents burst every few seconds"),
         new(FloorTheme.Crystal, 4, "The Crystal Caves", new(0.42f, 0.42f, 0.62f), new(0.5f, 0.5f, 0.72f), new Color(60, 120, 170), "A dark cave lit by glowing crystals"),
+        new(FloorTheme.NeonCity, 2, "Neon City", new(0.55f, 0.55f, 0.72f), new(0.6f, 0.6f, 0.78f), new Color(200, 40, 160), "Rainy neon streets: puddles are slippery"),
+        new(FloorTheme.Carnival, 3, "The Haunted Carnival", new(0.62f, 0.46f, 0.55f), new(0.7f, 0.55f, 0.62f), new Color(180, 70, 30), "Spinning carnival lights and grinning jack-o'-lanterns"),
+        new(FloorTheme.ToxicLab, 4, "The Toxic Lab", new(0.55f, 0.7f, 0.55f), new(0.6f, 0.72f, 0.62f), new Color(60, 160, 40), "Glowing acid puddles burn"),
+        new(FloorTheme.SpaceStation, 5, "The Space Station", new(0.6f, 0.66f, 0.82f), new(0.66f, 0.72f, 0.86f), new Color(40, 70, 150), "Low gravity: tanks glide"),
         new(FloorTheme.Factory, 4, "The Foundry", new(0.6f, 0.55f, 0.55f), new(0.68f, 0.62f, 0.6f), new Color(150, 30, 30), "Red alert! Steam vents burst every few seconds"),
     ];
     /// <summary>The theme's look for a floor (a theme can show up on more than one floor, under another name).</summary>
@@ -58,7 +62,7 @@ public static class TroveThemes {
 
     // ------------------------------------------------------------------ this room's details and hazards
 
-    private enum Deco { Grass, Flower, Leaf, Bush, Pebble, Cactus, Quicksand, Snow, Crack, Lava, Scorch, Cobweb, Candle, Grate, Stripes, Mud, LilyPad, Reed, Crystal, Drift }
+    private enum Deco { Grass, Flower, Leaf, Bush, Pebble, Cactus, Quicksand, Snow, Crack, Lava, Scorch, Cobweb, Candle, Grate, Stripes, Mud, LilyPad, Reed, Crystal, Drift, Neon, Puddle, Pumpkin, Acid, Vat, Panel, Console }
 
     /// <summary>Areas with an effect (bushes, quicksand, lava): where, how big.</summary>
     public static readonly List<(Vector2 At, float Radius)> Zones = [];
@@ -156,6 +160,48 @@ public static class TroveThemes {
                 Scatter(Deco.Snow, 22, 1.0f, 0.85f);
                 Hazards(Deco.Drift, 3 + rng.Next(3), 28f, 1.3f);
                 break;
+            case FloorTheme.NeonCity: {
+                Hazards(Deco.Puddle, 3 + rng.Next(3), 26f, 1.25f);
+                // neon signs in pink, blue and green, and warm streetlights that flicker
+                for (int i = 0; i < 7 && cells.Count > 0; i++) {
+                    var at = Jitter(W(cells[rng.Next(cells.Count)]));
+                    var col = NeonColors[rng.Next(NeonColors.Length)];
+                    Place(Deco.Neon, at, 0.7f, rng.NextSingle() * MathHelper.TwoPi, 1f, col);
+                    Glows.Add((at, col));
+                }
+                foreach (var (sx, sy) in new[] { (3, 3), (TroveGen.GW - 4, 3), (3, TroveGen.GH - 4), (TroveGen.GW - 4, TroveGen.GH - 4) })
+                    Flickers.Add(new BlockMapPosition(sx, sy));
+                break;
+            }
+            case FloorTheme.Carnival:
+                for (int i = 0; i < 6 && cells.Count > 0; i++) {
+                    var at = Jitter(W(cells[rng.Next(cells.Count)]));
+                    Place(Deco.Pumpkin, at, 0.55f, rng.NextSingle() * MathHelper.TwoPi, 1f);
+                    Glows.Add((at, new Color(255, 140, 30)));
+                }
+                Scatter(Deco.Leaf, 10, 0.35f, 0.8f);
+                Beacons.Add(Vector2.Zero); // the carousel light in the middle
+                break;
+            case FloorTheme.ToxicLab:
+                Hazards(Deco.Acid, 3 + rng.Next(3), 18f, 1.0f);
+                for (int i = 0; i < 4 && cells.Count > 0; i++) {
+                    var at = Jitter(W(cells[rng.Next(cells.Count)]));
+                    Place(Deco.Vat, at, 0.6f, 0f, 1f);
+                    Glows.Add((at, new Color(90, 255, 80)));
+                }
+                Scatter(Deco.Scorch, 6, 0.6f, 0.4f);
+                break;
+            case FloorTheme.SpaceStation:
+                Scatter(Deco.Panel, 14, 0.9f, 0.7f);
+                for (int i = 0; i < 6 && cells.Count > 0; i++) {
+                    var at = Jitter(W(cells[rng.Next(cells.Count)]));
+                    Place(Deco.Console, at, 0.55f, rng.Next(4) * MathHelper.PiOver2, 1f);
+                    Glows.Add((at, new Color(80, 160, 255)));
+                }
+                // warning strobes in two corners
+                Beacons.Add(new BlockMapPosition(1, 1));
+                Beacons.Add(new BlockMapPosition(TroveGen.GW - 2, TroveGen.GH - 2));
+                break;
         }
     }
 
@@ -166,6 +212,7 @@ public static class TroveThemes {
         Zones.Clear();
         Beacons.Clear();
         Glows.Clear();
+        Flickers.Clear();
         _slide.Clear();
         _onLavaSince.Clear();
         _burnedAt.Clear();
@@ -174,6 +221,17 @@ public static class TroveThemes {
     /// <summary>Factory: the red alarm lights; Crystal Caves: the crystals (where, what colour) for the dynamic lighting.</summary>
     public static readonly List<Vector2> Beacons = [];
     public static readonly List<(Vector2 At, Color Color)> Glows = [];
+    /// <summary>Neon City's streetlights (they flicker).</summary>
+    public static readonly List<Vector2> Flickers = [];
+    public static readonly Color[] NeonColors = [new(255, 60, 200), new(60, 200, 255), new(80, 255, 140), new(255, 220, 60)];
+    /// <summary>A streetlight is on (now and then it flickers off for a moment; every phone agrees).</summary>
+    public static bool FlickerOn(int i) { double k = (Now * 3.1 + i * 7.3) % 11.0; return !(k > 10.2 && (int)(Now * 20) % 2 == 0); }
+    /// <summary>The carnival's colours, cycling.</summary>
+    public static Color CarnivalColor(float offset) {
+        var cols = new[] { new Color(255, 70, 70), new Color(255, 200, 60), new Color(80, 220, 120), new Color(80, 160, 255), new Color(220, 90, 255) };
+        int k = (int)(Now * 2 + offset) % cols.Length;
+        return cols[(k + cols.Length) % cols.Length];
+    }
     private static readonly Color[] CrystalColors = [new(90, 220, 255), new(220, 90, 255), new(120, 255, 170), new(255, 120, 200)];
 
     /// <summary>Lights for the dynamic lighting: the factory's spinning alarm lights and bursting vents, glowing crystals, lava.</summary>
@@ -200,6 +258,40 @@ public static class TroveThemes {
                 foreach (var z in Zones)
                     Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(z.At.X, 8, z.At.Y), new Color(255, 110, 30), 1.1f + 0.3f * MathF.Sin(t * 2.5f + z.At.X), 80f);
                 break;
+            case FloorTheme.NeonCity:
+                foreach (var (at, col) in Glows)
+                    Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(at.X, 10, at.Y), col, 1.5f + 0.4f * MathF.Sin(t * 9f + at.X), 85f);
+                for (int i = 0; i < Flickers.Count; i++)
+                    if (FlickerOn(i))
+                        Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(Flickers[i].X, 40, Flickers[i].Y), new Color(255, 205, 140), 1.8f, 150f);
+                break;
+            case FloorTheme.Carnival:
+                for (int i = 0; i < Glows.Count; i++) {
+                    var (at, col) = Glows[i];
+                    Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(at.X, 8, at.Y), col, 1.2f + 0.4f * MathF.Sin(t * 7f + i), 70f);
+                }
+                // the carousel: a spinning beam that changes colour
+                Graphics.DynamicLighting.GameplayLights.AddBeacon(new Vector3(0, 50, 0), CarnivalColor(0), t * 2f);
+                Graphics.DynamicLighting.GameplayLights.AddBeacon(new Vector3(0, 50, 0), CarnivalColor(2.5f), t * 2f + MathHelper.Pi);
+                Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(0, 20, 0), CarnivalColor(1), 1.4f, 110f);
+                break;
+            case FloorTheme.ToxicLab:
+                foreach (var z in Zones)
+                    Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(z.At.X, 8, z.At.Y), new Color(100, 255, 70), 1.2f + 0.3f * MathF.Sin(t * 3f + z.At.X), 75f);
+                foreach (var (at, col) in Glows)
+                    Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(at.X, 25, at.Y), col, 1.3f, 100f);
+                break;
+            case FloorTheme.SpaceStation:
+                // consoles blink; the strobes flash red and blue in turn
+                for (int i = 0; i < Glows.Count; i++)
+                    if ((int)(t * 2 + i * 0.7f) % 3 != 0)
+                        Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(Glows[i].At.X, 10, Glows[i].At.Y), Glows[i].Color, 1.3f, 70f);
+                for (int i = 0; i < Beacons.Count; i++) {
+                    bool red = (int)(t * 1.5f) % 2 == i % 2;
+                    float flash = MathF.Max(0f, MathF.Sin(t * 9.4f));
+                    Graphics.DynamicLighting.GameplayLights.AddGlow(new Vector3(Beacons[i].X, 40, Beacons[i].Y), red ? new Color(255, 40, 40) : new Color(60, 120, 255), 0.5f + 2.2f * flash, 200f);
+                }
+                break;
         }
     }
 
@@ -220,7 +312,13 @@ public static class TroveThemes {
         p.Scale = new Vector3(scale);
         p.Alpha = alpha;
         p.Color = color ?? Color.White;
-        if (d is Deco.Lava or Deco.Candle or Deco.Crystal)
+        if (d is Deco.Neon or Deco.Acid or Deco.Pumpkin or Deco.Console or Deco.Vat)
+            p.HasAdditiveBlending = d is Deco.Neon or Deco.Acid;
+        if (d == Deco.Neon)
+            p.UniqueBehavior = q => q.Alpha = 0.8f + 0.2f * MathF.Sin((float)Now * 9f + q.Position.X) * ((int)(Now * 13 + q.Position.Z) % 17 == 0 ? 3 : 0.3f);
+        else if (d == Deco.Acid)
+            p.UniqueBehavior = q => q.Alpha = 0.75f + 0.25f * MathF.Sin((float)Now * 3f + q.Position.X);
+        else if (d is Deco.Lava or Deco.Candle or Deco.Crystal)
             p.UniqueBehavior = q => q.Alpha = 0.75f + 0.25f * MathF.Sin((float)Now * (d == Deco.Lava ? 2.5f : d == Deco.Crystal ? 1.5f : 7f) + q.Position.X);
         _decor.Add(p);
     }
@@ -241,6 +339,18 @@ public static class TroveThemes {
                 return InZone(t.Position) ? v * 0.55f : null;
             case FloorTheme.Blizzard:
                 return InZone(t.Position) ? v * 0.6f : null;
+            case FloorTheme.NeonCity:
+            case FloorTheme.SpaceStation: {
+                // wet puddles (Neon City) or low gravity everywhere (Space Station): tanks keep sliding a little
+                if (Current == FloorTheme.NeonCity && !InZone(t.Position)) {
+                    _slide.Remove(t);
+                    return null;
+                }
+                var last = _slide.TryGetValue(t, out var l) ? l : v;
+                var now = Vector2.Lerp(last, v, (Current == FloorTheme.SpaceStation ? 0.12f : 0.07f) * TanksRebirth.RuntimeData.DeltaTime);
+                _slide[t] = now;
+                return now;
+            }
             case FloorTheme.IceCave: {
                 // keep most of the last movement: turning and stopping take a moment
                 var last = _slide.TryGetValue(t, out var l) ? l : v;
@@ -275,7 +385,7 @@ public static class TroveThemes {
                 }
             }
         }
-        if (Current == FloorTheme.Volcano) {
+        if (Current is FloorTheme.Volcano or FloorTheme.ToxicLab) {
             bool host = !Client.IsConnected() || Client.IsHost();
             foreach (var t in GameHandler.AllTanks) {
                 if (t is null || t.IsDestroyed || t.Properties.Immortal)
@@ -290,7 +400,7 @@ public static class TroveThemes {
                     _onLavaSince[t] = since = Now;
                 if (Now - since > 0.6 && (!_burnedAt.TryGetValue(t, out var last) || Now - last > 1.5)) {
                     _burnedAt[t] = Now;
-                    t.Damage(new TankHurtContextOther(null, TankHurtContextOther.HurtContext.FromIngame, "Lava"), true);
+                    t.Damage(new TankHurtContextOther(null, TankHurtContextOther.HurtContext.FromIngame, Current == FloorTheme.ToxicLab ? "Acid" : "Lava"), true);
                     GameHandler.Particles.MakeSmallExplosion(t.Position3D, 4, 6, 0.8f, 4);
                 }
             }
@@ -302,7 +412,7 @@ public static class TroveThemes {
                 ember.FaceTowardsMe = false;
                 ember.Pitch = MathHelper.PiOver2;
                 ember.Scale = new Vector3(0.15f);
-                ember.Color = new Color(255, 140, 40);
+                ember.Color = Current == FloorTheme.ToxicLab ? new Color(110, 255, 90) : new Color(255, 140, 40);
                 ember.UniqueBehavior = q => {
                     q.Position += new Vector3(0, 0.35f, 0) * TanksRebirth.RuntimeData.DeltaTime;
                     q.Alpha -= 0.02f * TanksRebirth.RuntimeData.DeltaTime;
@@ -479,6 +589,60 @@ public static class TroveThemes {
             case Deco.Drift:
                 for (int i = 0; i < 7; i++)
                     Dot(32 + MathF.Cos(i * 0.9f) * (i % 3) * 8, 32 + MathF.Sin(i * 0.9f) * (i % 3) * 6, 16 - (i % 3) * 2, new Color(245, 250, 255, 235), 6f);
+                break;
+            case Deco.Neon:
+                // a glowing neon tube sign (tinted by the particle colour)
+                Dot(32, 32, 30, new Color(255, 255, 255, 50), 22f);
+                Line(12, 22, 52, 22, 2.6f, Color.White);
+                Line(12, 42, 52, 42, 2.6f, Color.White);
+                Line(12, 22, 12, 42, 2.6f, Color.White);
+                Line(52, 22, 52, 42, 2.6f, Color.White);
+                Line(22, 28, 30, 36, 2f, Color.White);
+                Line(30, 36, 42, 28, 2f, Color.White);
+                break;
+            case Deco.Puddle:
+                Dot(32, 32, 28, new Color(60, 80, 120, 150), 6f);
+                Dot(26, 28, 9, new Color(180, 200, 255, 90), 6f);
+                Dot(40, 38, 5, new Color(255, 120, 220, 70), 4f);
+                break;
+            case Deco.Pumpkin:
+                Dot(32, 34, 22, new Color(230, 110, 20));
+                Dot(22, 34, 14, new Color(245, 130, 30));
+                Dot(42, 34, 14, new Color(245, 130, 30));
+                Line(32, 12, 34, 6, 2.5f, new Color(70, 110, 40));
+                // the face, glowing
+                Dot(24, 30, 4, new Color(255, 240, 120));
+                Dot(40, 30, 4, new Color(255, 240, 120));
+                Line(22, 40, 42, 40, 2.4f, new Color(255, 240, 120));
+                break;
+            case Deco.Acid:
+                for (int i = 0; i < 6; i++)
+                    Dot(32 + MathF.Cos(i * 1.1f) * (i % 3) * 7, 32 + MathF.Sin(i * 1.1f) * (i % 3) * 6, 15 - (i % 3) * 2, new Color(110, 255, 80, 210), 5f);
+                Dot(28, 30, 3, new Color(220, 255, 200));
+                Dot(38, 36, 2, new Color(220, 255, 200));
+                break;
+            case Deco.Vat:
+                Dot(32, 32, 26, new Color(80, 85, 95), 2f);
+                Dot(32, 32, 21, new Color(60, 220, 60), 2f);
+                Dot(26, 28, 4, new Color(200, 255, 190));
+                Dot(38, 36, 3, new Color(200, 255, 190));
+                break;
+            case Deco.Panel:
+                for (int y = 8; y < 56; y++)
+                    for (int x = 8; x < 56; x++)
+                        px[y * N + x] = (x == 8 || y == 8 || x == 55 || y == 55) ? new Color(60, 70, 90, 200) : new Color(120, 130, 150, 120);
+                Dot(12, 12, 1.6f, new Color(40, 45, 55));
+                Dot(51, 12, 1.6f, new Color(40, 45, 55));
+                Dot(12, 51, 1.6f, new Color(40, 45, 55));
+                Dot(51, 51, 1.6f, new Color(40, 45, 55));
+                break;
+            case Deco.Console:
+                for (int y = 16; y < 48; y++)
+                    for (int x = 6; x < 58; x++)
+                        px[y * N + x] = new Color(30, 34, 44);
+                for (int i = 0; i < 5; i++)
+                    Dot(14 + i * 9, 26, 2.5f, i % 2 == 0 ? new Color(90, 180, 255) : new Color(255, 80, 80));
+                Line(12, 38, 52, 38, 1.5f, new Color(90, 180, 255));
                 break;
             case Deco.Candle:
                 Dot(32, 32, 26, new Color(255, 190, 90, 70), 18f);

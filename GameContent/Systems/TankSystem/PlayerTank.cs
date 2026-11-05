@@ -267,6 +267,7 @@ public class PlayerTank : Tank {
                 }
             }
             UpdateCharge();
+            UpdateGatling();
         }
 
         oldPosition = Position;
@@ -343,6 +344,18 @@ public class PlayerTank : Tank {
             if (_chargeFiring)
                 Systems.Troves.TroveItems.SuperCharge(this, before);
         }
+    }
+
+    /// <summary>Gatling Barrel: while fire is held, keep shooting (faster the longer it's held).</summary>
+    private void UpdateGatling() {
+        if (!Systems.Troves.TroveItems.HasGatling(PlayerId) || IsDestroyed || !CampaignGlobals.InMission)
+            return;
+        var pad = InputUtils.CurrentGamePadSnapshot;
+        bool held = !GameUI.Paused && (InputUtils.CurrentMouseSnapshot.LeftButton == ButtonState.Pressed || FireBullet.IsPressed
+            || pad.IsButtonDown(Buttons.RightShoulder) || pad.Triggers.Right > 0.4f);
+        Systems.Troves.TroveItems.GatlingHeld(PlayerId, held);
+        if (held && CurShootCooldown <= 0 && !InputUtils.CanDetectClick() && !Systems.Troves.TroveRun.InReady)
+            Shoot(false);
     }
 
     /// <summary>Charge Shot: while charging, watch for the fire button to be let go (full: fire; early: cancel).</summary>

@@ -64,6 +64,8 @@ public static class TroveRun {
     private static bool _starting;
     private static TroveDir? _entry;
     private static float _roomTime, _deadTimer, _bossTimer, _logTimer;
+    /// <summary>Seconds since this room started.</summary>
+    public static float RoomTime => _roomTime;
     // fading between rooms: 1 = going dark, -1 = coming back
     private static int _fadeDir;
     public static float Fade { get; private set; }

@@ -30,6 +30,8 @@ public enum TroveItemId {
     BoomerangShells, MortarShells, Wraparound, MegaShell, HolyMantle, Pyromaniac, MineDrone, LuckyFoot,
     BoxOfFriends, OilSlick, TeleportPads, Battery, MysteryPill, CupidsArrow, SacredHeart,
     ChargeShot,
+    // batch 7: speed and fire rate
+    Turbocharger, HairTrigger, Adrenaline, OverdriveEngine, NitroBoost, GatlingBarrel, LightweightAlloy, CoffeeThermos,
 }
 
 /// <summary>How an item works: used with the ITEM button, takes effect when picked up, or lasts the whole run.</summary>
@@ -151,6 +153,14 @@ public static class TroveItems {
         new(TroveItemId.MysteryPill, "Mystery Pill", "A random stat change for this floor (usually good)", TroveItemKind.Instant, new Color(225, 225, 240)),
         new(TroveItemId.CupidsArrow, "Cupid's Arrow", "Your shells go through every enemy they hit", TroveItemKind.Passive, new Color(255, 120, 170)),
         new(TroveItemId.SacredHeart, "Sacred Heart", "Homing shells and damage up, fire rate a little down", TroveItemKind.Passive, new Color(225, 40, 60)),
+        new(TroveItemId.Turbocharger, "Turbocharger", "Speed up; keep driving and you keep getting faster (up to +50%)", TroveItemKind.Passive, new Color(255, 150, 40)),
+        new(TroveItemId.HairTrigger, "Hair Trigger", "Fire rate up and +1 shell on screen; smaller shells", TroveItemKind.Passive, new Color(255, 90, 90)),
+        new(TroveItemId.Adrenaline, "Adrenaline", "Faster driving and shooting for every hit you've taken (lives lost, armor gone)", TroveItemKind.Passive, new Color(230, 40, 110)),
+        new(TroveItemId.OverdriveEngine, "Overdrive Engine", "+25% speed and fire rate, but no mines; you throw sparks", TroveItemKind.Passive, new Color(255, 205, 60)),
+        new(TroveItemId.NitroBoost, "Nitro Boost", "Speed up, and every few seconds a burst of double speed", TroveItemKind.Passive, new Color(80, 170, 255)),
+        new(TroveItemId.GatlingBarrel, "Gatling Barrel", "Hold fire to keep shooting; the longer you hold, the faster it fires (+2 shells on screen)", TroveItemKind.Passive, new Color(175, 180, 195)),
+        new(TroveItemId.LightweightAlloy, "Lightweight Alloy", "Faster, turns quicker, and drifts around corners", TroveItemKind.Passive, new Color(170, 245, 240)),
+        new(TroveItemId.CoffeeThermos, "Coffee Thermos", "Much faster driving and shooting for the first 10 seconds of every room", TroveItemKind.Passive, new Color(160, 105, 60)),
         new(TroveItemId.ChargeShot, "Charge Shot", "Hold fire for 2 seconds, then let go: a super-fast shot that goes through enemies (let go early to cancel)", TroveItemKind.Passive, new Color(120, 200, 255)),
     ];
     public static TroveItemDef Def(TroveItemId id) => All[(int)id];
@@ -238,7 +248,8 @@ public static class TroveItems {
 
     // item rooms draw from nearly everything; challenge and secret rooms have stronger pools; rooms mostly drop small stuff
     public static readonly TroveItemId[] PedestalPool = [
-        TroveItemId.ChargeShot,
+        TroveItemId.ChargeShot, TroveItemId.Turbocharger, TroveItemId.HairTrigger, TroveItemId.Adrenaline, TroveItemId.OverdriveEngine,
+        TroveItemId.NitroBoost, TroveItemId.GatlingBarrel, TroveItemId.LightweightAlloy, TroveItemId.CoffeeThermos,
         TroveItemId.Rocket, TroveItemId.Homing, TroveItemId.SliderBomb, TroveItemId.BlockBust, TroveItemId.Stopwatch, TroveItemId.ShellBurst,
         TroveItemId.Decoy, TroveItemId.Reroll, TroveItemId.SpeedTreads, TroveItemId.BouncyShells, TroveItemId.ExtraShell, TroveItemId.MinePack,
         TroveItemId.Detonator, TroveItemId.BigMines, TroveItemId.TripleShot, TroveItemId.QuickReload, TroveItemId.OrbitGuard, TroveItemId.TreasureMap,
@@ -265,6 +276,7 @@ public static class TroveItems {
         TroveItemId.ChainLightning, TroveItemId.EchoShot, TroveItemId.Airstrike, TroveItemId.Convert, TroveItemId.SplitShot, TroveItemId.RicochetMaster,
         TroveItemId.Clone, TroveItemId.MirrorShield, TroveItemId.TurretDrop, TroveItemId.SecondWind,
         TroveItemId.RocketBarrage, TroveItemId.GravityWell, TroveItemId.Wingman,
+        TroveItemId.Adrenaline, TroveItemId.OverdriveEngine, TroveItemId.GatlingBarrel,
         TroveItemId.MegaShell, TroveItemId.BoomerangShells, TroveItemId.BoxOfFriends, TroveItemId.Pyromaniac,
     ];
     public static readonly TroveItemId[] SecretPool = [
@@ -292,6 +304,8 @@ public static class TroveItems {
         TroveItemId.Pyromaniac, TroveItemId.CupidsArrow, TroveItemId.Battery, TroveItemId.MysteryPill,
         TroveItemId.Rocket, TroveItemId.Dash, TroveItemId.Teleport, TroveItemId.WallBuilder, TroveItemId.Invincibility,
         TroveItemId.RepairKit, TroveItemId.TeleportPads, TroveItemId.ChargeShot,
+        TroveItemId.Turbocharger, TroveItemId.HairTrigger, TroveItemId.Adrenaline, TroveItemId.OverdriveEngine,
+        TroveItemId.NitroBoost, TroveItemId.GatlingBarrel, TroveItemId.LightweightAlloy, TroveItemId.CoffeeThermos,
     ];
     public static readonly TroveItemId[] DropPool = [
         TroveItemId.ExtraLife, TroveItemId.ExtraLife, TroveItemId.Shield, TroveItemId.Shield, TroveItemId.Shield,
@@ -354,6 +368,10 @@ public static class TroveItems {
         public int SliderBombs;
         public int Shields;
         public double InvincibleUntil = -1;
+        // speed and fire-rate items that change from moment to moment: the stats ApplyTo worked out, and what feeds the changes
+        public float BaseSpeed, DriveTime, GatlingHold;
+        public uint BaseCooldown;
+        public bool Dynamic;
         public double ReadyAt = -1;     // time-based actives (Dash)
         public int RoomsForRegen, KillsForVampire;
         public double DashUntil = -1, TeslaAt;
@@ -487,6 +505,151 @@ public static class TroveItems {
 
     private static bool IsEnemy(Tank t) => t.Team != TeamID.Red;
 
+    /// <summary>The speed and fire-rate items that change from moment to moment (Turbocharger, Adrenaline, Nitro Boost,
+    /// Coffee Thermos, Gatling Barrel), on top of what ApplyTo set.</summary>
+    private static void SpeedItems(Tank t, PlayerItems p) {
+        if (!p.Dynamic || p.BaseSpeed <= 0)
+            return;
+        float dt = TanksRebirth.RuntimeData.DeltaTime / 60f;
+        float speed = 1f, fire = 1f;
+        if (p.Has(TroveItemId.Turbocharger)) {
+            bool driving = t.Velocity.Length() > p.BaseSpeed * 0.3f;
+            p.DriveTime = driving ? p.DriveTime + dt : Math.Max(0, p.DriveTime - dt * 4);
+            speed *= 1f + 0.5f * Math.Min(1f, p.DriveTime / 3f);
+        }
+        if (p.Has(TroveItemId.Adrenaline)) {
+            int hurt = Math.Max(0, PlayerTank.StartingLives - PlayerTank.Lives[p.Id]) + Math.Max(0, p.RoomHpMax - p.RoomHp) + Math.Max(0, p.FloorHpMax - p.FloorHp);
+            float k = 1f + 0.12f * Math.Min(4, hurt);
+            speed *= k;
+            fire *= k;
+        }
+        if (p.Has(TroveItemId.NitroBoost) && Now % 6.0 < 1.5)
+            speed *= 2f;
+        if (p.Has(TroveItemId.CoffeeThermos) && TroveRun.RoomTime < 10f && !TroveRun.InReady)
+        {
+            speed *= 1.4f;
+            fire *= 1.4f;
+        }
+        if (p.Has(TroveItemId.GatlingBarrel) && !p.Has(TroveItemId.ChargeShot))
+            fire *= 1f + 1.8f * Math.Min(1f, p.GatlingHold / 2f);
+        t.Properties.MaxSpeed = p.BaseSpeed * speed;
+        t.Properties.ShellCooldown = (uint)Math.Max(1, MathF.Round(p.BaseCooldown / fire));
+    }
+
+    /// <summary>Little effects behind tanks with some items: Nitro flames, Overdrive sparks, Coffee steam.</summary>
+    private static void ItemTrails(Tank t, PlayerItems p) {
+        float dt = TanksRebirth.RuntimeData.DeltaTime;
+        if (t.Velocity.LengthSquared() < 0.05f)
+            return;
+        var back = t.Position3D - new Vector3(t.Velocity.X, 0, t.Velocity.Y) * 6f + new Vector3(0, 6, 0);
+        if (p.Has(TroveItemId.NitroBoost) && Now % 6.0 < 1.5 && Random.Shared.NextDouble() < 0.8 * dt)
+            GameHandler.Particles.MakeShineSpot(back, Random.Shared.Next(2) == 0 ? new Color(80, 170, 255) : new Color(255, 160, 60), 0.5f);
+        if (p.Has(TroveItemId.OverdriveEngine) && Random.Shared.NextDouble() < 0.25 * dt)
+            GameHandler.Particles.MakeShineSpot(back, new Color(255, 220, 90), 0.35f);
+        if (p.Has(TroveItemId.CoffeeThermos) && TroveRun.RoomTime < 10f && Random.Shared.NextDouble() < 0.15 * dt)
+            GameHandler.Particles.MakeShineSpot(t.Position3D + new Vector3(0, 16, 0), new Color(235, 230, 220), 0.4f);
+    }
+
+    /// <summary>Gatling Barrel: holding fire keeps shooting (called by the player's tank while fire is held).</summary>
+    public static bool HasGatling(int playerId) => TroveRun.Active && playerId is >= 0 and < 4 && Players[playerId].Has(TroveItemId.GatlingBarrel) && !Players[playerId].Has(TroveItemId.ChargeShot);
+    public static void GatlingHeld(int playerId, bool held) {
+        if (playerId is < 0 or >= 4)
+            return;
+        var p = Players[playerId];
+        p.GatlingHold = held ? p.GatlingHold + TanksRebirth.RuntimeData.DeltaTime / 60f : 0f;
+    }
+
+    /// <summary>Lightweight Alloy: the tank keeps some of its momentum, so it drifts around corners.</summary>
+    private static readonly Dictionary<Tank, Vector2> _drift = [];
+    private static Vector2 DriftFilter(Tank t, Vector2 v) {
+        if (t is not PlayerTank pt || pt.PlayerId is < 0 or > 3 || !Players[pt.PlayerId].Has(TroveItemId.LightweightAlloy))
+            return v;
+        var last = _drift.TryGetValue(t, out var l) ? l : v;
+        var now = Vector2.Lerp(last, v, Math.Min(1f, 0.16f * TanksRebirth.RuntimeData.DeltaTime));
+        _drift[t] = now;
+        return now;
+    }
+
+    // ---- underglow: a neon glow under tanks carrying speed items or rare items
+    private static readonly HashSet<TroveItemId> _glowItems = [
+        TroveItemId.Turbocharger, TroveItemId.HairTrigger, TroveItemId.Adrenaline, TroveItemId.OverdriveEngine, TroveItemId.NitroBoost,
+        TroveItemId.GatlingBarrel, TroveItemId.LightweightAlloy, TroveItemId.CoffeeThermos,
+        TroveItemId.SpeedTreads, TroveItemId.NitroTreads, TroveItemId.Steroids, TroveItemId.Featherweight, TroveItemId.GhostTreads,
+    ];
+    private static bool Glows(TroveItemId id) => _glowItems.Contains(id) || SecretPool.Contains(id) || ChallengePool.Contains(id);
+
+    /// <summary>The colour of a player's underglow, or null for none (the newest item that gives one).</summary>
+    public static Color? UnderglowColor(int playerId) {
+        if (!TroveRun.Active || playerId is < 0 or > 3)
+            return null;
+        var p = Players[playerId];
+        TroveItemId? best = null;
+        foreach (var id in p.Passives.Keys.Concat(p.Actives))
+            if (Glows(id) && (best is null || (int)id > (int)best.Value))
+                best = id;
+        return best is { } b ? Def(b).Color : null;
+    }
+
+    private static readonly ParticleSystem.Particle?[] _glow = new ParticleSystem.Particle?[4];
+    private static Microsoft.Xna.Framework.Graphics.Texture2D? _glowTex;
+
+    /// <summary>Keeps each player's underglow under their tank (a flat glowing shape on the floor).</summary>
+    private static void UpdateUnderglow() {
+        for (int i = 0; i < 4; i++) {
+            var t = GameHandler.AllPlayerTanks[i];
+            var col = t is { IsDestroyed: false } && CampaignGlobals.InMission ? UnderglowColor(i) : null;
+            if (col is null) {
+                if (_glow[i] is { } old) { old.Destroy(); _glow[i] = null; }
+                continue;
+            }
+            var tex = GlowTexture();
+            if (tex is null)
+                continue;
+            if (_glow[i] is null || !GameHandler.Particles.CurrentParticles.Contains(_glow[i])) {
+                var g = GameHandler.Particles.MakeParticle(t!.Position3D + new Vector3(0, 0.25f, 0), tex);
+                g.HasAdditiveBlending = true;
+                g.Pitch = MathHelper.PiOver2;
+                _glow[i] = g;
+            }
+            var gp = _glow[i]!;
+            gp.Position = t!.Position3D + new Vector3(0, 0.25f, 0);
+            gp.Yaw = -t.ChassisRotation;
+            gp.Scale = new Vector3(1.1f * t.Scaling.X);
+            gp.Color = col.Value;
+            gp.Alpha = 0.75f + 0.2f * MathF.Sin((float)Now * 3f + i);
+            gp.LifeTime = 0;
+        }
+    }
+
+    /// <summary>Underglow lights for the dynamic lighting.</summary>
+    public static void AddUnderglowLights() {
+        for (int i = 0; i < 4; i++)
+            if (GameHandler.AllPlayerTanks[i] is { IsDestroyed: false } t && UnderglowColor(i) is { } c)
+                Graphics.DynamicLighting.GameplayLights.AddGlow(t.Position3D + new Vector3(0, 2.5f, 0), c, 1.3f, 60f);
+    }
+
+    private static Microsoft.Xna.Framework.Graphics.Texture2D? GlowTexture() {
+        if (_glowTex is { IsDisposed: false })
+            return _glowTex;
+        var gd = TankGame.Instance?.GraphicsDevice;
+        if (gd is null)
+            return null;
+        const int N = 64;
+        var px = new Color[N * N];
+        for (int y = 0; y < N; y++)
+            for (int x = 0; x < N; x++) {
+                // a soft rounded rectangle, a bit longer than wide (the shape of a tank)
+                float dx = Math.Max(0, Math.Abs(x + 0.5f - N / 2f) - 9f) / 13f, dy = Math.Max(0, Math.Abs(y + 0.5f - N / 2f) - 13f) / 13f;
+                float d = MathF.Sqrt(dx * dx + dy * dy);
+                float a = Math.Clamp(1f - d, 0f, 1f);
+                a *= a;
+                px[y * N + x] = new Color(255, 255, 255, (int)(a * 255));
+            }
+        _glowTex = new Microsoft.Xna.Framework.Graphics.Texture2D(gd, N, N);
+        _glowTex.SetData(px);
+        return _glowTex;
+    }
+
     /// <summary>A tank's headlight colour from its items (null = the normal warm white).</summary>
     public static Color? HeadlightColor(Tank t) {
         if (!TroveRun.Active)
@@ -526,16 +689,17 @@ public static class TroveItems {
         Graphics.DynamicLighting.LightManager.HeadlightTint = HeadlightColor;
         Graphics.DynamicLighting.LightManager.ExtraHeadlightTanks = () => !TroveRun.Active || TroveBosses.Boss is not { } bt || bt.Properties.Invisible ? []
             : TroveBosses.Twin is { } tw ? [bt, tw] : [bt];
-        Graphics.DynamicLighting.LightManager.ExtraLights = TroveThemes.AddLights;
+        Graphics.DynamicLighting.LightManager.ExtraLights = () => { TroveThemes.AddLights(); if (TroveRun.Active && CampaignGlobals.InMission) AddUnderglowLights(); };
         Graphics.DynamicLighting.LightManager.SceneDarkness = () => !TroveRun.Active || !CampaignGlobals.InMission ? 0f : TroveThemes.Current switch {
-            FloorTheme.Haunted => 0.35f, FloorTheme.Crystal => 0.4f, FloorTheme.Factory => 0.3f, FloorTheme.Swamp => 0.12f, FloorTheme.Volcano => 0.15f, _ => 0f,
+            FloorTheme.Haunted => 0.35f, FloorTheme.Crystal => 0.4f, FloorTheme.Factory => 0.3f, FloorTheme.Swamp => 0.12f, FloorTheme.Volcano => 0.15f,
+            FloorTheme.NeonCity => 0.4f, FloorTheme.Carnival => 0.42f, FloorTheme.ToxicLab => 0.3f, FloorTheme.SpaceStation => 0.35f, _ => 0f,
         };
         AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady || IcedUntil.TryGetValue(t, out var iu) && Now < iu;
         // Smoke Bomb: enemies can't see you
         AITank.IsHidden = t => TroveRun.Active && t is PlayerTank pt && pt.PlayerId is >= 0 and < 4
             && (Now < P(pt.PlayerId).SmokeUntil || TroveThemes.HiddenInBush(t));
         // floor themes: quicksand slows, ice slides
-        Tank.VelocityFilter = (t, v) => TroveRun.Active ? TroveBosses.SlowFilter(t, OilFilter(t, TroveThemes.FilterVelocity(t, v) ?? v)) : null;
+        Tank.VelocityFilter = (t, v) => TroveRun.Active ? DriftFilter(t, TroveBosses.SlowFilter(t, OilFilter(t, TroveThemes.FilterVelocity(t, v) ?? v))) : null;
         // Pyromaniac: explosions give you a shield instead of hurting you
         Explosion.Absorbs = (tank, _) => {
             if (!TroveRun.Active || tank is not PlayerTank pt || pt.PlayerId is < 0 or >= 4 || !P(pt.PlayerId).Has(TroveItemId.Pyromaniac))
@@ -1848,6 +2012,28 @@ public static class TroveItems {
         }
         if (p.Has(TroveItemId.MineDrone))
             props.MineLimit += (uint)(p.Has(Syn("Minesweeper")) ? 2 : 1); // the drone's mines don't use up yours
+        // speed and fire-rate items
+        if (p.Has(TroveItemId.Turbocharger)) props.MaxSpeed *= 1.1f;
+        if (p.Has(TroveItemId.NitroBoost)) props.MaxSpeed *= 1.1f;
+        if (p.Has(TroveItemId.HairTrigger)) {
+            props.ShellCooldown = (uint)Math.Max(1, MathF.Round(props.ShellCooldown * 0.75f));
+            props.ShellLimit += 1;
+        }
+        if (p.Has(TroveItemId.OverdriveEngine)) {
+            props.MaxSpeed *= 1.25f;
+            props.ShellCooldown = (uint)Math.Max(1, MathF.Round(props.ShellCooldown * 0.8f));
+            props.MineLimit = 0;
+        }
+        if (p.Has(TroveItemId.GatlingBarrel)) props.ShellLimit += 2;
+        if (p.Has(TroveItemId.LightweightAlloy)) {
+            props.MaxSpeed *= 1.2f;
+            props.TurningSpeed *= 1.6f;
+            props.MaximalTurn *= 1.4f;
+        }
+        p.BaseSpeed = props.MaxSpeed;
+        p.BaseCooldown = props.ShellCooldown;
+        p.Dynamic = p.Has(TroveItemId.Turbocharger) || p.Has(TroveItemId.Adrenaline) || p.Has(TroveItemId.NitroBoost)
+            || p.Has(TroveItemId.CoffeeThermos) || p.Has(TroveItemId.GatlingBarrel);
         int kidArmor = props.Armor?.HitPoints ?? 0; // Kid Mode's own armor (player 2)
         if (p.Has(TroveItemId.GlassCannon))
             p.Shields = 0; // glass cannons can't keep shields
@@ -1883,9 +2069,13 @@ public static class TroveItems {
 
     /// <summary>Every update: shields used up by hits, invincibility, orbiters, the decoy.</summary>
     public static void Update() {
-        if (!TroveRun.Active)
+        if (!TroveRun.Active) {
+            for (int i = 0; i < 4; i++)
+                if (_glow[i] is { } g) { g.Destroy(); _glow[i] = null; }
             return;
+        }
         HandleRequests();
+        UpdateUnderglow();
         for (int i = 0; i < 4; i++) {
             var t = GameHandler.AllPlayerTanks[i];
             if (t is null)
@@ -1907,6 +2097,9 @@ public static class TroveItems {
             }
             if (t.IsDestroyed || !CampaignGlobals.InMission)
                 continue;
+            if (IsLocal(i))
+                SpeedItems(t, p);
+            ItemTrails(t, p);
 
             // invincibility: can't be hurt; drive into enemies to destroy them
             bool inv = Now < p.InvincibleUntil;
