@@ -104,7 +104,7 @@ public static class LocalCoop {
         if (s.Cur.DPad.Right == ButtonState.Pressed) v.X = 1;
         if (s.Cur.DPad.Up == ButtonState.Pressed) v.Y = -1;
         if (s.Cur.DPad.Down == ButtonState.Pressed) v.Y = 1;
-        return v.Length() > 0.2f ? v : Vector2.Zero;
+        return v.Length() > PlayerTank.StickDeadZone ? v : Vector2.Zero;
     }
 
     public static bool ShootPressed(int playerId) {

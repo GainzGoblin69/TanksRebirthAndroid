@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Collections.Generic;
@@ -317,6 +317,10 @@ public class PlayerTank : Tank {
         }
         base.Remove(nullifyMe);
     }
+    /// <summary>How far a controller stick must be pushed before the tank moves. Built-in sticks (like the AYN Thor's)
+    /// can rest slightly off-centre, which used to drive the tank on its own.</summary>
+    public const float StickDeadZone = 0.35f;
+
     /// <summary>Tank Troves Charge Shot: when the fire button went down (play time), or -1 while not charging.</summary>
     public double ChargeStart = -1;
     private bool _chargeFiring;
@@ -510,7 +514,7 @@ public class PlayerTank : Tank {
             if (pad.DPad.Right == ButtonState.Pressed) padMove.X = 1;
             if (pad.DPad.Up == ButtonState.Pressed) padMove.Y = -1;
             if (pad.DPad.Down == ButtonState.Pressed) padMove.Y = 1;
-            if (padMove.Length() > 0.2f)
+            if (padMove.Length() > StickDeadZone)
                 move = padMove;
         }
         SteerWith(move);
