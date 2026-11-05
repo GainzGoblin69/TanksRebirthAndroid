@@ -425,9 +425,13 @@ public static class LightManager {
                             HeadlightTint?.Invoke(tank) ?? GameplayLights.DefaultHeadlight);
         }
 
+        // at night or on a dark floor, every plain shell gives off a faint white glow so it's easy to see
+        bool darkScene = LightingPresets.HeadlightsEnabled || _dark > 0.25f;
         if (ShellLights) {
             foreach (var shell in Shell.AllShells) {
                 if (shell is null) continue;
+                if (darkScene && shell.Tint is null && !shell.Rainbow)
+                    GameplayLights.AddGlow(shell.RenderPosition3D + new Vector3(0f, 4f, 0f), new Color(235, 240, 255), 0.7f, 26f);
                 // coloured shells (Tank Troves stat items) glow their own colour, with a burst as they leave the barrel
                 if (shell.Tint is not null || shell.Rainbow) {
                     var glow = shell.Rainbow ? shell.CurrentRainbowColor : shell.Tint!.Value;

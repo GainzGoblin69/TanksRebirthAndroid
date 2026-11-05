@@ -40,6 +40,7 @@ public static class TroveHud {
         bool banner = IntermissionSystem.Alpha > 0.05f || IntermissionSystem.BlackAlpha > 0.05f;
         if (!banner && TroveRun.Floor is { } floor && TroveRun.Fade < 1f) {
             DrawFog(sb);
+            DrawShellGlows(sb);
             DrawInRoom(sb);
             DrawItemStrip(sb);
             if (TroveRun.Battle)
@@ -180,6 +181,22 @@ public static class TroveHud {
                     }
                 break;
             }
+        }
+    }
+
+    /// <summary>On the dark floors, shells get a small soft white glow (drawn over the fog) so they're easy to see.</summary>
+    private static void DrawShellGlows(SpriteBatch sb) {
+        if (!CampaignGlobals.InMission || TroveThemes.Current is not (FloorTheme.Haunted or FloorTheme.Crystal or FloorTheme.NeonCity
+            or FloorTheme.Carnival or FloorTheme.SpaceStation or FloorTheme.ToxicLab or FloorTheme.Factory))
+            return;
+        float s = S;
+        foreach (var shell in Shell.AllShells) {
+            if (shell is null)
+                continue;
+            var c = ToScreen(shell.RenderPosition) - new Vector2(0, 8 * s);
+            var col = shell.Tint ?? Color.White;
+            ToggleSwitch.DrawDisc(sb, c, 9 * s, col * 0.16f);
+            ToggleSwitch.DrawDisc(sb, c, 5 * s, col * 0.28f);
         }
     }
 
