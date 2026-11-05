@@ -209,7 +209,7 @@ public class GameHandler {
         if (mmActive)
             MainMenuUI.Update();
         // I AM PUTTING THIS HERE BECAUSE FUCK YOU.
-        MainMenuUI.UpdateCampaignButton.IsVisible = MainMenuUI.MenuState == MainMenuUI.UIState.Campaigns && mmActive;
+        MainMenuUI.UpdateCampaignButton.IsVisible = MainMenuUI.MenuState == MainMenuUI.UIState.Campaigns && mmActive && !Internals.Common.Framework.Input.TouchControls.Enabled;
 
         // questioning as to why this is placed here
         if ((CameraGlobals.OverheadView || MainMenuUI.IsActive) && !LevelEditorUI.IsActive) {

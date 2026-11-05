@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xna.Framework;
 using TanksRebirth.Internals.Common.Framework.Input;
 using TanksRebirth.Internals.Common.Utilities;
@@ -67,7 +67,7 @@ public static partial class MainMenuUI {
             () => InMenuState(UIState.PlayList, 3, 5));
         // Difficulties: on the Single Player (campaign) screen and in the Wi-Fi host's lobby
         PhonePlace(DifficultiesButton, () => new Vector2(700, 550).ToResolution(), () => new Vector2(500, 50).ToResolution(),
-            () => InMenuState(UIState.Campaigns, CampaignColumnCount - 3, CampaignColumnCount) ?? InMenuState(UIState.MPLobby, 1, 4));
+            () => InMenuState(UIState.Campaigns, CampaignColumnCount - 2, CampaignColumnCount) ?? InMenuState(UIState.MPLobby, 1, 4));
 
         // Back is shared by every screen: only the play menu and the Campaigns screen use the column
         PhonePlace(GameUI.BackButton, () => new Vector2(700, 850).ToResolution(), () => new Vector2(500, 150).ToResolution(),

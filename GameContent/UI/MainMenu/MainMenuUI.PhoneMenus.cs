@@ -734,9 +734,15 @@ public static partial class MainMenuUI {
         int first = special ? PlayerColors.Palette.Length : 0;
         int tileCount = special ? PlayerColors.Skins.Length : PlayerColors.Palette.Length;
         int cols = special ? 5 : 4, rows = (tileCount + cols - 1) / cols;
-        float gap = 18 * s, top = panel.Y + 118 * s;
+        float gap = (special ? 12 : 18) * s, top = panel.Y + 118 * s;
+        // Special: a card under the grid tells the story of the skin you picked (and how to unlock it)
+        float cardH = special ? 196 * s : 0;
+        var card = new Rectangle((int)(panel.X + 20 * s), (int)(panel.Bottom - 20 * s - cardH), (int)(panel.Width - 40 * s), (int)cardH);
+        float gridBottom = special ? card.Y - 14 * s : panel.Bottom - 20 * s;
         float tw = (panel.Width - 40 * s - gap * (cols - 1)) / cols;
-        float th = (panel.Bottom - 20 * s - top - gap * (rows - 1)) / rows;
+        float th = (gridBottom - top - gap * (rows - 1)) / rows;
+        if (special && (_infoSkin < first || _infoSkin >= PlayerColors.Count))
+            _infoSkin = chosen >= first ? chosen : first;
         var tiles = new Rectangle[tileCount];
         for (int k = 0; k < tileCount; k++) {
             int i = first + k;
@@ -744,31 +750,24 @@ public static partial class MainMenuUI {
             tiles[k] = r;
             bool sel = i == chosen;
             bool open = PlayerColors.IsUnlocked(i);
-            if (sel)
-                ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X - (int)(6 * s), r.Y - (int)(6 * s), r.Width + (int)(12 * s), r.Height + (int)(12 * s)), 26 * s, new Color(52, 199, 89));
-            ToggleSwitch.DrawRoundedRect(sb, r, 22 * s, !open ? new Color(214, 208, 198) : sel ? new Color(255, 250, 238) : new Color(232, 226, 214));
-            if (open) {
-                PText(sb, PlayerColors.NameOf(i), new Vector2(r.Center.X, r.Bottom - 26 * s), 0.6f, Ink, maxWidth: r.Width - 20 * s);
-            }
-            else {
-                // what to beat for it, and how far along you are
-                var goal = PlayerColors.SkinAt(i) is { } sk ? Unlocks.GoalFor(sk.Unlock) : null;
-                var task = goal?.Task ?? "";
-                var lines = WrapTwo(task, 16);
-                float ly = r.Bottom - (goal is { Target: > 1 } ? 74 : 54) * s;
-                foreach (var line in lines) {
-                    PText(sb, line, new Vector2(r.Center.X, ly), 0.48f, Ink * 0.85f, maxWidth: r.Width - 20 * s);
-                    ly += 22 * s;
-                }
-                if (goal is { Target: > 1 }) {
-                    int have = Math.Min(Unlocks.Progress(goal.Key), goal.Target);
-                    var bar = new Rectangle(r.X + (int)(18 * s), r.Bottom - (int)(22 * s), r.Width - (int)(36 * s), (int)(10 * s));
-                    ToggleSwitch.DrawRoundedRect(sb, bar, 5 * s, new Color(190, 182, 170));
-                    if (have > 0)
-                        ToggleSwitch.DrawRoundedRect(sb, new Rectangle(bar.X, bar.Y, Math.Max(bar.Height, bar.Width * have / goal.Target), bar.Height), 5 * s, new Color(255, 180, 60));
-                }
+            bool info = special && i == _infoSkin && !sel;
+            if (sel || info)
+                ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X - (int)(5 * s), r.Y - (int)(5 * s), r.Width + (int)(10 * s), r.Height + (int)(10 * s)), 22 * s,
+                    sel ? new Color(52, 199, 89) : new Color(255, 180, 60));
+            ToggleSwitch.DrawRoundedRect(sb, r, 18 * s, !open ? new Color(214, 208, 198) : sel ? new Color(255, 250, 238) : new Color(232, 226, 214));
+            float nameScale = special ? 0.5f : 0.6f;
+            PText(sb, PlayerColors.NameOf(i), new Vector2(r.Center.X, r.Bottom - (special ? 20 : 26) * s), nameScale, open ? Ink : Ink * 0.55f, maxWidth: r.Width - 16 * s);
+            if (!open && PlayerColors.SkinAt(i) is { } lsk && Unlocks.GoalFor(lsk.Unlock) is { Target: > 1 } goal) {
+                // how far along you are
+                int have = Unlocks.Progress(goal.Key);
+                var bar = new Rectangle(r.X + (int)(16 * s), r.Bottom - (int)(44 * s), r.Width - (int)(32 * s), (int)(8 * s));
+                ToggleSwitch.DrawRoundedRect(sb, bar, 4 * s, new Color(190, 182, 170));
+                if (have > 0)
+                    ToggleSwitch.DrawRoundedRect(sb, new Rectangle(bar.X, bar.Y, Math.Max(bar.Height, bar.Width * have / goal.Target), bar.Height), 4 * s, new Color(255, 180, 60));
             }
             if (Tapped(r)) {
+                if (special)
+                    _infoSkin = i;
                 if (open) {
                     PlayerColors.SetChoice(_colorSlot, i);
                     SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
@@ -779,6 +778,9 @@ public static partial class MainMenuUI {
                 }
             }
         }
+        if (special && PlayerColors.SkinAt(_infoSkin) is { } isk)
+            DrawSkinCard(sb, card, isk, PlayerColors.IsUnlocked(_infoSkin), s);
+
         // the tanks themselves (3D), then the check on the chosen one and padlocks on the locked ones
         sb.End();
         float yaw = (float)(DateTime.UtcNow.TimeOfDay.TotalSeconds * 0.8 % (Math.PI * 2));
@@ -787,33 +789,72 @@ public static partial class MainMenuUI {
             int i = first + k;
             var r = tiles[k];
             bool open = PlayerColors.IsUnlocked(i);
-            int textRoom = open ? 52 : 92;
-            var modelRect = new Rectangle(r.X, r.Y + (int)(4 * s), r.Width, r.Height - (int)(textRoom * s));
-            DrawTankPreview(gd, modelRect, open ? _colorTex[i]! : _lockedTex, i == chosen || (special && open) ? yaw : 0.6f);
+            int textRoom = special ? (open ? 36 : 54) : 52;
+            var modelRect = new Rectangle(r.X, r.Y + (int)(2 * s), r.Width, r.Height - (int)(textRoom * s));
+            DrawTankPreview(gd, modelRect, open ? _colorTex[i]! : _lockedTex, i == chosen || (special && i == _infoSkin) ? yaw : 0.6f);
         }
         sb.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.LinearClamp, null, null);
+        float badge = special ? 15 : 20;
         for (int k = 0; k < tileCount; k++) {
             int i = first + k;
             var r = tiles[k];
             if (i == chosen)
-                ToggleSwitch.DrawCheckBadge(sb, new Vector2(r.Right - 26 * s, r.Y + 26 * s), 20 * s, new Color(52, 199, 89));
+                ToggleSwitch.DrawCheckBadge(sb, new Vector2(r.Right - (badge + 6) * s, r.Y + (badge + 6) * s), badge * s, new Color(52, 199, 89));
             else if (!PlayerColors.IsUnlocked(i))
-                DrawPadlock(sb, new Vector2(r.Right - 28 * s, r.Y + 30 * s), 18 * s);
+                DrawPadlock(sb, new Vector2(r.Right - (badge + 8) * s, r.Y + (badge + 10) * s), badge * 0.9f * s);
         }
+    }
+
+    private static int _infoSkin = -1;
+
+    /// <summary>The selected skin's name, where it's from, its story, and (locked) what to do for it.</summary>
+    private static void DrawSkinCard(SpriteBatch sb, Rectangle card, PlayerColors.Skin skin, bool open, float s) {
+        ToggleSwitch.DrawRoundedRect(sb, card, 22 * s, new Color(255, 250, 238));
+        var font = FontGlobals.RebirthFont;
+        float x = card.X + 26 * s, y = card.Y + 18 * s, maxW = card.Width - 52 * s;
+        float nameSc = 0.75f * s;
+        sb.DrawString(font, skin.Name, new Vector2(x, y), Ink, new Vector2(nameSc), 0f, Vector2.Zero);
+        if (!string.IsNullOrEmpty(skin.Origin)) {
+            float nw = font.MeasureString(skin.Name).X * nameSc;
+            sb.DrawString(font, skin.Origin, new Vector2(x + nw + 18 * s, y + 10 * s), Ink * 0.55f, new Vector2(0.5f * s), 0f, Vector2.Zero);
+        }
+        y += 50 * s;
+        float bodySc = 0.46f * s;
+        var lines = WrapToWidth(skin.Blurb, bodySc, maxW);
+        int maxLines = open ? 3 : 2;
+        for (int l = 0; l < Math.Min(lines.Count, maxLines); l++) {
+            sb.DrawString(font, lines[l], new Vector2(x, y), Ink * 0.85f, new Vector2(bodySc), 0f, Vector2.Zero);
+            y += 32 * s;
+        }
+        if (!open && Unlocks.GoalFor(skin.Unlock) is { } goal) {
+            string need = goal.Target > 1 ? $"To unlock: {goal.Task}  ({Unlocks.Progress(goal.Key):N0} / {goal.Target:N0})" : $"To unlock: {goal.Task}";
+            float ny = card.Bottom - 46 * s;
+            DrawPadlock(sb, new Vector2(x + 12 * s, ny + 16 * s), 12 * s);
+            sb.DrawString(font, need, new Vector2(x + 34 * s, ny), new Color(196, 110, 20), new Vector2(Math.Min(0.5f * s, (maxW - 34 * s) / Math.Max(1f, font.MeasureString(need).X))), 0f, Vector2.Zero);
+        }
+    }
+
+    /// <summary>Splits text into lines that fit <paramref name="maxWidth"/> pixels at <paramref name="scale"/>.</summary>
+    private static List<string> WrapToWidth(string text, float scale, float maxWidth) {
+        var font = FontGlobals.RebirthFont;
+        var lines = new List<string>();
+        string line = "";
+        foreach (var word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries)) {
+            string tryLine = line.Length == 0 ? word : line + " " + word;
+            if (line.Length > 0 && font.MeasureString(tryLine).X * scale > maxWidth) {
+                lines.Add(line);
+                line = word;
+            }
+            else
+                line = tryLine;
+        }
+        if (line.Length > 0)
+            lines.Add(line);
+        return lines;
     }
 
     private static int _colorTab;
     private static Texture2D? _lockedTex;
-
-    /// <summary>Splits a short sentence into at most two lines of about <paramref name="width"/> characters.</summary>
-    private static string[] WrapTwo(string text, int width) {
-        if (text.Length <= width)
-            return [text];
-        int cut = text.LastIndexOf(' ', Math.Min(text.Length - 1, width + 4));
-        if (cut <= 0)
-            cut = text.IndexOf(' ');
-        return cut <= 0 ? [text] : [text[..cut], text[(cut + 1)..]];
-    }
 
     /// <summary>A little padlock (body + shackle).</summary>
     private static void DrawPadlock(SpriteBatch sb, Vector2 c, float size) {

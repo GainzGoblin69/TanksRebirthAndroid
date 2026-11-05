@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,25 +19,40 @@ namespace TanksRebirth.GameContent.Systems;
 /// Saved to unlocks.json next to the other save data, with a few running counters for the "do it N times" ones.
 /// </summary>
 public static class Unlocks {
-    public sealed record Goal(string Key, string Task, int Target = 1);
+    /// <summary>An unlock: reached when <paramref name="Stat"/> gets to <paramref name="Target"/>.</summary>
+    public sealed record Goal(string Key, string Task, string Stat, int Target = 1);
 
     /// <summary>Every unlock, keyed like <see cref="PlayerColors.Skin.Unlock"/>.</summary>
     public static readonly Goal[] Goals = [
-        new("campaign", "Beat the campaign"),
-        new("troves", "Win a Tank Troves run"),
-        new("battle", "Win a Battle"),
-        new("secret", "Find a secret room in Tank Troves"),
-        new("bosses10", "Defeat 10 Tank Troves bosses", 10),
-        new("troves3", "Win 3 Tank Troves runs", 3),
-        new("rooms100", "Clear 100 Tank Troves rooms", 100),
-        new("levels25", "Clear 25 different missions", 25),
-        new("kills1000", "Destroy 1,000 tanks", 1000),
-        new("achievements15", "Unlock 15 achievements", 15),
+        new("campaign", "Beat the campaign", "campaign"),
+        new("troves", "Win a Tank Troves run", "troves"),
+        new("battle", "Win a Battle", "battle"),
+        new("secret", "Find a secret room in Tank Troves", "secrets"),
+        new("bosses10", "Defeat 10 Tank Troves bosses", "bosses", 10),
+        new("troves3", "Win 3 Tank Troves runs", "troves", 3),
+        new("rooms100", "Clear 100 Tank Troves rooms", "rooms", 100),
+        new("levels25", "Clear 25 different missions", "missions", 25),
+        new("kills1000", "Destroy 1,000 tanks", "kills", 1000),
+        new("achievements15", "Unlock 15 achievements", "achievements", 15),
+        // the famous real tanks
+        new("floor1", "Clear a Tank Troves floor", "floors"),
+        new("missions50", "Clear 50 different missions", "missions", 50),
+        new("bosses25", "Defeat 25 Tank Troves bosses", "bosses", 25),
+        new("kills5000", "Destroy 5,000 tanks", "kills", 5000),
+        new("troves5", "Win 5 Tank Troves runs", "troves", 5),
+        new("battle5", "Win 5 Battles", "battle", 5),
+        new("rooms500", "Clear 500 Tank Troves rooms", "rooms", 500),
+        new("secrets5", "Find 5 secret rooms in Tank Troves", "secrets", 5),
+        new("achievements30", "Unlock 30 achievements", "achievements", 30),
+        new("missions100", "Clear 100 different missions", "missions", 100),
     ];
 
     sealed class Data {
         public List<string> Unlocked { get; set; } = [];
-        public Dictionary<string, int> Counters { get; set; } = [];
+        /// <summary>Running totals ("rooms", "bosses", "troves"...), shared by every goal that counts the same thing.</summary>
+        public Dictionary<string, int> Stats { get; set; } = [];
+        /// <summary>(Build 205-208 kept counts per goal; read once and moved into <see cref="Stats"/>.)</summary>
+        public Dictionary<string, int>? Counters { get; set; }
     }
 
     static Data _data = new();
@@ -55,7 +70,32 @@ public static class Unlocks {
         catch (Exception e) {
             TankGame.ClientLog.Write($"Couldn't read unlocks.json: {e.Message}", LogType.Warn);
         }
+        _data.Stats ??= [];
+        _data.Unlocked ??= [];
+        // older saves: counts were kept per goal, and finished goals imply at least their target
+        bool migrated = false;
+        if (_data.Counters is { } old) {
+            foreach (var (key, value) in old)
+                if (GoalFor(key) is { } g)
+                    Raise(g.Stat, value);
+            _data.Counters = null;
+            migrated = true;
+        }
+        foreach (var key in _data.Unlocked)
+            if (GoalFor(key) is { } g && Stat(g.Stat) < g.Target) {
+                Raise(g.Stat, g.Target);
+                migrated = true;
+            }
+        if (migrated)
+            Save();
     }
+
+    static void Raise(string stat, int value) {
+        if (!_data.Stats.TryGetValue(stat, out var n) || n < value)
+            _data.Stats[stat] = value;
+    }
+
+    static int Stat(string stat) => _data.Stats.TryGetValue(stat, out var n) ? n : 0;
 
     static void Save() {
         try {
@@ -73,47 +113,45 @@ public static class Unlocks {
         return _data.Unlocked.Contains(key);
     }
 
-    /// <summary>How far along a counted goal is (0 for one-off goals that aren't done).</summary>
+    /// <summary>How far along a goal is (capped at its target).</summary>
     public static int Progress(string key) {
         Load();
-        if (_data.Unlocked.Contains(key))
-            return GoalFor(key)?.Target ?? 1;
-        return _data.Counters.TryGetValue(key, out var n) ? n : 0;
+        if (GoalFor(key) is not { } g)
+            return 0;
+        return _data.Unlocked.Contains(key) ? g.Target : Math.Min(Stat(g.Stat), g.Target);
     }
 
     public static int UnlockedCount {
         get { Load(); return Goals.Count(g => _data.Unlocked.Contains(g.Key)); }
     }
 
-    /// <summary>The goal is done: unlocks its skin (with a popup the first time).</summary>
-    public static void Grant(string key) {
-        Load();
-        if (_data.Unlocked.Contains(key) || GoalFor(key) is null)
+    /// <summary>Unlocks a goal's skin (with a popup the first time).</summary>
+    static void Grant(Goal goal) {
+        if (_data.Unlocked.Contains(goal.Key))
             return;
-        _data.Unlocked.Add(key);
-        Save();
-        var skin = PlayerColors.Skins.FirstOrDefault(s => s.Unlock == key);
-        TankGame.ClientLog.Write($"Unlocked '{key}' ({skin?.Name})", LogType.Info);
+        _data.Unlocked.Add(goal.Key);
+        var skin = PlayerColors.Skins.FirstOrDefault(s => s.Unlock == goal.Key);
+        TankGame.ClientLog.Write($"Unlocked '{goal.Key}' ({skin?.Name})", LogType.Info);
         if (skin is not null)
             _toasts.Enqueue(skin);
     }
 
-    /// <summary>One more toward a counted goal (unlocks it at its target).</summary>
-    public static void Count(string key, int amount = 1) => SetAtLeast(key, Progress(key) + amount);
-
-    /// <summary>Progress toward a counted goal from a number kept elsewhere (kills, achievements...).</summary>
-    public static void SetAtLeast(string key, int value) {
+    /// <summary>One more of something (a room cleared, a run won...): unlocks every goal it completes.</summary>
+    public static void Count(string stat, int amount = 1) {
         Load();
-        if (_data.Unlocked.Contains(key) || GoalFor(key) is not { } goal)
+        SetAtLeast(stat, Stat(stat) + amount);
+    }
+
+    /// <summary>A total kept elsewhere (kills, achievements, missions cleared).</summary>
+    public static void SetAtLeast(string stat, int value) {
+        Load();
+        if (value <= Stat(stat))
             return;
-        int now = _data.Counters.TryGetValue(key, out var n) ? n : 0;
-        if (value <= now)
-            return;
-        _data.Counters[key] = value;
-        if (value >= goal.Target)
-            Grant(key); // (saves)
-        else
-            Save();
+        _data.Stats[stat] = value;
+        foreach (var g in Goals)
+            if (g.Stat == stat && value >= g.Target)
+                Grant(g);
+        Save();
     }
 
     static int _tick;
@@ -122,8 +160,8 @@ public static class Unlocks {
         if (++_tick % 60 != 0)
             return;
         try {
-            SetAtLeast("kills1000", (int)Math.Min(int.MaxValue, TankGame.SaveFile.TotalKills));
-            SetAtLeast("achievements15", AchievementStore.All.Count(a => a.IsComplete));
+            SetAtLeast("kills", (int)Math.Min(int.MaxValue, TankGame.SaveFile.TotalKills));
+            SetAtLeast("achievements", AchievementStore.All.Count(a => a.IsComplete));
         }
         catch { }
     }

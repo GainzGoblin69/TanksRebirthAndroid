@@ -108,7 +108,7 @@ public static class AchievementStore {
             return;
         if (LevelProgress.CurrentCampaignKey == "Vanilla" && LevelProgress.Run is null) {
             Unlock("A winner is you");
-            Unlocks.Grant("campaign");
+            Unlocks.Count("campaign");
             if (Difficulties.Types["POV"])
                 Unlock("See through the dragon's eyes");
         }

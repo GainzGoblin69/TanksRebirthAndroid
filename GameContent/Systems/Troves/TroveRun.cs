@@ -380,7 +380,7 @@ public static class TroveRun {
         if (Floor is null || Floor.SecretFound || Floor.Secret is not { } sp)
             return;
         Floor.SecretFound = true;
-        Unlocks.Grant("secret");
+        Unlocks.Count("secrets");
         Floor.Rooms[sp].Seen = true;
         // the cork walls in front of it stay gone (also when you come back to those rooms)
         foreach (var r in Floor.Rooms.Values)
@@ -492,9 +492,9 @@ public static class TroveRun {
             room.Cleared = true;
             TroveItems.OnRoomCleared();
             RoomsCleared++;
-            Unlocks.Count("rooms100");
+            Unlocks.Count("rooms");
             if (room.Kind == TroveRoomKind.Boss)
-                Unlocks.Count("bosses10");
+                Unlocks.Count("bosses");
             TanksDestroyed += room.Enemies.Count + room.Wave2.Count + room.Wave3.Count;
             SoundPlayer.PlaySoundInstance("Assets/sounds/menu/client_join.ogg", SoundContext.Effect, 0.8f);
             if (room.Kind == TroveRoomKind.Boss)
@@ -768,6 +768,8 @@ public static class TroveRun {
     }
 
     private static void NextFloor() {
+        if (!Battle)
+            Unlocks.Count("floors");
         FloorNumber++;
         ReadyUntil = -1;
         TroveItems.NewFloor();
@@ -790,11 +792,11 @@ public static class TroveRun {
         Ended = kind;
         if (kind == EndKind.Victory) {
             if (!Battle) {
-                Unlocks.Grant("troves");
-                Unlocks.Count("troves3");
+                Unlocks.Count("floors"); // (the last floor)
+                Unlocks.Count("troves");
             }
             else if (BattleMode.LocalPlayerWon())
-                Unlocks.Grant("battle");
+                Unlocks.Count("battle");
         }
         TankMusicSystem.StopAll();
         SoundPlayer.PlaySoundInstance(kind == EndKind.Victory ? "Assets/music/fanfares/mission_complete_M100.ogg"

@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework.Input;
+﻿using Microsoft.Xna.Framework.Input;
 using System.Diagnostics;
 using System.IO;
 using System;
@@ -76,7 +76,7 @@ public static partial class MainMenuUI {
 
         int slot = 0;
         // phones: one big left-hand column (campaigns, Level Select, Validate, Back)
-        CampaignColumnCount = totalCampaigns + 3; // + Difficulties, Update Campaign, Back
+        CampaignColumnCount = totalCampaigns + 2; // + Difficulties, Back (phones have no Update Campaign button)
         (Func<Vector2>, Func<Vector2>) nextSlot() {
             if (phone) {
                 int idx = slot++;
@@ -171,12 +171,9 @@ public static partial class MainMenuUI {
                 campaignNames.Add(bt);
             }
         }
-        // phones: Freeplay is gone (it only opened an empty board); Validate joins the column
+        // phones: Freeplay is gone (it only opened an empty board)
         if (phone) {
-            int vIdx = CampaignColumnCount - 2;
-            UpdateCampaignButton.Text = "Update Campaign";
-            UpdateCampaignButton.Tooltip = null;
-            UpdateCampaignButton.SetDimensions(() => PhoneColumnSlot(vIdx, CampaignColumnCount).Location.ToVector2(), () => PhoneColumnSlot(vIdx, CampaignColumnCount).Size.ToVector2());
+            // (no Update Campaign button: the app ships its own campaign and updates it with the app)
             return;
         }
         var extra = new UITextButton("Freeplay", FontGlobals.RebirthFont, Color.White, 0.8f) {
