@@ -736,7 +736,7 @@ public static partial class MainMenuUI {
         int cols = special ? 5 : 4, rows = (tileCount + cols - 1) / cols;
         float gap = (special ? 12 : 18) * s, top = panel.Y + 118 * s;
         // Special: a card under the grid tells the story of the skin you picked (and how to unlock it)
-        float cardH = special ? 196 * s : 0;
+        float cardH = special ? 270 * s : 0;
         var card = new Rectangle((int)(panel.X + 20 * s), (int)(panel.Bottom - 20 * s - cardH), (int)(panel.Width - 40 * s), (int)cardH);
         float gridBottom = special ? card.Y - 14 * s : panel.Bottom - 20 * s;
         float tw = (panel.Width - 40 * s - gap * (cols - 1)) / cols;
@@ -755,7 +755,7 @@ public static partial class MainMenuUI {
                 ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X - (int)(5 * s), r.Y - (int)(5 * s), r.Width + (int)(10 * s), r.Height + (int)(10 * s)), 22 * s,
                     sel ? new Color(52, 199, 89) : new Color(255, 180, 60));
             ToggleSwitch.DrawRoundedRect(sb, r, 18 * s, !open ? new Color(214, 208, 198) : sel ? new Color(255, 250, 238) : new Color(232, 226, 214));
-            float nameScale = special ? 0.5f : 0.6f;
+            float nameScale = special ? 0.62f : 0.6f;
             PText(sb, PlayerColors.NameOf(i), new Vector2(r.Center.X, r.Bottom - (special ? 20 : 26) * s), nameScale, open ? Ink : Ink * 0.55f, maxWidth: r.Width - 16 * s);
             if (!open && PlayerColors.SkinAt(i) is { } lsk && Unlocks.GoalFor(lsk.Unlock) is { Target: > 1 } goal) {
                 // how far along you are
@@ -817,18 +817,18 @@ public static partial class MainMenuUI {
         bool locked = !open && Unlocks.GoalFor(skin.Unlock) is not null;
 
         // name, then where and when it's from
-        float nameSc = 0.62f * k;
+        float nameSc = 1.0f * k;
         var nm = font.MeasureString(skin.Name) * nameSc;
         sb.DrawString(font, skin.Name, new Vector2(x, y), Ink, new Vector2(nameSc), 0f, Vector2.Zero);
         if (!string.IsNullOrEmpty(skin.Origin)) {
-            float oSc = 0.42f * k;
+            float oSc = 0.62f * k;
             var om = font.MeasureString(skin.Origin) * oSc;
             sb.DrawString(font, skin.Origin, new Vector2(x + nm.X + 16 * s, y + nm.Y - om.Y - 2 * s), Ink * 0.55f, new Vector2(oSc), 0f, Vector2.Zero);
         }
         y += nm.Y + 6 * s;
 
         // the story, as many lines as fit above the unlock line
-        float bodySc = 0.4f * k;
+        float bodySc = 0.62f * k;
         float lineH = font.LineHeight * bodySc;
         float bottom = card.Bottom - pad * 0.6f - (locked ? lineH + 10 * s : 0);
         var lines = WrapToWidth(skin.Blurb, bodySc, maxW);
