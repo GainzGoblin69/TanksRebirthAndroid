@@ -1,4 +1,4 @@
-using FontStashSharp;
+﻿using FontStashSharp;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
@@ -302,8 +302,18 @@ public abstract partial class UIElement {
         var width = (int)(scaleFont.X + 30).ToResolutionX();
         var height = (int)(scaleFont.Y + 30).ToResolutionY();
 
-        var x = Math.Clamp(MouseUtils.MouseX + 10, 0, WindowUtils.WindowWidth - width);
-        var y = Math.Clamp(MouseUtils.MouseY + 10, 0, WindowUtils.WindowHeight - height);
+        int x, y;
+        if (TanksRebirth.Internals.Common.Framework.Input.TouchControls.Enabled) {
+            // phones: in the gap just under the button (above it if there's no room), so it never covers the button
+            int gap = (int)(8 * WindowUtils.WindowHeight / 1080f);
+            var hb = this.Hitbox;
+            x = Math.Clamp(hb.Center.X - width / 2, 0, Math.Max(0, WindowUtils.WindowWidth - width));
+            y = hb.Bottom + gap + height <= WindowUtils.WindowHeight ? hb.Bottom + gap : Math.Max(0, hb.Y - gap - height);
+        }
+        else {
+            x = Math.Clamp(MouseUtils.MouseX + 10, 0, WindowUtils.WindowWidth - width);
+            y = Math.Clamp(MouseUtils.MouseY + 10, 0, WindowUtils.WindowHeight - height);
+        }
 
         var Hitbox = new Rectangle(x, y, width, height);
         DrawUtils.DrawNineSliced(spriteBatch, UIPanelBackground, 12, Hitbox, color, Vector2.Zero);

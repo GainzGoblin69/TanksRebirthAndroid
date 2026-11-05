@@ -148,7 +148,10 @@ public static class ToggleSwitch {
                             float dx = x + (sx + 0.5f) / SS - rad, dy = y + (sy + 0.5f) / SS - rad;
                             if (dx * dx + dy * dy <= rad * rad) hit++;
                         }
-                    data[y * size + x] = new Color(255, 255, 255, hit * 255 / (SS * SS)); // straight alpha
+                    // premultiplied: fully see-through outside the circle whichever blend mode the batch uses
+                    // (straight-alpha white there brightened the corners in premultiplied batches)
+                    int a = hit * 255 / (SS * SS);
+                    data[y * size + x] = new Color(a, a, a, a);
                 }
             _circle.SetData(level, null, data, 0, data.Length);
         }
