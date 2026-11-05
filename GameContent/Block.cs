@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Linq;
@@ -482,6 +482,7 @@ public class Block : IGameObject
                     GameHandler.Particles.MakeShineSpot(sh.Position3D, Color.Cyan, 0.6f);
                     sh.Position = other.Position + dir * SIDE_LENGTH * 0.55f;
                     sh.TeleportCooldown = 25;
+                    sh.SnapRender();
                     GameHandler.Particles.MakeShineSpot(sh.Position3D, Color.Cyan, 0.6f);
                 }
             }

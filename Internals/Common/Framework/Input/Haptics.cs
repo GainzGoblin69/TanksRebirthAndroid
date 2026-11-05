@@ -32,6 +32,8 @@ public static class Haptics {
         try { Impl!(ms, Math.Clamp(strength, 1, 255)); } catch { }
     }
 
+    /// <summary>A light tick for pressing a menu button.</summary>
+    public static void Tap() => Pulse(12, 90);
     public static void Shoot() => Pulse(14, 70);
     public static void Mine() => Pulse(28, 130);
     public static void ItemPickup() => Pulse(40, 160);

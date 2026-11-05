@@ -1502,8 +1502,10 @@ public static class TroveHud {
     // ---- run over / victory
     private static bool Tapped(Rectangle r) {
         bool hit = !_down && _wasDown && r.Contains(_press) && r.Contains(MouseUtils.MousePosition);
-        if (hit)
+        if (hit) {
             SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect);
+            Internals.Common.Framework.Input.Haptics.Tap();
+        }
         return hit;
     }
 

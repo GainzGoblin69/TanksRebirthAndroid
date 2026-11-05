@@ -382,142 +382,75 @@ public partial class AITank {
             CacheAim(Vector2.UnitY.Rotate(_seekRotation + Parameters.TurretSpeed * 0.25f), default, tr, miss, null, bounce);
     }
 
+    /// <summary>1.9.1: traces where a shot would go by stepping a <see cref="ShellSim"/> (the same physics as a real shell),
+    /// noting the tanks it would hit or pass close to. Safe on worker threads (no shared buffers).</summary>
     private List<Tank> TracePath(Vector2 pathDir, out Vector2[] ricochetPoints, out Vector2[] tankCollPoints, float turretRot,
         bool draw = false, Vector2 offset = default, float missDist = 0f, Func<Block, bool>? pattern = null, bool doBounceReset = true) {
-        const int MAX_PATH_UNITS = 1000;
-        const int PATH_UNIT_LENGTH = 8;
+        // upper bound on ticks simulated
+        const int MAX_PATH_FRAMES = 1000;
+        // a step used to be 8 units: kept, so DetectionForgiveness still means the same thing
+        const float FORGIVENESS_UNIT = 8f;
 
         List<Tank> tanks = [];
         List<Vector2> ricoPoints = [];
         List<Vector2> tnkPoints = [];
 
         pattern ??= c => c.Properties.IsSolid || c.Type == BlockID.Teleporter;
-
         var whitePixel = draw ? TextureGlobals.Pixels[Color.White] : null!; // debug drawing only (keeps worker threads off shared lookups)
-        Vector2 pathPos = Position + offset.Rotate(-turretRot);
-        pathDir.Y *= -1;
-        pathDir *= PATH_UNIT_LENGTH;
 
-        int ricochetCount = 0;
-        int uninterruptedIterations = 0;
+        pathDir.Y *= -1;
+        var sim = ShellSim.From(this, Position + offset.Rotate(-turretRot), pathDir);
 
         bool teleported = false;
-        int tpTriggerIndex = -1;
-        Vector2 teleportedTo = Vector2.Zero;
+        Vector2? teleportTo = null;
 
-        var pathHitbox = new Rectangle();
-
-        for (int i = 0; i < MAX_PATH_UNITS; i++) {
-            uninterruptedIterations++;
-
-            // World bounds check
-            if (pathPos.X < GameScene.MIN_X || pathPos.X > GameScene.MAX_X) {
-                ricoPoints.Add(pathPos);
-                pathDir.X *= -1;
-                ricochetCount++;
-                if (doBounceReset) uninterruptedIterations = 0;
-            }
-            else if (pathPos.Y < GameScene.MIN_Z || pathPos.Y > GameScene.MAX_Z) {
-                ricoPoints.Add(pathPos);
-                pathDir.Y *= -1;
-                ricochetCount++;
-                if (doBounceReset) uninterruptedIterations = 0;
+        for (int i = 0; i < MAX_PATH_FRAMES; i++) {
+            // teleport on the tick after touching the pad
+            if (teleportTo is { } to) {
+                sim.Position = to;
+                teleportTo = null;
             }
 
-            // Setup hitbox once
-            pathHitbox.X = (int)pathPos.X - 5;
-            pathHitbox.Y = (int)pathPos.Y - 5;
-            pathHitbox.Width = 8;
-            pathHitbox.Height = 8;
-
-            Vector2 dummy = Vector2.Zero;
-            Collision.HandleCollisionSimple_ForBlocks(pathHitbox, pathDir, ref dummy, out var dir, out var block, out bool corner, false, pattern);
-            if (corner) break;
-
-            if (block is not null) {
-                if (block.Type == BlockID.Teleporter && !teleported) {
-                    var dest = Block.AllBlocks.FirstOrDefault(bl => bl != null && bl != block && bl.TpLink == block.TpLink);
-                    if (dest is not null) {
-                        teleported = true;
-                        teleportedTo = dest.Position;
-                        tpTriggerIndex = i + 1;
-                    }
-                }
-                else if (block.Properties.AllowShotPathBounce) {
-                    ricoPoints.Add(pathPos);
-                    ricochetCount += block.Properties.PathBounceCount;
-
-                    switch (dir) {
-                        case CollisionDirection.Up:
-                        case CollisionDirection.Down:
-                            pathDir.Y *= -1;
-                            break;
-                        case CollisionDirection.Left:
-                        case CollisionDirection.Right:
-                            pathDir.X *= -1;
-                            break;
-                    }
-
-                    if (doBounceReset) uninterruptedIterations = 0;
-                }
-            }
-
-            // Delay teleport until next frame
-            if (teleported && i == tpTriggerIndex) {
-                pathPos = teleportedTo;
-            }
-
-            // Check destroy conditions
-            bool hitsInstant = i == 0 && Block.AllBlocks.Any(x => x != null && x.Hitbox.Intersects(pathHitbox) && pattern(x));
-            bool hitsTooEarly = i < (int)Properties.ShellSpeed / 2 && ricochetCount > 0;
-            bool ricochetLimitReached = ricochetCount > Properties.RicochetCount;
-
-            if (hitsInstant || hitsTooEarly || ricochetLimitReached)
-                break;
-
-            // Check tanks BEFORE moving
-            float realMiss = 1f + missDist * 2 * uninterruptedIterations;
-
+            // check tanks BEFORE moving
+            float realMiss = 1f + missDist * 2 * (sim.Distance / FORGIVENESS_UNIT);
             foreach (var enemy in GameHandler.AllTanks) {
                 if (enemy is null || enemy.IsDestroyed || tanks.Contains(enemy)) continue;
 
-                if (i > 15 && GameUtils.Distance_WiiTanksUnits(enemy.Position, pathPos) <= realMiss) {
-                    var pathAngle = pathDir.ToRotation();
-                    var toEnemy = pathPos.DirectionTo(enemy.Position).ToRotation();
-
+                if (i > 5 && GameUtils.Distance_WiiTanksUnits(enemy.Position, sim.Position) <= realMiss) {
+                    var pathAngle = sim.Velocity.ToRotation();
+                    var toEnemy = sim.Position.DirectionTo(enemy.Position).ToRotation();
                     if (MathUtils.AbsoluteAngleBetween(pathAngle, toEnemy) >= MathHelper.PiOver2)
                         tanks.Add(enemy);
                 }
 
-                var pathCircle = new Circle { Center = pathPos, Radius = 4 };
+                var pathCircle = new Circle { Center = sim.Position, Radius = 4 };
                 if (enemy.CollisionCircle.Intersects(pathCircle)) {
-                    tnkPoints.Add(pathPos);
+                    tnkPoints.Add(sim.Position);
                     tanks.Add(enemy);
                 }
             }
 
             if (draw) {
-                var screenPos = MatrixUtils.ConvertWorldToScreen(
-                    Vector3.Zero,
-                    Matrix.CreateTranslation(pathPos.X, 11, pathPos.Y),
-                    CameraGlobals.GameView,
-                    CameraGlobals.GameProjection
-                );
-
-                TankGame.SpriteRenderer.Draw(
-                    whitePixel,
-                    screenPos,
-                    null,
-                    Color.White * 0.5f,
-                    0,
-                    whitePixel.Size() / 2,
-                    realMiss,
-                    default,
-                    default
-                );
+                var screenPos = MatrixUtils.ConvertWorldToScreen(Vector3.Zero, Matrix.CreateTranslation(sim.Position.X, 11, sim.Position.Y),
+                    CameraGlobals.GameView, CameraGlobals.GameProjection);
+                TankGame.SpriteRenderer.Draw(whitePixel, screenPos, null, Color.White * 0.5f, 0, whitePixel.Size() / 2, realMiss, default, default);
             }
 
-            pathPos += pathDir;
+            var result = sim.Step(pattern, out var block);
+
+            if (block is { Type: BlockID.Teleporter } && !teleported) {
+                var dest = Block.AllBlocks.FirstOrDefault(bl => bl != null && bl != block && bl.Type == BlockID.Teleporter && bl.TpLink == block.TpLink);
+                if (dest is not null) {
+                    teleported = true;
+                    teleportTo = dest.Position;
+                }
+            }
+
+            if (result == ShellSimResult.Destroyed) break;
+            if (result == ShellSimResult.Ricochet) {
+                ricoPoints.Add(sim.Position);
+                if (doBounceReset) sim.Distance = 0f;
+            }
         }
 
         tankCollPoints = [.. tnkPoints];

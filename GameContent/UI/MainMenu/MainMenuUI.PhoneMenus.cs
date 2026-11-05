@@ -61,8 +61,10 @@ public static partial class MainMenuUI {
         sb.DrawString(font, label, face.Center.ToVector2(), enabled ? Ink : new Color(120, 112, 104), new Vector2(scale), 0f, size / 2f);
 
         bool tapped = enabled && !_pmDown && _pmWasDown && r.Contains(_pmPress) && r.Contains(mouse) && !_pmEnteredThisFrame;
-        if (tapped)
+        if (tapped) {
             SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
+            Internals.Common.Framework.Input.Haptics.Tap();
+        }
         return tapped;
     }
 

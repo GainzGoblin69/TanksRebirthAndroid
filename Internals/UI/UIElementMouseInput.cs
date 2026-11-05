@@ -118,8 +118,10 @@ namespace TanksRebirth.Internals.UI {
             if (!IsInputValid(InputUtils.MouseLeft && !InputUtils.OldMouseLeft))
                 return;
 
-            if (delay <= 0)
-                OnLeftClick?.Invoke(this);
+            if (delay <= 0 && OnLeftClick is not null) {
+                Common.Framework.Input.Haptics.Tap(); // a light buzz for menu buttons
+                OnLeftClick.Invoke(this);
+            }
             delay = 2;
         }
 

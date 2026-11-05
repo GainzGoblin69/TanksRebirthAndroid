@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using System.Runtime.CompilerServices;
@@ -389,7 +389,6 @@ public class Shell : IAITankDanger {
         if (TeleportCooldown > 0)
             TeleportCooldown -= RuntimeData.DeltaTime;
         Rotation = Velocity.ToRotation() - MathHelper.PiOver2;
-        Position += Velocity * 0.62f * RuntimeData.DeltaTime;
         if (Lobbed) {
             // up and over: high in the middle of the flight, then it comes down and goes off
             float t = LifeTime / MathF.Max(LobTime, 1f);
@@ -418,98 +417,23 @@ public class Shell : IAITankDanger {
             _wallRicCooldown = MathF.Max(_wallRicCooldown, 2f); // flies back over the room's edge instead of bouncing off it
             _ghostTicks = MathF.Max(_ghostTicks, 2f);
         }
+        // 1.9.1: movement, ricochets and block hits run on a fixed 60-per-second tick (in small steps, so fast shells
+        // can't skip through a corner), the same at any framerate and on every phone; the drawing blends between ticks
+        if (!_started) {
+            _started = true;
+            _tickStart = Position;
+        }
+        _accum = MathF.Min(_accum + RuntimeData.DeltaTime, MAX_TICKS_PER_UPDATE);
+        while (_accum >= 1f && !_removed) {
+            _accum -= 1f;
+            _tickStart = Position;
+            Tick();
+        }
+        _tickProgress = _accum;
+        if (_removed)
+            return;
         World = Matrix.CreateScale(VisualScale) * Matrix.CreateFromYawPitchRoll(-Rotation, 0, 0)
-                * Matrix.CreateTranslation(Position3D);
-
-        //if (TrailSound != null) {
-            //if (CameraGlobals.IsUsingFirstPresonCamera)
-            //    SoundUtils.CreateSpatialSound(TrailSound, Position3D, CameraGlobals.RebirthFreecam.Position);
-        //}
-
-        if (_wallRicCooldown <= 0) {
-            if (Wraps > 0 && Position.X is < GameScene.MIN_X or > GameScene.MAX_X) {
-                // Wraparound: out one side, in the other
-                Position = new(Position.X < GameScene.MIN_X ? GameScene.MAX_X - 2 : GameScene.MIN_X + 2, Position.Y);
-                Wraps--;
-                _wallRicCooldown = 5;
-            }
-            else if (Position.X is < GameScene.MIN_X or > GameScene.MAX_X) {
-                // (1.9 fix) put the shell back on the border first, so fast shells can't end up past it
-                Position = new(Math.Clamp(Position.X, GameScene.MIN_X, GameScene.MAX_X), Position.Y);
-                OnRicochet?.Invoke(this);
-                Ricochet(true);
-
-                ModdedData?.OnRicochet(null);
-
-                _wallRicCooldown = 5;
-            }
-
-            if (Wraps > 0 && Position.Y is < GameScene.MIN_Z or > GameScene.MAX_Z) {
-                Position = new(Position.X, Position.Y < GameScene.MIN_Z ? GameScene.MAX_Z - 2 : GameScene.MIN_Z + 2);
-                Wraps--;
-                _wallRicCooldown = 5;
-            }
-            else if (Position.Y is < GameScene.MIN_Z or > GameScene.MAX_Z) {
-                Position = new(Position.X, Math.Clamp(Position.Y, GameScene.MIN_Z, GameScene.MAX_Z));
-                OnRicochet?.Invoke(this);
-                Ricochet(false);
-
-                ModdedData?.OnRicochet(null);
-
-                _wallRicCooldown = 5;
-            }
-        }
-        else
-            _wallRicCooldown -= RuntimeData.DeltaTime;
-
-        var dummy = Vector2.Zero;
-
-        Collision.HandleCollisionSimple_ForBlocks(Hitbox, Velocity, ref dummy, out var dir, out var block,
-            out bool corner, false, (c) => c.Properties.IsSolid);
-
-        if (_ghostTicks > 0) {
-            _ghostTicks -= RuntimeData.DeltaTime; // passing through a wall (Ghost Shells)
-        }
-        else if (WallPasses > 0 && block is not null && (dir != CollisionDirection.None || corner)) {
-            // go through this wall: ignore blocks until it's out the other side (a block or two)
-            WallPasses--;
-            _ghostTicks = Block.SIDE_LENGTH * 2f / Math.Max(0.5f, Velocity.Length() * 0.62f);
-        }
-        else if (BreaksCork && block is { Properties.IsDestructible: true } && (dir != CollisionDirection.None || corner)) {
-            block.Destroy(); // heavy shells smash breakable blocks and keep going
-        }
-        else if (Type == ShellID.Missile && block is not null && (dir != CollisionDirection.None || corner)) {
-            // missiles break through destructible blocks and keep going; anything else stops them
-            if (block.Properties.IsDestructible)
-                block.Destroy();
-            else
-                Destroy(DestructionContext.WithObstacle);
-        }
-        else {
-        if (LifeTime <= 5 && (dir != CollisionDirection.None || corner))
-            Destroy(DestructionContext.WithObstacle);
-        if (corner)
-            Destroy(DestructionContext.WithObstacle);
-        if (_wallRicCooldown <= 0) {
-            switch (dir) {
-                case CollisionDirection.Up:
-                case CollisionDirection.Down:
-                    Ricochet(false);
-                    block.ModdedData?.OnRicochet(this);
-                    ModdedData?.OnRicochet(block);
-                    OnRicochetWithBlock?.Invoke(block, this);
-                    break;
-                case CollisionDirection.Left:
-                case CollisionDirection.Right:
-                    // TODO: fix this pls
-                    Ricochet(true);
-                    block.ModdedData?.OnRicochet(this);
-                    ModdedData?.OnRicochet(block);
-                    OnRicochetWithBlock?.Invoke(block, this);
-                    break;
-            }
-        }
-        }
+                * Matrix.CreateTranslation(RenderPosition3D);
 
         LifeTime += RuntimeData.DeltaTime;
 
@@ -582,6 +506,130 @@ public class Shell : IAITankDanger {
         ModdedData?.PostUpdate();
         OnPostUpdate?.Invoke(this);
     }
+    // ---- the fixed tick (1.9.1)
+    const float MAX_TICKS_PER_UPDATE = 4f;
+    /// <summary>A shell that hits a wall this soon after being fired is destroyed (counted in ticks, like <see cref="ShellSim.LifeTime"/>).</summary>
+    public const int TOO_SHORT_TICKS = 5;
+    /// <summary>How much of <see cref="Velocity"/> a shell moves each tick.</summary>
+    public const float MOVE_SCALE = 0.62f;
+    /// <summary>The longest distance a shell moves between collision checks (under its 4-unit hitbox, so corners can't be skipped).</summary>
+    public const float SUBSTEP_LENGTH = 3f;
+    public static int NumSubsteps(float distance) => Math.Max(1, (int)MathF.Ceiling(distance / SUBSTEP_LENGTH));
+    float _accum = 1f, _tickProgress;
+    int _ticks;
+    bool _started, _removed;
+    Vector2 _tickStart;
+    /// <summary>Where the shell is drawn: up to a tick behind <see cref="Position"/>, so it moves smoothly at any framerate.</summary>
+    public Vector2 RenderPosition => Vector2.Lerp(_tickStart, Position, _tickProgress);
+    public Vector3 RenderPosition3D => RenderPosition.ExpandZ() + new Vector3(0, 11 + Height, 0);
+    /// <summary>Call after moving the shell somewhere else (a teleporter), so it isn't drawn sliding there.</summary>
+    public void SnapRender() => _tickStart = Position;
+
+    /// <summary>One tick of movement, edge ricochets and block hits. Keep in step with <see cref="ShellSim.Step"/>.</summary>
+    void Tick() {
+        int substeps = NumSubsteps((Velocity * MOVE_SCALE).Length());
+        for (int sub = 0; sub < substeps && !_removed; sub++) {
+            Position += Velocity * MOVE_SCALE / substeps;
+
+                //if (TrailSound != null) {
+                    //if (CameraGlobals.IsUsingFirstPresonCamera)
+                    //    SoundUtils.CreateSpatialSound(TrailSound, Position3D, CameraGlobals.RebirthFreecam.Position);
+                //}
+
+                if (_wallRicCooldown <= 0) {
+                    if (Wraps > 0 && Position.X is < GameScene.MIN_X or > GameScene.MAX_X) {
+                        // Wraparound: out one side, in the other
+                        Position = new(Position.X < GameScene.MIN_X ? GameScene.MAX_X - 2 : GameScene.MIN_X + 2, Position.Y);
+                        _tickStart = Position; // (no streak across the room)
+                        Wraps--;
+                        _wallRicCooldown = 5;
+                    }
+                    else if (Position.X is < GameScene.MIN_X or > GameScene.MAX_X) {
+                        // (1.9 fix) put the shell back on the border first, so fast shells can't end up past it
+                        Position = new(Math.Clamp(Position.X, GameScene.MIN_X, GameScene.MAX_X), Position.Y);
+                        OnRicochet?.Invoke(this);
+                        Ricochet(true);
+
+                        ModdedData?.OnRicochet(null);
+
+                        _wallRicCooldown = 5;
+                    }
+
+                    if (Wraps > 0 && Position.Y is < GameScene.MIN_Z or > GameScene.MAX_Z) {
+                        Position = new(Position.X, Position.Y < GameScene.MIN_Z ? GameScene.MAX_Z - 2 : GameScene.MIN_Z + 2);
+                        _tickStart = Position;
+                        Wraps--;
+                        _wallRicCooldown = 5;
+                    }
+                    else if (Position.Y is < GameScene.MIN_Z or > GameScene.MAX_Z) {
+                        Position = new(Position.X, Math.Clamp(Position.Y, GameScene.MIN_Z, GameScene.MAX_Z));
+                        OnRicochet?.Invoke(this);
+                        Ricochet(false);
+
+                        ModdedData?.OnRicochet(null);
+
+                        _wallRicCooldown = 5;
+                    }
+                }
+
+                var dummy = Vector2.Zero;
+
+                Collision.HandleCollisionSimple_ForBlocks(Hitbox, Velocity, ref dummy, out var dir, out var block,
+                    out bool corner, false, (c) => c.Properties.IsSolid);
+
+                if (_ghostTicks > 0) {
+                    // passing through a wall (Ghost Shells); counted down once per tick below
+                }
+                else if (WallPasses > 0 && block is not null && (dir != CollisionDirection.None || corner)) {
+                    // go through this wall: ignore blocks until it's out the other side (a block or two)
+                    WallPasses--;
+                    _ghostTicks = Block.SIDE_LENGTH * 2f / Math.Max(0.5f, Velocity.Length() * 0.62f);
+                }
+                else if (BreaksCork && block is { Properties.IsDestructible: true } && (dir != CollisionDirection.None || corner)) {
+                    block.Destroy(); // heavy shells smash breakable blocks and keep going
+                }
+                else if (Type == ShellID.Missile && block is not null && (dir != CollisionDirection.None || corner)) {
+                    // missiles break through destructible blocks and keep going; anything else stops them
+                    if (block.Properties.IsDestructible)
+                        block.Destroy();
+                    else
+                        Destroy(DestructionContext.WithObstacle);
+                }
+                else {
+                if (_ticks <= TOO_SHORT_TICKS && (dir != CollisionDirection.None || corner))
+                    Destroy(DestructionContext.WithObstacle);
+                if (corner)
+                    Destroy(DestructionContext.WithObstacle);
+                if (_wallRicCooldown <= 0) {
+                    switch (dir) {
+                        case CollisionDirection.Up:
+                        case CollisionDirection.Down:
+                            Ricochet(false);
+                            block.ModdedData?.OnRicochet(this);
+                            ModdedData?.OnRicochet(block);
+                            OnRicochetWithBlock?.Invoke(block, this);
+                            break;
+                        case CollisionDirection.Left:
+                        case CollisionDirection.Right:
+                            // TODO: fix this pls
+                            Ricochet(true);
+                            block.ModdedData?.OnRicochet(this);
+                            ModdedData?.OnRicochet(block);
+                            OnRicochetWithBlock?.Invoke(block, this);
+                            break;
+                    }
+                }
+                }
+
+
+        }
+        if (_wallRicCooldown > 0)
+            _wallRicCooldown -= 1f;
+        if (_ghostTicks > 0)
+            _ghostTicks -= 1f;
+        _ticks++;
+    }
+
     void RenderSmokeParticle(float timer) {
 
         // TODO: make look accurate
@@ -590,7 +638,7 @@ public class Shell : IAITankDanger {
 
         Particle p;
         p = GameHandler.Particles.MakeParticle(
-            Position3D + new Vector3(0, 0, 5).FlattenZ()
+            RenderPosition3D + new Vector3(0, 0, 5).FlattenZ()
                                         .Rotate(Rotation + MathHelper.Pi + Client.ClientRandom.NextFloat(-0.3f, 0.3f))
                                         .ExpandZ(),
         GameResources.GetGameResource<Texture2D>("Assets/textures/misc/tank_smoke"));
@@ -619,7 +667,7 @@ public class Shell : IAITankDanger {
         //var numToAdd
 
         var p = GameHandler.Particles.MakeParticle(
-            Position3D + new Vector3(0, 0, 5).FlattenZ().Rotate(Rotation + MathHelper.Pi).ExpandZ(),
+            RenderPosition3D + new Vector3(0, 0, 5).FlattenZ().Rotate(Rotation + MathHelper.Pi).ExpandZ(),
             GameResources.GetGameResource<Texture2D>("Assets/textures/bullet/smoketrail"));
 
         // p.Layer = 1f;
@@ -642,7 +690,7 @@ public class Shell : IAITankDanger {
     }
     void RenderFlamingParticle() {
         var flame = GameHandler.Particles.MakeParticle(
-            Position3D + new Vector3(0, 0, 5).FlattenZ().Rotate(Rotation + MathHelper.Pi).ExpandZ(),
+            RenderPosition3D + new Vector3(0, 0, 5).FlattenZ().Rotate(Rotation + MathHelper.Pi).ExpandZ(),
             GameResources.GetGameResource<Texture2D>("Assets/textures/bullet/flame"));
 
         var scaleRand = Client.ClientRandom.NextFloat(0.5f, 0.75f);
@@ -824,6 +872,7 @@ public class Shell : IAITankDanger {
         }
     }
     public void Remove() {
+        _removed = true;
         if (Owner?.OwnedShells != null) {
             var idx = Array.IndexOf(Owner.OwnedShells, this);
             if (idx > -1)

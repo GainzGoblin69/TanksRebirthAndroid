@@ -102,8 +102,10 @@ public static class MPEndScreen {
     private static bool Tapped(Rectangle r) {
         var m = MouseUtils.MousePosition;
         bool hit = !_down && _wasDown && r.Contains(_press) && r.Contains(m);
-        if (hit)
+        if (hit) {
             SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect);
+            Internals.Common.Framework.Input.Haptics.Tap();
+        }
         return hit;
     }
 
