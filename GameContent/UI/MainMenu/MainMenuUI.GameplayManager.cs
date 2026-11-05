@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using System.Collections.Generic;
 using System;
 using System.IO;
@@ -56,8 +56,8 @@ public static partial class MainMenuUI {
                 var bundled = Path.Combine("Content", "MenuMissions");
                 if (Directory.Exists(bundled))
                     foreach (var f in Directory.GetFiles(bundled, "Menu*.mission").OrderBy(f => f.Length).ThenBy(f => f)) {
-                        using var r = new BinaryReader(File.OpenRead(f));
-                        _cachedMissions.Add(Mission.Read(r));
+                        try { _cachedMissions.Add(ReadMenuMission(File.ReadAllBytes(f))); }
+                        catch (Exception e) { TankGame.ClientLog.Write($"Menu map {Path.GetFileName(f)}: {e.Message}", LogType.Warn); }
                     }
                 if (_cachedMissions.Count > 0)
                     TankGame.ClientLog.Write($"Loaded {_cachedMissions.Count} menu maps from the game files.", LogType.Info);
@@ -103,6 +103,45 @@ public static partial class MainMenuUI {
         catch (Exception e) {
             TankGame.ClientLog.Write($"Couldn't set up a menu map: {e.Message}", LogType.Warn);
         }
+    }
+
+    /// <summary>A menu map: the older binary format, or 1.9.1's compressed JSON ({"tanks":[{x,y,facing,tier,team}], "blocks":[[type,stack,x,y]]}).</summary>
+    static Mission ReadMenuMission(byte[] bytes) {
+        if (bytes.Length > 2 && bytes[0] == 0x1f && bytes[1] == 0x8b) {
+            using var gz = new System.IO.Compression.GZipStream(new MemoryStream(bytes), System.IO.Compression.CompressionMode.Decompress);
+            using var doc = System.Text.Json.JsonDocument.Parse(gz);
+            var root = doc.RootElement;
+            var tanks = new List<TankTemplate>();
+            foreach (var t in root.GetProperty("tanks").EnumerateArray()) {
+                int x = t.GetProperty("x").GetInt32(), y = t.GetProperty("y").GetInt32();
+                string facing = t.TryGetProperty("facing", out var fv) ? fv.GetString() ?? "Down" : "Down";
+                float rot = facing switch { "Left" => 1, "Up" => 2, "Right" => 3, _ => 0 } * Microsoft.Xna.Framework.MathHelper.PiOver2;
+                string tier = t.TryGetProperty("tier", out var tv) ? tv.GetString() ?? "Brown" : "Brown";
+                string team = t.TryGetProperty("team", out var tm) ? tm.GetString() ?? "NoTeam" : "NoTeam";
+                bool player = t.TryGetProperty("player", out var pv) && pv.ValueKind != System.Text.Json.JsonValueKind.Null && pv.ValueKind != System.Text.Json.JsonValueKind.False;
+                tanks.Add(new TankTemplate {
+                    IsPlayer = player,
+                    AiTier = ID.TankID.Collection.GetValue(tier) ?? ID.TankID.Brown,
+                    Team = ID.TeamID.Collection.GetValue(team) ?? ID.TeamID.NoTeam,
+                    Position = new BlockMapPosition(x, y),
+                    Rotation = rot,
+                });
+            }
+            var blocks = new List<BlockTemplate>();
+            foreach (var b in root.GetProperty("blocks").EnumerateArray()) {
+                var a = b.EnumerateArray().ToArray();
+                if (a.Length < 4) continue;
+                blocks.Add(new BlockTemplate {
+                    Type = ID.BlockID.Collection.GetValue(a[0].GetString() ?? "Wood") ?? ID.BlockID.Wood,
+                    Stack = (byte)Math.Clamp(a[1].GetInt32(), 1, 7),
+                    Position = new BlockMapPosition(a[2].GetInt32(), a[3].GetInt32()),
+                    TpLink = -1,
+                });
+            }
+            return new Mission(tanks.ToArray(), blocks.ToArray()) { Name = root.TryGetProperty("name", out var nv) ? nv.GetString() ?? "" : "", Note = "" };
+        }
+        using var r = new BinaryReader(new MemoryStream(bytes));
+        return Mission.Read(r);
     }
 
     private static void FetchMenuMissions() {
