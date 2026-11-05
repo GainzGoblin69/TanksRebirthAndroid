@@ -128,8 +128,8 @@ public static partial class MainMenuUI {
         FlipUpDown.Color = Difficulties.Types["FlipY"] ? Color.Lime : Color.Red;
 
         if (Internals.Common.Framework.Input.TouchControls.Enabled)
-            foreach (var (button, _) in DifficultyKeys)
-                button.Color = Color.WhiteSmoke;
+            foreach (var (button, key) in DifficultyKeys)
+                button.Color = button.HoverColor = Difficulties.Types.TryGetValue(key, out var on) && on ? GraphicsUI.OnFill : GraphicsUI.OffFill;
 
         if (IsActive && Client.IsConnected() && Client.IsHost())
             Client.SendDiffiulties();
