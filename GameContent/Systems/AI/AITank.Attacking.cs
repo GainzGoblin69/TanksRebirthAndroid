@@ -129,40 +129,17 @@ public partial class AITank {
         }
 
         bool isMineLayOk = goodDirs.Length != 0;
-
-        /*Console.WriteLine();
-        Console.WriteLine($"Opportunity: " +
-            $"\nIsOk:             {isMineLayOk}" +
-            $"\nDirsNoObstacle:   {string.Join(", ", goodDirs.Select(x => x.Direction))}" +
-            $"\nNearDestructible: {nearDestructible}" +
-            $"\nNewOpportunity:   {CurrentRandomMineLay}");*/
-
-        //Console.WriteLine(isMineLayOk ? $"Mine-lay is ok! ({string.Join(", ", dirs.Where(x => x.Direction != CollisionDirection.None).Select(x => x.Direction))})" : "Mine-lay is not ok.");
-
-        // don't lay a mine if the checks fail
         if (!isMineLayOk) return;
 
-        // SmartMineLaying was removed in favor
         // attempt via an opportunity to lay a mine
         var random = Client.ClientRandom.NextFloat(0, 1);
-
         // change chance based on whether or not the tank is near a destructible obstacle
         var randomSuccess = random <= (nearDestructible ? Parameters.ChanceMineLayNearBreakables : Parameters.ChanceMineLay);
-
         if (!randomSuccess) return;
-        
+
+        // 1.9.1: pick the way out with the most room first (no good way out: no mine), then run that way until clear
+        if (!CanEscapeOwnMine()) return;
         LayMine();
-
-        var randomDir = Client.ClientRandom.Next(goodDirs.Length);
-
-        // then determine a good fleeing direction
-        // Console.WriteLine("Laid mine. Choosing to go " + goodDirs[randomDir].Direction);
-
-
-        var rot = goodDirs[randomDir].Vec.ToRotation();
-
-        // Position += goodDirs[randomDir].Vec * 50;
-        DesiredChassisRotation = rot - MathHelper.PiOver2;
     }
     // TODO: make view distance, and make tanks in path public
     /// <summary>Updates meta-data related to aiming and shooting. The tank will not fire if <see cref="DoAttack"/> is false, but meta-data will still update.</summary>
@@ -245,10 +222,9 @@ public partial class AITank {
             if (TurretRotation == TargetTurretRotation || !canShoot)
                 _isSeeking = false;
         }
-        // tanks wont shoot when fleeing from a mine
-        if (ClosestDanger is Mine)
-            if (Parameters.CantShootWhileFleeing)
-                return;
+        // tanks that can't shoot while fleeing don't, while they dodge
+        if (AttackPrevented || ClosestDanger is Mine && Parameters.CantShootWhileFleeing)
+            return;
 
         if (!DoAttack) return;
         if (!Behaviors[2].IsModOf(CurrentRandomShoot)) return;

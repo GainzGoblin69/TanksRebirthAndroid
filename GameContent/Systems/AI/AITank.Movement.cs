@@ -1,23 +1,19 @@
 ﻿using Microsoft.Xna.Framework;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using tainicom.Aether.Physics2D.Dynamics;
-using TanksRebirth.Enums;
-using TanksRebirth.GameContent.Systems.TankSystem;
-using TanksRebirth.Graphics;
 using TanksRebirth.Internals.Common.Utilities;
 using TanksRebirth.Net;
 
-namespace TanksRebirth.GameContent.Systems.AI; 
+namespace TanksRebirth.GameContent.Systems.AI;
 
-/// <summary>The kind of pivot entered into a pivot queue.</summary>
-public enum PivotType {
-    RandomTurn = 2,
-    NavTurn = 1,
-}
+/// <summary>
+/// Enemy tank movement, from Tanks! Rebirth 1.9.1 ("closer to the original"): every movement opportunity the tank
+/// either meanders (a random turn, biased toward its target, steered away from walls it would reach soon) or dodges
+/// (shells push it sideways out of their path, mines and other dangers push it straight away), and its heading is the
+/// average of its last few picks, which gives the smooth curving movement of the original game. After laying a mine
+/// it picks the direction with the most room and keeps going that way until it's clear.
+/// </summary>
 public partial class AITank {
-    public bool IsTooCloseToObstacle;
-
     /// <summary>Whether or not this tank should perform movement logic.</summary>
     public bool DoMovements = true;
     /// <summary>Whether or not this tank should update its desired direction.</summary>
@@ -25,211 +21,219 @@ public partial class AITank {
 
     public int CurrentRandomMove;
 
-    // random movements do not happen until this queue is empty
-    // random turns SHOULD BE (but not now) added to the pivot queue
-    /// <summary>A queue of movements that will be split into <see cref="AIParameters.MaxQueuedMovements"/> sub-turns, which are entered into <see cref="SubPivotQueue"/>.</summary>
-    public Queue<(Vector2 Direction, PivotType Type)> PivotQueue = [];
-    /// <summary>The most recently removed <see cref="PivotQueue"/> entry, divided into <see cref="AIParameters.MaxQueuedMovements"/> turns.</summary>
-    public Queue<Vector2> SubPivotQueue = [];
-
     /// <summary>Whether or not this <see cref="AITank"/> is avoiding a dangerous object.</summary>
     public bool IsSurviving;
+    /// <summary>Whether or not this tank is running from a mine it laid itself (it keeps going until it's clear).</summary>
+    public bool EscapingOwnMine;
+    /// <summary>The tank is dodging and its parameters say it can't shoot while fleeing.</summary>
+    public bool AttackPrevented;
 
-    // this code runs every "movement opportunity" (any number between RandomTimerMinMove and RandomTimerMaxMove)
-    /// <summary>Default movement handling for this <see cref="AITank"/>. Includes random movements, avoidance, PivotQueue/SubQueue working, and obstacle navigation.</summary>
+    public const int HISTORY_SLOTS = 8;
+    /// <summary>How the closest dangers count (the original game's weights).</summary>
+    static readonly float[] _dangerWeights = [1f, 0.8f, 0.6f, 0.4f];
+    /// <summary>The original game's circle radius for wall checks.</summary>
+    public const float WALL_SWEEP_RADIUS = 16f;
+
+    /// <summary>The last directions this tank picked, newest first; it heads along the average of the first few.</summary>
+    Vector2[]? _history;
+    readonly List<Shell> _movingDangers = [];
+    readonly List<IAITankDanger> _stillDangers = [];
+
+    // the same scale the physics uses for velocity
+    float SpeedPerFrame => Properties.MaxSpeed * 0.55f;
+
+    static Vector2 DirectionOf(float rotation) => Vector2.UnitY.Rotate(rotation);
+    static float RotationOf(Vector2 direction) => direction.ToRotation() - MathHelper.PiOver2;
+    static Vector2 NormOr(Vector2 v, Vector2 fallback = default) {
+        float l = v.Length();
+        return l > 1e-6f ? v / l : fallback;
+    }
+    static Vector2 Perp(Vector2 v) => new(-v.Y, v.X);
+
+    // this runs every "movement opportunity" (somewhere between RandomTimerMinMove and RandomTimerMaxMove frames)
+    /// <summary>Wanders, dodges shells and mines, or runs from its own mine, then averages its history into <see cref="Tank.DesiredChassisRotation"/>.</summary>
     public void DoMovement() {
-        // IsTurning is on crack?
         bool shouldMove = !IsTurning && CurMineStun <= 0 && CurShootStun <= 0;
-
         if (!shouldMove) return;
         if (!Behaviors[0].IsModOf(CurrentRandomMove)) return;
+
+        if (_history is null) {
+            _history = new Vector2[HISTORY_SLOTS];
+            Array.Fill(_history, DirectionOf(ChassisRotation));
+        }
+
+        IsSurviving = false;
+        AttackPrevented = false;
 
         CurrentRandomMove = Client.ClientRandom.Next(Parameters.RandomTimerMinMove, Parameters.RandomTimerMaxMove);
         Behaviors[0].Value = 0;
 
-        if (PivotQueue.Count == 0 && SubPivotQueue.Count == 0 && !IsInDanger) {
-            IsSurviving = false;
+        if (EscapingOwnMine && !_nearOwnMine)
+            EscapingOwnMine = false;
 
-            if (!IsTooCloseToObstacle && !IsSurviving) {
-                DoRandomMove();
+        // while escaping its own mine it just keeps following its history
+        if (!EscapingOwnMine) {
+            if (NearbyDangers is { Count: > 0 })
+                Dodge();
+            else
+                Meander();
+        }
+
+        var sum = Vector2.Zero;
+        for (int i = 0; i < Math.Clamp(Parameters.MaxQueuedMovements, 1, HISTORY_SLOTS); i++)
+            sum += _history[i];
+        if (sum != Vector2.Zero)
+            DesiredChassisRotation = RotationOf(NormOr(sum));
+    }
+
+    void PushHistory(Vector2 direction) {
+        for (int i = _history!.Length - 1; i > 0; i--)
+            _history[i] = _history[i - 1];
+        _history[0] = direction;
+    }
+
+    /// <summary>A new random direction, leaning toward the target, and away from walls it would run into soon.</summary>
+    void Meander() {
+        var direction = _history![0];
+        if (TargetTank is not null)
+            direction += NormOr(TargetTank.Position - Position) * Parameters.AggressivenessBias;
+        direction = NormOr(direction, _history[0]);
+
+        // ObstacleAwarenessMovement is a number of frames here, not a distance
+        var sweep = SweepForWalls(Position, direction, SpeedPerFrame, (int)Parameters.ObstacleAwarenessMovement);
+        if (sweep.Hit)
+            direction = NormOr(direction + NormOr(sweep.Normal), direction);
+
+        var angle = Client.ClientRandom.NextFloat(-Parameters.MaxAngleRandomTurn, Parameters.MaxAngleRandomTurn);
+        PushHistory(NormOr(direction + Perp(direction) * MathF.Tan(angle), direction));
+    }
+
+    /// <summary>Shells push it sideways out of their path (and away); mines and other dangers push it straight away.</summary>
+    void Dodge() {
+        IsSurviving = true;
+        AttackPrevented = Parameters.CantShootWhileFleeing;
+        var position = Position;
+
+        _movingDangers.Clear();
+        _stillDangers.Clear();
+        foreach (var d in NearbyDangers) {
+            if (d is Shell shell) _movingDangers.Add(shell);
+            else _stillDangers.Add(d);
+        }
+        _movingDangers.Sort((a, b) => Vector2.Distance(a.Position, position).CompareTo(Vector2.Distance(b.Position, position)));
+        _stillDangers.Sort((a, b) => Vector2.Distance(a.Position, position).CompareTo(Vector2.Distance(b.Position, position)));
+
+        var push = Vector2.Zero;
+        for (int i = 0; i < Math.Min(_movingDangers.Count, _dangerWeights.Length); i++) {
+            var shell = _movingDangers[i];
+            var heading = NormOr(shell.Velocity);
+            var away = position - shell.Position;
+            // step out of the shell's path, not just straight away from it
+            var sideways = NormOr(away - heading * Vector2.Dot(away, heading), Perp(heading));
+            push += _dangerWeights[i] * (sideways + NormOr(away));
+        }
+        if (_movingDangers.Count > 0) {
+            push = NormOr(push, _history![0]);
+            PushHistory(push); PushHistory(push); // (twice, like the original)
+        }
+        if (_stillDangers.Count == 0) return;
+
+        for (int i = 0; i < Math.Min(_stillDangers.Count, _dangerWeights.Length); i++)
+            push += _dangerWeights[i] * NormOr(position - _stillDangers[i].Position);
+        push = NormOr(push, _history![0]);
+        PushHistory(push); PushHistory(push);
+    }
+
+    /// <summary>Picks the direction to run in after laying a mine: any clear way, or the one with the most room.</summary>
+    /// <returns>False if there's nowhere good to go (so the mine shouldn't be laid).</returns>
+    public bool CanEscapeOwnMine() {
+        var forward = DirectionOf(ChassisRotation);
+        Span<Vector2> directions = [forward, -forward, Perp(forward), -Perp(forward)];
+        var escapeDistance = GameUtils.Value_WiiTanksUnits(Parameters.ObstacleAwarenessMine);
+        var frames = (int)(3f * Parameters.ObstacleAwarenessMine / MathF.Max(Properties.MaxSpeed, 1e-6f));
+
+        var farthest = escapeDistance;
+        int farthestIndex = -1;
+        for (int i = 0; i < directions.Length; i++) {
+            var sweep = SweepForWalls(Position, directions[i], SpeedPerFrame, frames);
+            if (!sweep.Hit) {
+                InitMineEscape(directions[i]);
+                return true;
+            }
+            if (sweep.Distance > farthest) {
+                farthest = sweep.Distance;
+                farthestIndex = i;
             }
         }
-
-        DoBlockNav();
-
-        // the tank avoids the average position of all dangers
-        if (NearbyDangers.Count > 0) {
-            var averageDangerPosition = NearbyDangers.Aggregate(Vector2.Zero, (sum, dng) => sum + dng.Position) / NearbyDangers.Count;
-
-            SubPivotQueue.Clear();
-            PivotQueue.Clear();
-
-            // Console.WriteLine("Evading " + dangerPositions.Count + " dangers");
-
-            // unsure yet if this should be added to the queue or not
-            Avoid(averageDangerPosition);
-        }
-
-        /*if (Properties.MaxSpeed > 0) {
-            Console.WriteLine("Pivot Queue:    " + PivotQueue.Count);
-            Console.WriteLine("Pivot Subqueue: " + SubPivotQueue.Count);
-        }*/
-        // only generates a subqueue if there are no large pivot queues and there are not already a subqueue
-        TryGenerateSubQueue();
-
-        // only works the subqueue if there is a subqueue
-        TryWorkSubQueue();
-    }
-    /// <summary>Makes this <see cref="AITank"/> navigate around obstacles.</summary>
-    public void DoBlockNav() {
-        // dont navigate if running away from something
-        if (IsSurviving) return;
-        //uint framesLookAhead = AiParams.ObstacleAwarenessMovement / 2;
-        //var tankDirection = Vector2.UnitY.Rotate(TargetTankRotation);
-
-        var checkDist = Parameters.ObstacleAwarenessMovement / 2;
-        // strictly 
-        IsTooCloseToObstacle = RaycastAheadOfTank(checkDist * Speed);
-
-        // don't bother doing anything else since it's not blocked
-        if (!IsTooCloseToObstacle) {
-            // Console.WriteLine("Obstacle not found.. block navigation skipped.");
-            return;
-        }
-
-        float angleDiff = MathHelper.PiOver4 / 2; // normally pi/2
-
-        float fracL = -1f;
-        float fracR = -1f;
-
-        bool checkLeft = RaycastAheadOfTank(checkDist * 100, -angleDiff,
-            (fixture, point, normal, fraction) => {
-                fracL = fraction;
-                return fraction;
-            });
-
-        bool checkRight = RaycastAheadOfTank(checkDist * 100, angleDiff,
-            (fixture, point, normal, fraction) => {
-                fracR = fraction;
-                return fraction;
-            });
-
-        var dir = fracL > fracR ? CollisionDirection.Left : CollisionDirection.Right;
-
-        // if the rays are highly similar in distance, reverse, since you're most likely heading into a wall directly
-        if (fracL.IsWithinRange(fracR, 0.00125f)) {
-            // backwards, not down, lol
-            dir = CollisionDirection.Down;
-        }
-
-        float vecRot;
-        //if (goBackwards)
-        //vecRot = MathHelper.Pi;
-        //else
-        var redirectAngle = MathHelper.PiOver2; // normally /2
-
-        if (dir != CollisionDirection.Down)
-            vecRot = dir == CollisionDirection.Left ? -redirectAngle : redirectAngle;
-        else
-            vecRot = MathHelper.Pi + Client.ClientRandom.NextFloat(-0.5f, 0.5f);
-
-        var movementDirection = Vector2.UnitY.Rotate(ChassisRotation + vecRot);
-
-        // SubPivotQueue.Clear();
-
-        if (!PivotQueue.Any(x => x.Type == PivotType.NavTurn)) {
-            PivotQueue.Enqueue((movementDirection, PivotType.NavTurn));
-            // Console.WriteLine("Pivot 0 overwritten.");
-        }
-    }
-    /// <summary>Makes this <see cref="AITank"/> perform a random turn.</summary>
-    public void DoRandomMove() {
-        // previous impl
-        var randomTurn = Client.ClientRandom.NextFloat(-Parameters.MaxAngleRandomTurn, Parameters.MaxAngleRandomTurn);
-
-        if (TargetTank is not null) {
-            var toTarget = Vector2.Normalize(TargetTank.Position - Position);
-            float targetAngle = toTarget.ToRotation() - MathHelper.PiOver2;
-
-            // shortest signed angle difference
-            // MathHelper.WrapAngle() ?
-            float angleDifference = MathHelper.WrapAngle(targetAngle - ChassisRotation);
-
-            // negatives don't work?
-
-            // applies bias toward or away from the target's angle
-            randomTurn += angleDifference * Parameters.AggressivenessBias;
-        }
-
-        /*float finalAngle = TankRotation + randomTurn;
-        Vector2 direction = Vector2.UnitY.Rotate(finalAngle);
-
-        PivotQueue.Add((direction, PivotType.RandomTurn));
-
-        // add to list
-        Console.WriteLine();
-        Console.WriteLine("Random movement: " + MathHelper.ToDegrees(direction.ToRotation()));
-        Console.WriteLine();*/
-
-        DesiredChassisRotation += randomTurn / 2;
-    }
-    // if raycasting based on radii, divide what is input to distance by two
-    /// <summary>Performs a raycast to check for blocking objects, with respect to <see cref="Tank.ChassisRotation"/>.</summary>
-    /// <param name="distance">The distance ahead of the tank, in world units, not physics units.</param>
-    /// <param name="offset">The angle offset for the check.</param>
-    /// <param name="callback">Callback data to do custom logic with the raycast result.</param>
-    /// <returns>Whether or not the ray had an intersection.</returns>
-    public bool RaycastAheadOfTank(float distance, float offset = 0f, RayCastReportFixtureDelegate? callback = null) {
-        bool isPathBlocked = false;
-
-        // the tank by default faces down, so positive Y.
-        var dir = Vector2.UnitY.Rotate(ChassisRotation + offset);
-
-        // switch to using game units if necessary?
-        var gameUnits = GameUtils.Value_WiiTanksUnits(TNK_WIDTH + distance);
-        var endpoint = Physics.Position + dir * gameUnits / UNITS_PER_METER;
-
-        CollisionsWorld.RayCast((fixture, point, normal, fraction) => {
-            callback?.Invoke(fixture, point, normal, fraction);
-
-            if (fixture.Body.Tag is Block or GameScene.BoundsRenderer.BOUNDARY_TAG) {
-                isPathBlocked = true;
-            }
-
-            return fraction;
-            // divide by 2 because it's a radius, i think
-        }, Physics.Position, endpoint);
-
-        return isPathBlocked;
-    }
-    /// <summary>Attempts to dequeue from <see cref="PivotQueue"/> and split it into <see cref="AIParameters.MaxQueuedMovements"/> smaller turns.</summary>
-    /// <returns>Whether or not the attempt was successful.</returns>
-    public bool TryGenerateSubQueue() {
-        if (PivotQueue.Count == 0) return false;
-        if (SubPivotQueue.Count > 0) return false;
-        // grab from the top of the queue
-        var pivot = PivotQueue.Dequeue(); //PivotQueue[0];
-        var desiredCuts = Parameters.MaxQueuedMovements;
-
-        for (int i = 0; i < desiredCuts; i++) {
-            //SubPivotQueue.Add(Vector2.UnitY.Rotate(MathHelper.PiOver2 * i));
-            SubPivotQueue.Enqueue(MathUtils.Slerp2D(Vector2.UnitY.Rotate(ChassisRotation), pivot.Direction, 1f / desiredCuts * (i + 1)));
-        }
-        // drop the first element since this works as a queue under the hood
-        // PivotQueue.RemoveAt(0);
-
+        if (farthestIndex == -1) return false;
+        InitMineEscape(directions[farthestIndex]);
         return true;
     }
-    /// <summary>Attempts to dequeue from <see cref="SubPivotQueue"/> and adjust this <see cref="AITank"/>'s <see cref="Tank.DesiredChassisRotation"/>.</summary>
-    /// <returns>Whether or not the dequeue was successful.</returns>
-    public bool TryWorkSubQueue() {
-        if (SubPivotQueue.Count == 0) return false;
 
-        DesiredChassisRotation = /*SubPivotQueue[0]*/SubPivotQueue.Dequeue().ToRotation() - MathHelper.PiOver2;
+    void InitMineEscape(Vector2 direction) {
+        _history ??= new Vector2[HISTORY_SLOTS];
+        Array.Fill(_history, direction);
+        EscapingOwnMine = true;
+        DesiredChassisRotation = RotationOf(direction);
+    }
 
-        // drop the first element again, but for the sub-queue
-        // SubPivotQueue.RemoveAt(0);
+    // ------------------------------------------------------------------ wall sweeps
 
+    public struct WallSweep {
+        public bool Hit;
+        public int HitFrame;
+        public float Distance;
+        public Vector2 Normal;
+    }
+
+    /// <summary>Whether a circle at <paramref name="position"/> touches a solid block or the edge of the arena (and which way is out).</summary>
+    public static bool TouchesWall(Vector2 position, out Vector2 normal, float scanRadius = WALL_SWEEP_RADIUS) {
+        normal = Vector2.Zero;
+        bool hit = false;
+        float radius = GameUtils.Value_WiiTanksUnits(scanRadius);
+        var half = new Vector2(Block.SIDE_LENGTH / 2f);
+        var blocks = Block.AllBlocks;
+        for (int i = 0; i < blocks.Length; i++) {
+            var block = blocks[i];
+            if (block is null || !block.Properties.IsCollidable) continue;
+            if (!CircleIntersectsRect(position, radius, block.Position - half, block.Position + half, out var n)) continue;
+            normal += n;
+            hit = true;
+        }
+        // the arena's edges
+        if (position.X - radius < Graphics.GameScene.MIN_X) { normal += Vector2.UnitX; hit = true; }
+        if (position.X + radius > Graphics.GameScene.MAX_X) { normal -= Vector2.UnitX; hit = true; }
+        if (position.Y - radius < Graphics.GameScene.MIN_Z) { normal += Vector2.UnitY; hit = true; }
+        if (position.Y + radius > Graphics.GameScene.MAX_Z) { normal -= Vector2.UnitY; hit = true; }
+        return hit;
+    }
+
+    /// <summary>Moves a circle along <paramref name="direction"/> and checks for walls on frames 1, 3, 5... below <paramref name="numFrames"/>.</summary>
+    public static WallSweep SweepForWalls(Vector2 start, Vector2 direction, float speedPerFrame, int numFrames, float scanRadius = WALL_SWEEP_RADIUS) {
+        var sweep = new WallSweep();
+        for (int frame = 1; frame < numFrames; frame += 2) {
+            if (!TouchesWall(start + direction * speedPerFrame * frame, out var normal, scanRadius)) continue;
+            sweep.Hit = true;
+            sweep.HitFrame = frame;
+            sweep.Distance = speedPerFrame * frame;
+            sweep.Normal += normal;
+            break;
+        }
+        return sweep;
+    }
+
+    static bool CircleIntersectsRect(Vector2 center, float radius, Vector2 min, Vector2 max, out Vector2 normal) {
+        normal = Vector2.Zero;
+        var diff = center - Vector2.Clamp(center, min, max);
+        if (diff.LengthSquared() >= radius * radius) return false;
+        if (diff != Vector2.Zero) {
+            normal = MathF.Abs(diff.X) > MathF.Abs(diff.Y) ? new(MathF.Sign(diff.X), 0) : new(0, MathF.Sign(diff.Y));
+            return true;
+        }
+        var toMin = center - min;
+        var toMax = max - center;
+        var nearest = MathF.Min(MathF.Min(toMin.X, toMax.X), MathF.Min(toMin.Y, toMax.Y));
+        normal = nearest == toMin.X ? -Vector2.UnitX : nearest == toMax.X ? Vector2.UnitX : nearest == toMin.Y ? -Vector2.UnitY : Vector2.UnitY;
         return true;
     }
 }
