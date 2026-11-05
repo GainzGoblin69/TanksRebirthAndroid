@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
 using TanksRebirth.Enums;
@@ -511,10 +511,11 @@ public abstract class Tank {
         // players keep full speed through gentle turns (a slightly pushed stick wobbles its direction a little;
         // that used to count as "turning" and slowed the tank right down). Only sharp turns slow a player down.
         bool sharpTurn = IsTurning;
-        if (IsTurning && this is PlayerTank) {
+        // (no input leaves the desired direction NaN, which must keep counting as "turning" so the tank slows to a stop)
+        if (IsTurning && this is PlayerTank && !float.IsNaN(DesiredChassisRotation) && !float.IsNaN(ChassisRotation)) {
             float diff = MathF.Abs(MathHelper.WrapAngle(DesiredChassisRotation - ChassisRotation));
             diff = MathF.Min(diff, MathHelper.Pi - diff); // (tanks can drive either way round)
-            sharpTurn = diff > 1.0f;
+            sharpTurn = float.IsNaN(diff) || diff > 1.0f;
         }
         if (!sharpTurn) {
             Speed += Properties.Acceleration * RuntimeData.DeltaTime;

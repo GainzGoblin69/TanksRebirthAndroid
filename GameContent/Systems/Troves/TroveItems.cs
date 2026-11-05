@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xna.Framework;
@@ -2013,6 +2013,11 @@ public static class TroveItems {
         if (p.Has(TroveItemId.MineDrone))
             props.MineLimit += (uint)(p.Has(Syn("Minesweeper")) ? 2 : 1); // the drone's mines don't use up yours
         // speed and fire-rate items
+        if (p.Has(TroveItemId.Featherweight)) {
+            // light and nimble: it gets up to speed and turns quicker too
+            props.Acceleration *= MathF.Pow(1.5f, p.Count(TroveItemId.Featherweight));
+            props.TurningSpeed *= 1.3f;
+        }
         if (p.Has(TroveItemId.Turbocharger)) props.MaxSpeed *= 1.1f;
         if (p.Has(TroveItemId.NitroBoost)) props.MaxSpeed *= 1.1f;
         if (p.Has(TroveItemId.HairTrigger)) {
