@@ -257,6 +257,32 @@ public class Block : IGameObject
         AllBlocks[Id] = null;
     }
 
+    // 1.9.1: debris takes the block's own (average) colour; worked out once per texture
+    static readonly System.Collections.Generic.Dictionary<Texture2D, Color> _avgColors = [];
+    Color DebrisColor {
+        get {
+            var c = Color.Coral;
+            if (_texture is { IsDisposed: false } tex) {
+                if (!_avgColors.TryGetValue(tex, out c)) {
+                    try {
+                        var data = new Color[tex.Width * tex.Height];
+                        tex.GetData(data);
+                        long r = 0, g = 0, bl = 0, n = 0;
+                        for (int i = 0; i < data.Length; i += 3) {
+                            if (data[i].A < 128) continue;
+                            r += data[i].R; g += data[i].G; bl += data[i].B; n++;
+                        }
+                        c = n > 0 ? new Color((int)(r / n), (int)(g / n), (int)(bl / n)) : Color.Coral;
+                    }
+                    catch { c = Color.Coral; } // (some phones can't read textures back)
+                    _avgColors[tex] = c;
+                }
+            }
+            // floor themes tint the blocks: the debris too
+            return new Color(Math.Clamp(c.R * Tint.X / 255f, 0, 1), Math.Clamp(c.G * Tint.Y / 255f, 0, 1), Math.Clamp(c.B * Tint.Z / 255f, 0, 1));
+        }
+    }
+
     /// <summary>Make destruction particle effects and later, <see cref="Remove"/> this <see cref="Block"/>.</summary>
     public void Destroy() {
         if (Properties.IsDestructible) {
@@ -278,7 +304,7 @@ public class Block : IGameObject
 
                 part.Scale = new(0.7f);
 
-                part.Color = Color.Coral;
+                part.Color = DebrisColor;
 
                 part.UniqueBehavior = (p) => {
                     vel.Y -= 0.2f;

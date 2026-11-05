@@ -76,6 +76,8 @@
     -->
     <AndroidAsset Include="..\Content\Assets\**\*.png;..\Content\Assets\**\*.ogg;..\Content\Assets\**\*.mp3;..\Content\Assets\**\*.ttf"
                   Link="Assets\Content\Assets\%(RecursiveDir)%(Filename)%(Extension)" />
+    <AndroidAsset Include="..\Content\MenuMissions\*.mission"
+                  Link="Assets\Content\MenuMissions\%(Filename)%(Extension)" />
     <AndroidAsset Include="..\Localization\*.loc"
                   Link="Assets\Localization\%(Filename)%(Extension)" />
 

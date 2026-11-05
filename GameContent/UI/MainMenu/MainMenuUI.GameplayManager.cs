@@ -51,6 +51,23 @@ public static partial class MainMenuUI {
     private static void LoadTemplateMission(bool autoSetup = true, bool loadForMenu = true) {
         if (_firstTime) {
             _firstTime = false;
+            // 1.9.1: the menu maps ship with the game (no internet needed)
+            try {
+                var bundled = Path.Combine("Content", "MenuMissions");
+                if (Directory.Exists(bundled))
+                    foreach (var f in Directory.GetFiles(bundled, "Menu*.mission").OrderBy(f => f.Length).ThenBy(f => f)) {
+                        using var r = new BinaryReader(File.OpenRead(f));
+                        _cachedMissions.Add(Mission.Read(r));
+                    }
+                if (_cachedMissions.Count > 0)
+                    TankGame.ClientLog.Write($"Loaded {_cachedMissions.Count} menu maps from the game files.", LogType.Info);
+            }
+            catch (Exception e) {
+                TankGame.ClientLog.Write($"Couldn't read the built-in menu maps: {e.Message}", LogType.Warn);
+                _cachedMissions.Clear();
+            }
+            if (_cachedMissions.Count > 0)
+                goto ready;
             try {
                 if (Directory.Exists(MenuCacheDir))
                     foreach (var f in Directory.GetFiles(MenuCacheDir, "Menu*.mission").OrderBy(f => f)) {
@@ -64,6 +81,7 @@ public static partial class MainMenuUI {
             }
             System.Threading.Tasks.Task.Run(FetchMenuMissions);
         }
+        ready:
         // the download finished: use the fresh maps from now on
         if (_fetchedMissions is { Count: > 0 } fresh) {
             _fetchedMissions = null;
