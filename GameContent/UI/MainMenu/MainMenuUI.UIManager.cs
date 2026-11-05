@@ -1,4 +1,4 @@
-using TanksRebirth.Net;
+﻿using TanksRebirth.Net;
 using TanksRebirth.GameContent.Systems;
 using FontStashSharp;
 using Microsoft.Xna.Framework;
@@ -259,6 +259,9 @@ public static partial class MainMenuUI
                 DrawUtils.DrawStringWithBorder(spriteBatch, font, label, new Vector2(24 * s + size.X / 2, WindowUtils.WindowHeight - 20 * s - size.Y / 2),
                     Color.White * 0.85f, Color.Black * 0.85f, new Vector2(0.5f * s), 0f, borderThickness: 1.5f * s);
             }
+            // a newer build is out: a button to update right here
+            if (MenuState == UIState.PrimaryMenu)
+                Internals.AppUpdate.DrawButton(spriteBatch);
             return;
         }
 

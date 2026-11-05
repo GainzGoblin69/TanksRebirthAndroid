@@ -87,6 +87,8 @@ public class MainActivity : AndroidGameActivity {
             TanksRebirth.GameContent.UI.MainMenu.MainMenuUI.BuildLabel = $"Build {code}";
         }
         catch { }
+        // updating from inside the app (the main menu shows a button when a newer build is out)
+        AppInstaller.Register(this);
 
         var internalDir = FilesDir!.AbsolutePath;
         _gameDir = Path.Combine(internalDir, "game");

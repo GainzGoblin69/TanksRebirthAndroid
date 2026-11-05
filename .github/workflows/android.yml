@@ -105,7 +105,9 @@ jobs:
         run: |
           gh release delete latest --yes --cleanup-tag 2>$null
           $global:LASTEXITCODE = 0
-          gh release create latest out/TanksRebirth.apk --title "Latest Android build" --notes "Built from $env:GITHUB_SHA. Tap TanksRebirth.apk below to download it on your phone." --latest
+          # version.txt: the build number, so the app can tell when a newer one is out (in-app updates)
+          "$(100 + [int]$env:GITHUB_RUN_NUMBER)" | Set-Content -NoNewline out/version.txt
+          gh release create latest out/TanksRebirth.apk out/version.txt --title "Latest Android build" --notes "Built from $env:GITHUB_SHA. Tap TanksRebirth.apk below to download it on your phone." --latest
 
   # Runs the APK on an Android emulator and publishes screenshots + logs as the "emulator-test" release,
   # so startup problems can be diagnosed without a phone.
