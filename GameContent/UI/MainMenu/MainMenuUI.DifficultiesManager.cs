@@ -1,4 +1,4 @@
-using FontStashSharp;
+﻿using FontStashSharp;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
 using System.Collections.Generic;
@@ -389,12 +389,11 @@ public static partial class MainMenuUI {
     ];
 
     /// <summary>
-    /// Phones: neutral rows with a standard on/off switch at the right end, instead of red/green buttons.
+    /// Phones: each row is its own switch (green when on, grey when off).
     /// </summary>
     private static void ApplyPhoneToggleLook() {
         foreach (var (button, key) in DifficultyKeys) {
             var k = key;
-            button.HoverColor = Color.White;
             // in multiplayer only the host changes these (everyone else sees the host's choices)
             var toggle = button.OnLeftClick;
             button.OnLeftClick = (elem) => {
@@ -407,9 +406,10 @@ public static partial class MainMenuUI {
             };
             button.UniqueDraw = (elem, sb) => {
                 bool on = Difficulties.Types.TryGetValue(k, out var v) && v;
-                var sw = ToggleSwitch.RightOf(elem.Hitbox);
-                ((UITextButton)elem).TextOffset = new Vector2(-(sw.Width + elem.Hitbox.Right - sw.Right) / 2f, 0);
-                ToggleSwitch.Draw(sb, sw, on);
+                // the whole row shows on/off: green = on, grey = off
+                var b = (UITextButton)elem;
+                b.Color = b.HoverColor = on ? GraphicsUI.OnFill : GraphicsUI.OffFill;
+                b.TextOffset = Vector2.Zero;
             };
         }
     }

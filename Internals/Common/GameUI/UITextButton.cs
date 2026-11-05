@@ -1,4 +1,4 @@
-using FontStashSharp;
+﻿using FontStashSharp;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
@@ -74,7 +74,7 @@ public class UITextButton : UIImage
         if (TextScale != null && DrawText && !string.IsNullOrEmpty(Text)) {
             SpriteFontBase font = FontGlobals.RebirthFont;
             var size = font.MeasureString(Text);
-            float availW = face.Width - 2f * MathF.Abs(TextOffset.X) - face.Height * 0.5f;
+            float availW = face.Width - 2f * MathF.Abs(TextOffset.X) - 2f * TextPadding - face.Height * 0.5f;
             // same label size on every menu button (by height, capped so big buttons don't get huge text)
             float byHeight = MathF.Min(face.Height * 0.40f, 46f * WindowUtils.WindowHeight / 1080f) / MathF.Max(1f, size.Y);
             float scale = MathF.Min(byHeight, availW / MathF.Max(1f, size.X));
@@ -85,4 +85,6 @@ public class UITextButton : UIImage
 
     /// <summary>Shifts the label from the button's center, in pixels (e.g. to make room for a switch).</summary>
     public Vector2 TextOffset { get; set; }
+    /// <summary>Phones: room kept free on both sides of the label (e.g. for - and + keys).</summary>
+    public float TextPadding { get; set; }
 }

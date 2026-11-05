@@ -570,13 +570,22 @@ public static class TroveItems {
         return now;
     }
 
-    // ---- underglow: a neon glow under tanks carrying speed items or rare items
+    /// <summary>How dark this floor is (0 = normal; the darkest floors are about 0.4).</summary>
+    public static float SceneDarkness() => !TroveRun.Active || !CampaignGlobals.InMission ? 0f : TroveThemes.Current switch {
+        FloorTheme.Haunted => 0.35f, FloorTheme.Crystal => 0.4f, FloorTheme.Factory => 0.3f, FloorTheme.Swamp => 0.12f, FloorTheme.Volcano => 0.15f,
+        FloorTheme.NeonCity => 0.4f, FloorTheme.Carnival => 0.42f, FloorTheme.ToxicLab => 0.3f, FloorTheme.SpaceStation => 0.35f, _ => 0f,
+    };
+
+    /// <summary>A soft white glow under your tank on the darkest floors (when no speed item gives it a color).</summary>
+    public static readonly Color DarkGlow = new(150, 150, 160);
+
+    // ---- underglow: a neon glow under tanks carrying speed items (movement or fire rate)
     private static readonly HashSet<TroveItemId> _glowItems = [
         TroveItemId.Turbocharger, TroveItemId.HairTrigger, TroveItemId.Adrenaline, TroveItemId.OverdriveEngine, TroveItemId.NitroBoost,
         TroveItemId.GatlingBarrel, TroveItemId.LightweightAlloy, TroveItemId.CoffeeThermos,
         TroveItemId.SpeedTreads, TroveItemId.NitroTreads, TroveItemId.Steroids, TroveItemId.Featherweight, TroveItemId.GhostTreads,
     ];
-    private static bool Glows(TroveItemId id) => _glowItems.Contains(id) || SecretPool.Contains(id) || ChallengePool.Contains(id);
+    private static bool Glows(TroveItemId id) => _glowItems.Contains(id);
 
     /// <summary>The colour of a player's underglow, or null for none (the newest item that gives one).</summary>
     public static Color? UnderglowColor(int playerId) {
@@ -587,7 +596,9 @@ public static class TroveItems {
         foreach (var id in p.Passives.Keys.Concat(p.Actives))
             if (Glows(id) && (best is null || (int)id > (int)best.Value))
                 best = id;
-        return best is { } b ? Def(b).Color : null;
+        if (best is { } b)
+            return Def(b).Color;
+        return SceneDarkness() >= 0.35f ? DarkGlow : null;
     }
 
     private static readonly ParticleSystem.Particle?[] _glow = new ParticleSystem.Particle?[4];
@@ -616,7 +627,7 @@ public static class TroveItems {
             gp.Yaw = -t.ChassisRotation;
             gp.Scale = new Vector3(1.1f * t.Scaling.X);
             gp.Color = col.Value;
-            gp.Alpha = 0.75f + 0.2f * MathF.Sin((float)Now * 3f + i);
+            gp.Alpha = col.Value == DarkGlow ? 0.45f : 0.75f + 0.2f * MathF.Sin((float)Now * 3f + i);
             gp.LifeTime = 0;
         }
     }
@@ -625,7 +636,8 @@ public static class TroveItems {
     public static void AddUnderglowLights() {
         for (int i = 0; i < 4; i++)
             if (GameHandler.AllPlayerTanks[i] is { IsDestroyed: false } t && UnderglowColor(i) is { } c)
-                Graphics.DynamicLighting.GameplayLights.AddGlow(t.Position3D + new Vector3(0, 2.5f, 0), c, 1.3f, 60f);
+                Graphics.DynamicLighting.GameplayLights.AddGlow(t.Position3D + new Vector3(0, 2.5f, 0), c,
+                    c == DarkGlow ? 0.6f : 1.3f, c == DarkGlow ? 45f : 60f);
     }
 
     private static Microsoft.Xna.Framework.Graphics.Texture2D? GlowTexture() {
@@ -690,10 +702,7 @@ public static class TroveItems {
         Graphics.DynamicLighting.LightManager.ExtraHeadlightTanks = () => !TroveRun.Active || TroveBosses.Boss is not { } bt || bt.Properties.Invisible ? []
             : TroveBosses.Twin is { } tw ? [bt, tw] : [bt];
         Graphics.DynamicLighting.LightManager.ExtraLights = () => { TroveThemes.AddLights(); if (TroveRun.Active && CampaignGlobals.InMission) AddUnderglowLights(); };
-        Graphics.DynamicLighting.LightManager.SceneDarkness = () => !TroveRun.Active || !CampaignGlobals.InMission ? 0f : TroveThemes.Current switch {
-            FloorTheme.Haunted => 0.35f, FloorTheme.Crystal => 0.4f, FloorTheme.Factory => 0.3f, FloorTheme.Swamp => 0.12f, FloorTheme.Volcano => 0.15f,
-            FloorTheme.NeonCity => 0.4f, FloorTheme.Carnival => 0.42f, FloorTheme.ToxicLab => 0.3f, FloorTheme.SpaceStation => 0.35f, _ => 0f,
-        };
+        Graphics.DynamicLighting.LightManager.SceneDarkness = SceneDarkness;
         AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady || IcedUntil.TryGetValue(t, out var iu) && Now < iu;
         // Smoke Bomb: enemies can't see you
         AITank.IsHidden = t => TroveRun.Active && t is PlayerTank pt && pt.PlayerId is >= 0 and < 4
