@@ -675,7 +675,7 @@ public static class TroveRun {
                 TroveItems.ApplyTo(p);
     }
 
-    /// <summary>Broken cork: 5% a Shield, 3% an Extra Life, 2% Bouncy Shells or Extra Shell.
+    /// <summary>Broken cork: 5% a Shield, 3% an Extra Life, 2% Bouncy Shells or Extra Shell, 4% a Boost.
     /// Rolled from the run's seed and the block's spot, so every phone gets the same result without sending anything,
     /// and each cork block only gets one chance per run (coming back to the room can't farm it).</summary>
     internal static void OnBlockBroken(Block block) {
@@ -711,6 +711,7 @@ public static class TroveRun {
             < 8 => TroveItemId.ExtraLife,
             8 => TroveItemId.BouncyShells,
             9 => TroveItemId.ExtraShell,
+            < 14 => TroveItemId.Boost,
             _ => null,
         };
         if (item is not { } id)

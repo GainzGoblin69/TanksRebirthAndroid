@@ -358,6 +358,21 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, cc, rr * 0.55f, new Color(170, 230, 255) * pulse);
         }
 
+        // Boost: a bar under each of this phone's tanks that empties while boosting
+        for (int i = 0; i < 4; i++) {
+            var bp = TroveItems.Players[i];
+            if (bp.BoostMax <= 0 || bp.BoostFuel <= 0 || !TroveItems.IsLocal(i) || GameHandler.AllPlayerTanks[i] is not { IsDestroyed: false } bt)
+                continue;
+            float f = bp.BoostFuel / bp.BoostMax;
+            float w = 64 * s * MathF.Sqrt(bp.BoostMax), h = 9 * s;
+            var bc = ToScreen(bt.Position) + new Vector2(0, 38 * s);
+            var outer = new Rectangle((int)(bc.X - w / 2 - 2 * s), (int)(bc.Y - h / 2 - 2 * s), (int)(w + 4 * s), (int)(h + 4 * s));
+            ToggleSwitch.DrawRoundedRect(sb, outer, outer.Height / 2f, Color.Black * 0.55f);
+            var col = f < 0.25f ? new Color(255, 80, 60) : bp.Boosting ? new Color(255, 225, 120) : new Color(255, 160, 40);
+            if (f > 0)
+                ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(bc.X - w / 2), (int)(bc.Y - h / 2), Math.Max((int)h, (int)(w * f)), (int)h), h / 2f, col);
+        }
+
         // Pyro Baron's fire, Chrono Tank's time bubbles, the Phantom's laser sight
         float tnow = (float)TroveRun.PlayTime;
         foreach (var (at, until) in TroveBosses.Fires) {
@@ -1302,6 +1317,16 @@ public static class TroveHud {
                 ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(c.X - r * 0.2f), (int)(c.Y - r * 0.5f), (int)(r * 0.4f), (int)(r * 0.16f)), r * 0.05f, new Color(90, 90, 100));
                 ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.05f, -r * 0.6f), c + new Vector2(r * 0.05f, -r * 0.8f), t * 0.4f, Color.White * 0.7f);
                 break;
+            case TroveItemId.Boost: {
+                // two flame chevrons pointing forward
+                var flame = new Color(255, 230, 120);
+                for (int k = 0; k < 2; k++) {
+                    float x = -r * 0.32f + k * r * 0.36f;
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(x, -r * 0.42f), c + new Vector2(x + r * 0.3f, 0), t * 1.1f, k == 0 ? Color.White : flame);
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(x + r * 0.3f, 0), c + new Vector2(x, r * 0.42f), t * 1.1f, k == 0 ? Color.White : flame);
+                }
+                break;
+            }
             case TroveItemId.ChargeShot: {
                 // a ring filling up around a glowing shell
                 for (int i = 0; i < 24; i++) {

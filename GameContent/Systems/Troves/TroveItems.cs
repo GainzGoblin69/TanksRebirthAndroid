@@ -32,6 +32,8 @@ public enum TroveItemId {
     ChargeShot,
     // batch 7: speed and fire rate
     Turbocharger, HairTrigger, Adrenaline, OverdriveEngine, NitroBoost, GatlingBarrel, LightweightAlloy, CoffeeThermos,
+    // found in cork: a refillable boost bar
+    Boost,
 }
 
 /// <summary>How an item works: used with the ITEM button, takes effect when picked up, or lasts the whole run.</summary>
@@ -162,8 +164,19 @@ public static class TroveItems {
         new(TroveItemId.LightweightAlloy, "Lightweight Alloy", "Faster, turns quicker, and drifts around corners", TroveItemKind.Passive, new Color(170, 245, 240)),
         new(TroveItemId.CoffeeThermos, "Coffee Thermos", "Much faster driving and shooting for the first 10 seconds of every room", TroveItemKind.Passive, new Color(160, 105, 60)),
         new(TroveItemId.ChargeShot, "Charge Shot", "Hold fire for 2 seconds, then let go: a super-fast shot that goes through enemies (let go early to cancel)", TroveItemKind.Passive, new Color(120, 200, 255)),
+        new(TroveItemId.Boost, "Boost", "Hold BOOST (right trigger on a controller) to drive twice as fast until the bar runs out", TroveItemKind.Instant, new Color(255, 140, 40)),
     ];
-    public static TroveItemDef Def(TroveItemId id) => All[(int)id];
+    // looked up by id (the list above isn't in the enum's order)
+    private static readonly TroveItemDef[] _byId = BuildIndex();
+    private static TroveItemDef[] BuildIndex() {
+        var arr = new TroveItemDef[Enum.GetValues<TroveItemId>().Length];
+        foreach (var d in All)
+            arr[(int)d.Id] = d;
+        for (int i = 0; i < arr.Length; i++)
+            arr[i] ??= new((TroveItemId)i, ((TroveItemId)i).ToString(), "", TroveItemKind.Passive, Color.Gray);
+        return arr;
+    }
+    public static TroveItemDef Def(TroveItemId id) => _byId[(int)id];
 
     public static readonly TroveSynergy[] Synergies = [
         new("Wrecking Ball", "Heavy shells blow up every time they punch through", TroveItemId.HeavyShells, TroveItemId.ExplosiveShells),
@@ -301,7 +314,7 @@ public static class TroveItems {
         TroveItemId.GiantTank, TroveItemId.EchoShot, TroveItemId.GhostShells, TroveItemId.NitroTreads, TroveItemId.RapidBarrel,
         TroveItemId.ArmorPlating, TroveItemId.LongBarrel, TroveItemId.Steroids, TroveItemId.MagicMushroom,
         TroveItemId.BoomerangShells, TroveItemId.MortarShells, TroveItemId.Wraparound, TroveItemId.MegaShell, TroveItemId.HolyMantle,
-        TroveItemId.Pyromaniac, TroveItemId.CupidsArrow, TroveItemId.Battery, TroveItemId.MysteryPill,
+        TroveItemId.Pyromaniac, TroveItemId.CupidsArrow, TroveItemId.Battery, TroveItemId.MysteryPill, TroveItemId.Boost, TroveItemId.Boost,
         TroveItemId.Rocket, TroveItemId.Dash, TroveItemId.Teleport, TroveItemId.WallBuilder, TroveItemId.Invincibility,
         TroveItemId.RepairKit, TroveItemId.TeleportPads, TroveItemId.ChargeShot,
         TroveItemId.Turbocharger, TroveItemId.HairTrigger, TroveItemId.Adrenaline, TroveItemId.OverdriveEngine,
@@ -372,6 +385,9 @@ public static class TroveItems {
         public float BaseSpeed, DriveTime, GatlingHold;
         public uint BaseCooldown;
         public bool Dynamic;
+        /// <summary>Boost (found in cork): how much is left and how big the bar is (0 = no boost), and whether it's on right now.</summary>
+        public float BoostFuel, BoostMax;
+        public bool Boosting;
         public double ReadyAt = -1;     // time-based actives (Dash)
         public int RoomsForRegen, KillsForVampire;
         public double DashUntil = -1, TeslaAt;
@@ -508,10 +524,22 @@ public static class TroveItems {
     /// <summary>The speed and fire-rate items that change from moment to moment (Turbocharger, Adrenaline, Nitro Boost,
     /// Coffee Thermos, Gatling Barrel), on top of what ApplyTo set.</summary>
     private static void SpeedItems(Tank t, PlayerItems p) {
-        if (!p.Dynamic || p.BaseSpeed <= 0)
+        if ((!p.Dynamic && p.BoostMax <= 0) || p.BaseSpeed <= 0)
             return;
         float dt = TanksRebirth.RuntimeData.DeltaTime / 60f;
         float speed = 1f, fire = 1f;
+        // Boost: twice as fast while it's held (on top of every other speed item), draining the bar
+        bool wasBoosting = p.Boosting;
+        p.Boosting = p.BoostFuel > 0 && BoostInput(p.Id) && !TroveRun.InReady && !TanksRebirth.GameContent.UI.GameUI.Paused
+            && t.Velocity.Length() > p.BaseSpeed * 0.15f;
+        if (p.Boosting) {
+            speed *= 2f;
+            p.BoostFuel = Math.Max(0f, p.BoostFuel - dt / BOOST_SECONDS);
+            if (!wasBoosting)
+                SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_shoot_rocket.ogg", SoundContext.Effect, 0.35f, pitchOverride: -0.3f);
+            if (p.BoostFuel <= 0)
+                SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.6f, pitchOverride: -0.6f);
+        }
         if (p.Has(TroveItemId.Turbocharger)) {
             bool driving = t.Velocity.Length() > p.BaseSpeed * 0.3f;
             p.DriveTime = driving ? p.DriveTime + dt : Math.Max(0, p.DriveTime - dt * 4);
@@ -536,6 +564,21 @@ public static class TroveItems {
         t.Properties.ShellCooldown = (uint)Math.Max(1, MathF.Round(p.BaseCooldown / fire));
     }
 
+    /// <summary>A full Boost bar lasts this many seconds of boosting.</summary>
+    public const float BOOST_SECONDS = 4f;
+
+    /// <summary>This player has boost left (the right trigger boosts instead of shooting then).</summary>
+    public static bool HasBoost(int playerId) => TroveRun.Active && playerId is >= 0 and < 4 && Players[playerId].BoostFuel > 0;
+
+    /// <summary>Whether this player is holding boost: the BOOST button, the right trigger, or Shift.</summary>
+    public static bool BoostInput(int playerId) {
+        if (LocalCoop.Active)
+            return LocalCoop.BoostHeld(playerId);
+        var pad = TanksRebirth.Internals.Common.InputUtils.CurrentGamePadSnapshot;
+        return TanksRebirth.Internals.Common.Framework.Input.TouchControls.BoostHeld || pad.Triggers.Right > 0.3f
+            || TanksRebirth.Internals.Common.InputUtils.CurrentKeySnapshot.IsKeyDown(Microsoft.Xna.Framework.Input.Keys.LeftShift);
+    }
+
     /// <summary>Little effects behind tanks with some items: Nitro flames, Overdrive sparks, Coffee steam.</summary>
     private static void ItemTrails(Tank t, PlayerItems p) {
         float dt = TanksRebirth.RuntimeData.DeltaTime;
@@ -544,6 +587,13 @@ public static class TroveItems {
         var back = t.Position3D - new Vector3(t.Velocity.X, 0, t.Velocity.Y) * 6f + new Vector3(0, 6, 0);
         if (p.Has(TroveItemId.NitroBoost) && Now % 6.0 < 1.5 && Random.Shared.NextDouble() < 0.8 * dt)
             GameHandler.Particles.MakeShineSpot(back, Random.Shared.Next(2) == 0 ? new Color(80, 170, 255) : new Color(255, 160, 60), 0.5f);
+        if (p.Boosting) {
+            // boost: a stream of flame and sparks behind the tank
+            for (int k = 0; k < 2; k++)
+                if (Random.Shared.NextDouble() < 0.9 * dt)
+                    GameHandler.Particles.MakeShineSpot(back + new Vector3(Random.Shared.NextSingle() * 4 - 2, 0, Random.Shared.NextSingle() * 4 - 2),
+                        Random.Shared.Next(3) == 0 ? new Color(255, 230, 120) : new Color(255, 120, 30), 0.55f);
+        }
         if (p.Has(TroveItemId.OverdriveEngine) && Random.Shared.NextDouble() < 0.25 * dt)
             GameHandler.Particles.MakeShineSpot(back, new Color(255, 220, 90), 0.35f);
         if (p.Has(TroveItemId.CoffeeThermos) && TroveRun.RoomTime < 10f && Random.Shared.NextDouble() < 0.15 * dt)
@@ -901,6 +951,11 @@ public static class TroveItems {
                     // the carried ITEM is ready again
                     p.Charges[charged] = Def(charged).Recharge;
                     p.ReadyAt = Now;
+                }
+                else if (id == TroveItemId.Boost) {
+                    // a full bar; finding more makes the bar bigger (up to twice as long)
+                    p.BoostMax = p.BoostMax <= 0 ? 1f : Math.Min(2f, p.BoostMax + 0.5f);
+                    p.BoostFuel = p.BoostMax;
                 }
                 else if (id == TroveItemId.MysteryPill && local) {
                     // usually good: the last two effects are the bad ones (1 in 4)
@@ -2090,6 +2145,10 @@ public static class TroveItems {
         }
         HandleRequests();
         UpdateUnderglow();
+        // the BOOST button shows this phone's player's bar
+        var me = Players[MyPlayer];
+        if (me.BoostFuel > 0 && me.BoostMax > 0 && CampaignGlobals.InMission)
+            TanksRebirth.Internals.Common.Framework.Input.TouchControls.SetBoost(me.BoostFuel / me.BoostMax, me.Boosting);
         for (int i = 0; i < 4; i++) {
             var t = GameHandler.AllPlayerTanks[i];
             if (t is null)

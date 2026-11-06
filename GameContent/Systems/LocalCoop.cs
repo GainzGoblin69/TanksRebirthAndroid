@@ -111,7 +111,15 @@ public static class LocalCoop {
         var s = _slots[playerId];
         if (s.Touch)
             return false; // touch shooting comes through the tap (synthesized mouse click)
-        return Just(s, Buttons.RightShoulder) || (s.Cur.Triggers.Right > 0.5f && s.Old.Triggers.Right <= 0.5f);
+        // with Boost the right trigger boosts instead (RB still shoots)
+        bool triggerFires = !Troves.TroveItems.HasBoost(playerId);
+        return Just(s, Buttons.RightShoulder) || (triggerFires && s.Cur.Triggers.Right > 0.5f && s.Old.Triggers.Right <= 0.5f);
+    }
+
+    /// <summary>Boost held: the right trigger, or the BOOST button for the touch player.</summary>
+    public static bool BoostHeld(int playerId) {
+        var s = _slots[playerId];
+        return s.Touch ? TouchControls.BoostHeld : s.Cur.Triggers.Right > 0.3f;
     }
 
     public static bool MinePressed(int playerId) {

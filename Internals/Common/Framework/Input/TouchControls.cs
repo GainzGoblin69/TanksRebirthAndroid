@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using FontStashSharp;
 using Microsoft.Xna.Framework;
@@ -35,6 +35,19 @@ public static class TouchControls {
     /// <summary>The ITEM / MISSILE button next to MINE, while there's something to show (title, small text, tappable).</summary>
     public static (string Title, string Sub, bool Usable)? MissileButton { get; set; }
     public static bool MissileJustPressed { get; private set; }
+    /// <summary>Boost: whether the BOOST button is held down (it shows while Tank Troves reports a bar).</summary>
+    public static bool BoostHeld { get; private set; }
+    private static float _boostFill;
+    private static bool _boostOn;
+    private static double _boostSetAt = -10;
+    private static int _boostId = -1;
+    /// <summary>Tank Troves, every frame while you have boost: how full the bar is (0-1), and whether it's burning.</summary>
+    public static void SetBoost(float fill, bool on) {
+        _boostFill = fill;
+        _boostOn = on;
+        _boostSetAt = _clock.Elapsed.TotalSeconds;
+    }
+    private static bool BoostVisible => _clock.Elapsed.TotalSeconds - _boostSetAt < 0.25 && _boostFill > 0;
     /// <summary>Where the ITEM button is (Tank Troves draws the carried items under it).</summary>
     public static Vector2 ItemButtonCenter => MissileButtonCenter;
     public static float ItemButtonRadius => ButtonRadius;
@@ -118,6 +131,8 @@ public static class TouchControls {
         ButtonRadius * 1.05f);
     // the missile upgrade button sits next to the mine button, toward the middle
     private static Vector2 MissileButtonCenter => MineButtonCenter + new Vector2((StickOnRight ? 1 : -1) * ButtonRadius * 2.4f, 0);
+    // the BOOST button sits under the mine button
+    private static Vector2 BoostButtonCenter => MineButtonCenter + new Vector2(0, ButtonRadius * 2.35f);
     private static Vector2 PauseButtonCenter => new(ButtonRadius * 0.9f, ButtonRadius * 0.9f);
     private static float PauseButtonRadius => ButtonRadius * 0.65f;
 
@@ -184,6 +199,11 @@ public static class TouchControls {
                 }
                 if (gameplay && MissileButton is { Usable: true } && Vector2.Distance(pos, MissileButtonCenter) <= ButtonRadius * 1.1f) {
                     MissileJustPressed = true;
+                    _buttonTouches.Add(touch.Id);
+                    continue;
+                }
+                if (gameplay && BoostVisible && Vector2.Distance(pos, BoostButtonCenter) <= ButtonRadius * 1.15f) {
+                    _boostId = touch.Id;
                     _buttonTouches.Add(touch.Id);
                     continue;
                 }
@@ -262,6 +282,9 @@ public static class TouchControls {
         if (_pointerId != -1 && !_seen.Contains(_pointerId))
             _pointerId = -1;
         _buttonTouches.RemoveWhere(id => !_seen.Contains(id));
+        if (_boostId != -1 && (!_seen.Contains(_boostId) || !gameplay))
+            _boostId = -1;
+        BoostHeld = _boostId != -1;
 
         _pointerDown = (_pointerId != -1 && !_pointerRetap) || _tapPressThisFrame;
 
@@ -362,6 +385,24 @@ public static class TouchControls {
             DrawCircle(sb, _ring!, MissileButtonCenter, ButtonRadius, Color.White * 0.6f);
             DrawLabel(sb, mb.Title, MissileButtonCenter - new Vector2(0, ButtonRadius * 0.18f), mb.Title.Length > 7 ? 0.38f : 0.45f);
             DrawLabel(sb, mb.Sub, MissileButtonCenter + new Vector2(0, ButtonRadius * 0.28f), 0.4f);
+        }
+
+        // BOOST: hold it to drive twice as fast; the ring around it is the bar, emptying as you use it
+        if (BoostVisible) {
+            var bc = BoostButtonCenter;
+            bool on = BoostHeld;
+            DrawCircle(sb, _disc!, bc, ButtonRadius, (on ? new Color(255, 120, 20) : new Color(200, 90, 20)) * (on ? 0.75f : 0.5f));
+            DrawCircle(sb, _ring!, bc, ButtonRadius, Color.White * 0.6f);
+            const int segs = 36;
+            int lit = (int)MathF.Ceiling(_boostFill * segs);
+            float rr = ButtonRadius * 1.16f;
+            for (int i = 0; i < segs; i++) {
+                float a = -MathHelper.PiOver2 + (i + 0.5f) * MathHelper.TwoPi / segs;
+                var col = i < lit ? (_boostFill < 0.25f ? new Color(255, 80, 60) : new Color(255, 190, 60)) : Color.Black * 0.35f;
+                DrawCircle(sb, _disc!, bc + new Vector2(MathF.Cos(a), MathF.Sin(a)) * rr, ButtonRadius * 0.085f, col);
+            }
+            DrawLabel(sb, "BOOST", bc - new Vector2(0, ButtonRadius * 0.14f), 0.45f);
+            DrawLabel(sb, $"{(int)MathF.Ceiling(_boostFill * 100)}%", bc + new Vector2(0, ButtonRadius * 0.3f), 0.38f);
         }
 
         // pause button (two bars); lives on the second screen when there is one

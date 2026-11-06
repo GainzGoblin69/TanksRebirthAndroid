@@ -357,7 +357,7 @@ public class PlayerTank : Tank {
             return;
         var pad = InputUtils.CurrentGamePadSnapshot;
         bool held = !GameUI.Paused && (InputUtils.CurrentMouseSnapshot.LeftButton == ButtonState.Pressed || FireBullet.IsPressed
-            || pad.IsButtonDown(Buttons.RightShoulder) || pad.Triggers.Right > 0.4f);
+            || pad.IsButtonDown(Buttons.RightShoulder) || (pad.Triggers.Right > 0.4f && !Systems.Troves.TroveItems.HasBoost(PlayerId)));
         Systems.Troves.TroveItems.GatlingHeld(PlayerId, held);
         if (held && CurShootCooldown <= 0 && !InputUtils.CanDetectClick() && !Systems.Troves.TroveRun.InReady)
             Shoot(false);
@@ -373,7 +373,7 @@ public class PlayerTank : Tank {
         }
         var pad = InputUtils.CurrentGamePadSnapshot;
         bool held = InputUtils.CurrentMouseSnapshot.LeftButton == ButtonState.Pressed || FireBullet.IsPressed
-            || pad.IsButtonDown(Buttons.RightShoulder) || pad.Triggers.Right > 0.4f;
+            || pad.IsButtonDown(Buttons.RightShoulder) || (pad.Triggers.Right > 0.4f && !Systems.Troves.TroveItems.HasBoost(PlayerId));
         if (held || GameUI.Paused)
             return;
         bool full = ChargeFraction >= 1f;
