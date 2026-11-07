@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using tainicom.Aether.Physics2D.Dynamics;
 using TanksRebirth.GameContent.Globals;
 using TanksRebirth.GameContent.ID;
@@ -14,7 +15,7 @@ using TanksRebirth.Net;
 
 namespace TanksRebirth.GameContent.Systems.Troves;
 
-public enum EnemyVariant : byte { None, Scout, Brute, Splitter, Kamikaze, Gunner, Ghost, Medic, Sniper }
+public enum EnemyVariant : byte { None, Scout, Brute, Splitter, Kamikaze, Gunner, Ghost, Medic, Sniper, Turret, Bunker, Nest, Crawler }
 public enum GunnerKind { Triple, Homing, Explosive, Bouncy }
 
 /// <summary>
@@ -26,7 +27,7 @@ public enum GunnerKind { Triple, Homing, Explosive, Bouncy }
 /// (splits, explosions, shields, shots) and tells the other phones.
 /// </summary>
 public static class TroveEnemies {
-    public static readonly string[] Names = ["", "Scout", "Brute", "Splitter", "Kamikaze", "Gunner", "Ghost", "Medic", "Sniper"];
+    public static readonly string[] Names = ["", "Scout", "Brute", "Splitter", "Kamikaze", "Gunner", "Ghost", "Medic", "Sniper", "Wall Turret", "Mortar Bunker", "Crawler Nest", "Mine Crawler"];
     private static readonly Color[] GunnerColors = [new(255, 220, 60), new(80, 220, 255), new(255, 120, 30), new(110, 255, 120)];
 
     private sealed class Info {
@@ -35,7 +36,14 @@ public static class TroveEnemies {
         public bool Handled; // (splits and blasts happen once)
         public double FuseAt = -1;
         public double NextAct;
+        public Tank? Parent; // a crawler's nest
     }
+
+    /// <summary>Mortar shells in the air: where from, where they land, when they were fired and when they land.</summary>
+    public static readonly List<(Vector2 From, Vector2 To, double FiredAt, double LandAt, Tank Bunker)> Mortars = [];
+    public const double MORTAR_FLIGHT = 1.7;
+    // textures painted for this room's special enemies (thrown away with the room)
+    private static readonly List<Texture2D> _painted = [];
 
     private static readonly Dictionary<Tank, Info> _info = [];
     /// <summary>The variant tanks in the order they were set up (the same on every phone), for events that name one.</summary>
@@ -87,11 +95,44 @@ public static class TroveEnemies {
                 break;
             }
         }
+
+        // now and then (not often) a room also has a non-tank enemy: wall turrets, a mortar bunker or a crawler nest
+        if (room.BossIndex >= 0 || rng.NextDouble() >= 0.08 + 0.015 * f.Number)
+            return;
+        var kinds = new List<EnemyVariant> { EnemyVariant.Turret, EnemyVariant.Turret };
+        if (f.Number >= 2) kinds.Add(EnemyVariant.Bunker);
+        if (f.Number >= 2) kinds.Add(EnemyVariant.Nest);
+        var kind = kinds[rng.Next(kinds.Count)];
+        bool Free(int x, int y) => x >= 2 && y >= 2 && x <= TroveGen.GW - 3 && y <= TroveGen.GH - 3 && !blocked.Contains(new Point(x, y))
+            && !room.Enemies.Any(o => Math.Abs(o.X - x) + Math.Abs(o.Y - y) < 2);
+        bool NextToWall(int x, int y) => blocked.Contains(new Point(x + 1, y)) || blocked.Contains(new Point(x - 1, y))
+            || blocked.Contains(new Point(x, y + 1)) || blocked.Contains(new Point(x, y - 1));
+        var cells = new List<Point>();
+        for (int x = 2; x <= TroveGen.GW - 3; x++)
+            for (int y = 2; y <= TroveGen.GH - 3; y++)
+                if (Free(x, y) && (kind != EnemyVariant.Turret || NextToWall(x, y)))
+                    cells.Add(new Point(x, y));
+        // away from the doors (the middle of each side), so nothing is waiting right where you walk in
+        cells.RemoveAll(c => Math.Abs(c.X - TroveGen.GW / 2) <= 2 && (c.Y <= 3 || c.Y >= TroveGen.GH - 4)
+                          || Math.Abs(c.Y - TroveGen.GH / 2) <= 2 && (c.X <= 3 || c.X >= TroveGen.GW - 4));
+        int count = kind == EnemyVariant.Turret ? 2 : 1;
+        for (int k = 0; k < count && cells.Count > 0; k++) {
+            var c = cells[rng.Next(cells.Count)];
+            cells.RemoveAll(o => Math.Abs(o.X - c.X) + Math.Abs(o.Y - c.Y) < 5);
+            room.Enemies.Add((c.X, c.Y, kind == EnemyVariant.Turret ? TankID.Marine : TankID.Brown, 0f));
+            room.Variants[room.Enemies.Count - 1] = kind;
+            blocked.Add(c);
+        }
     }
 
     // ------------------------------------------------------------------ a room's tanks just appeared
 
     public static void Clear() {
+        Mortars.Clear();
+        foreach (var tex in _painted)
+            if (!GameHandler.AllAITanks.Any(t => t is { IsDestroyed: false } && t.TankTexture == tex))
+                tex.Dispose();
+        _painted.RemoveAll(tx => tx.IsDisposed);
         _info.Clear();
         _order.Clear();
         SniperLines.Clear();
@@ -176,7 +217,70 @@ public static class TroveEnemies {
                 p.ShellLimit = 0; // it only fires its aimed shots
                 p.MineLimit = 0;
                 break;
+            case EnemyVariant.Turret:
+                // a squat steel gun on a wall: it turns and fires, but never moves
+                t.Scaling = new Vector3(1.15f, 0.7f, 1.15f);
+                p.Stationary = true;
+                p.MineLimit = 0;
+                p.ShellLimit = 2;
+                p.ShellCooldown = 70;
+                p.Armor = new TankArmor(t, 1);
+                Paint(t, new Color(150, 156, 165));
+                break;
+            case EnemyVariant.Bunker:
+                // a low concrete bunker that lobs shells over walls
+                t.Scaling = new Vector3(1.35f, 0.55f, 1.35f);
+                p.Stationary = true;
+                p.HasTurret = false;
+                p.ShellLimit = 0;
+                p.MineLimit = 0;
+                p.Armor = new TankArmor(t, 2);
+                info.NextAct = Now + 2.5 + salt % 2;
+                Paint(t, new Color(128, 126, 112));
+                break;
+            case EnemyVariant.Nest:
+                // a crawler nest: more crawlers keep coming out until it's destroyed
+                t.Scaling = new Vector3(1.25f, 0.5f, 1.25f);
+                p.Stationary = true;
+                p.HasTurret = false;
+                p.ShellLimit = 0;
+                p.MineLimit = 0;
+                p.Armor = new TankArmor(t, 2);
+                info.NextAct = Now + 1.5;
+                Paint(t, new Color(120, 52, 78));
+                break;
+            case EnemyVariant.Crawler:
+                // a tiny bug that scurries at you and blows up
+                t.Scaling = new Vector3(0.5f);
+                p.Stationary = true; // it moves the way this file says
+                p.HasTurret = false;
+                p.ShellLimit = 0;
+                p.MineLimit = 0;
+                p.Armor = null;
+                Paint(t, new Color(240, 200, 40));
+                break;
         }
+    }
+
+    /// <summary>Repaints a special enemy (its own copy of the texture, in the given color).</summary>
+    private static void Paint(AITank t, Color c) {
+        if (t.TankTexture is not { IsDisposed: false } tex || tex.Width * tex.Height > 64 * 64)
+            return;
+        var data = new Color[tex.Width * tex.Height];
+        tex.GetData(data);
+        float avg = 0;
+        foreach (var d in data)
+            avg += (d.R * 0.299f + d.G * 0.587f + d.B * 0.114f) / 255f;
+        avg = Math.Max(0.05f, avg / data.Length);
+        for (int i = 0; i < data.Length; i++) {
+            float l = (data[i].R * 0.299f + data[i].G * 0.587f + data[i].B * 0.114f) / 255f / avg;
+            float f = MathHelper.Clamp(0.3f + 0.7f * l, 0f, 1.5f);
+            data[i] = new Color(Math.Clamp(c.R * f / 255f, 0f, 1f), Math.Clamp(c.G * f / 255f, 0f, 1f), Math.Clamp(c.B * f / 255f, 0f, 1f));
+        }
+        var own = new Texture2D(tex.GraphicsDevice, tex.Width, tex.Height);
+        own.SetData(data);
+        _painted.Add(own);
+        t.SwapTankTexture(own);
     }
 
     // ------------------------------------------------------------------ every update
@@ -201,8 +305,30 @@ public static class TroveEnemies {
                     t.Properties.Invisible = (Now + _order.IndexOf(t) * 0.7) % 4.0 > 2.6;
                     break;
                 case EnemyVariant.Kamikaze:
+                case EnemyVariant.Crawler:
                     if (!frozen)
                         Kamikaze(t, info);
+                    break;
+                case EnemyVariant.Bunker:
+                    if (!frozen && Authority && Now >= info.NextAct && NearestPlayer(t.Position) is { } mt
+                        && Vector2.Distance(mt.Position, t.Position) < 520f) {
+                        info.NextAct = Now + 4.2;
+                        // aimed a little ahead of where you're driving
+                        var lead = new Vector2(mt.Velocity.X, mt.Velocity.Y) * 22f;
+                        var to = mt.Position + (lead.Length() > 70f ? Vector2.Normalize(lead) * 70f : lead);
+                        Send(ACT_MORTAR, TroveItems.EncodePos(to));
+                    }
+                    break;
+                case EnemyVariant.Nest:
+                    if (Random.Shared.NextDouble() < 0.12 * Dt)
+                        GameHandler.Particles.MakeShineSpot(t.Position3D + new Vector3(Random.Shared.NextSingle() * 16 - 8, 6, Random.Shared.NextSingle() * 16 - 8),
+                            new Color(200, 90, 140), 0.45f);
+                    if (!frozen && Authority && Now >= info.NextAct) {
+                        info.NextAct = Now + 5;
+                        int alive = _info.Count(k => k.Value.Parent == t && !k.Key.IsDestroyed);
+                        if (alive < 3)
+                            Send(ACT_HATCH, _order.IndexOf(t));
+                    }
                     break;
                 case EnemyVariant.Medic:
                     if ((int)(Now * 2) % 3 == 0 && Random.Shared.NextDouble() < 0.1 * Dt)
@@ -225,6 +351,14 @@ public static class TroveEnemies {
                     }
                     break;
             }
+        }
+        // mortar shells land (every phone makes the blast)
+        for (int i = Mortars.Count - 1; i >= 0; i--) {
+            var m = Mortars[i];
+            if (Now < m.LandAt)
+                continue;
+            Mortars.RemoveAt(i);
+            new Explosion(m.To, 2.6f, m.Bunker.IsDestroyed ? null : m.Bunker, 0.4f);
         }
         // snipers fire when their line has been up for a moment (every phone makes the shot)
         for (int i = SniperLines.Count - 1; i >= 0; i--) {
@@ -253,10 +387,11 @@ public static class TroveEnemies {
 
     /// <summary>Rushes the nearest player; close up, a short fuse, then it blows up.</summary>
     private static void Kamikaze(Tank t, Info info) {
+        bool crawler = info.Variant == EnemyVariant.Crawler;
         if (info.FuseAt >= 0) {
             if ((int)((Now - info.FuseAt) * 10) % 2 == 0)
-                GameHandler.Particles.MakeShineSpot(t.Position3D + new Vector3(0, 14, 0), Color.Red, 0.5f);
-            if (Authority && Now - info.FuseAt > 0.9 && !info.Handled) {
+                GameHandler.Particles.MakeShineSpot(t.Position3D + new Vector3(0, crawler ? 8 : 14, 0), Color.Red, crawler ? 0.35f : 0.5f);
+            if (Authority && Now - info.FuseAt > (crawler ? 0.45 : 0.9) && !info.Handled) {
                 info.Handled = true;
                 Send(ACT_BOOM, _order.IndexOf(t));
             }
@@ -266,12 +401,15 @@ public static class TroveEnemies {
             return;
         var to = target.Position - t.Position;
         float d = to.Length();
-        if (d < 46f) {
+        if (d < (crawler ? 30f : 46f)) {
             Send(ACT_FUSE, _order.IndexOf(t));
             return;
         }
         var dir = to / d;
-        float speed = 1.7f * Dt * 0.62f;
+        // crawlers scuttle (fast, with a wobble)
+        if (crawler)
+            dir = Vector2.Normalize(dir + new Vector2(-dir.Y, dir.X) * MathF.Sin((float)Now * 9f + _order.IndexOf(t)) * 0.35f);
+        float speed = (crawler ? 2.3f : 1.7f) * Dt * 0.62f;
         var nx = t.Position + new Vector2(dir.X * speed, 0);
         if (!Solid(nx, 12f)) t.Position = nx;
         var ny = t.Position + new Vector2(0, dir.Y * speed);
@@ -298,7 +436,7 @@ public static class TroveEnemies {
 
     // ------------------------------------------------------------------ the moments everyone sees together
 
-    private const int ACT_SPLIT = 1, ACT_SHIELD = 2, ACT_AIM = 3, ACT_FUSE = 4, ACT_BOOM = 5;
+    private const int ACT_SPLIT = 1, ACT_SHIELD = 2, ACT_AIM = 3, ACT_FUSE = 4, ACT_BOOM = 5, ACT_MORTAR = 6, ACT_HATCH = 7;
 
     private static void Send(int act, int a) {
         Do(act, a);
@@ -312,6 +450,32 @@ public static class TroveEnemies {
 
     private static void Do(int act, int a) {
         switch (act) {
+            case ACT_MORTAR: {
+                // the bunker nearest the target fires (the same one on every phone)
+                var to = TroveItems.DecodePos(a);
+                var bunker = _info.Where(k => k.Value.Variant == EnemyVariant.Bunker && !k.Key.IsDestroyed)
+                    .Select(k => k.Key).OrderBy(b => Vector2.Distance(b.Position, to)).FirstOrDefault();
+                if (bunker is null)
+                    break;
+                Mortars.Add((bunker.Position, to, Now, Now + MORTAR_FLIGHT, bunker));
+                SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_shoot_rocket.ogg", SoundContext.Effect, 0.5f, pitchOverride: -0.7f);
+                GameHandler.Particles.MakeSmallExplosion(bunker.Position3D + new Vector3(0, 8, 0), 4, 3, 0.6f, 4);
+                break;
+            }
+            case ACT_HATCH: {
+                if (ByIndex(a) is not { IsDestroyed: false } nest)
+                    break;
+                int n = _info.Count(k => k.Value.Parent == nest);
+                var off = new Vector2(MathF.Cos(n * 2.4f), MathF.Sin(n * 2.4f)) * 22f;
+                var p = Solid(nest.Position + off, 8f) ? nest.Position : nest.Position + off;
+                var t = new TankTemplate { IsPlayer = false, AiTier = TankID.Brown, Position = p, Team = TeamID.Blue }.GetAiTank();
+                t.Team = TeamID.Blue;
+                Make(t, EnemyVariant.Crawler, _order.Count);
+                _info[t].Parent = nest;
+                GameHandler.Particles.MakeShineSpot(nest.Position3D + new Vector3(0, 8, 0), new Color(255, 210, 60), 0.9f);
+                SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.5f, pitchOverride: -0.8f);
+                break;
+            }
             case ACT_SPLIT: {
                 // two little scouts burst out
                 var at = TroveItems.DecodePos(a);
@@ -351,7 +515,7 @@ public static class TroveEnemies {
                 if (ByIndex(a) is { IsDestroyed: false } b) {
                     if (_info.TryGetValue(b, out var bi))
                         bi.Handled = true;
-                    new Explosion(b.Position, 3.2f, b, 0.4f);
+                    new Explosion(b.Position, bi?.Variant == EnemyVariant.Crawler ? 2.2f : 3.2f, b, 0.4f);
                     b.Destroy(new TankHurtContextOther(null, TankHurtContextOther.HurtContext.FromIngame, "Kamikaze"), false);
                 }
                 break;

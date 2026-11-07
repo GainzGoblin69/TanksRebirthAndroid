@@ -405,6 +405,28 @@ public static class TroveHud {
             for (float dd = 0; dd < len; dd += 18 * s)
                 ToggleSwitch.DrawLine(sb, a0 + dir * dd, a0 + dir * Math.Min(len, dd + 9 * s), 2.5f * s, new Color(255, 40, 40) * 0.75f);
         }
+        // mortar shells: a red target circle where each will land, and the shell arcing over
+        foreach (var (from, to, firedAt, landAt, _) in TroveEnemies.Mortars) {
+            float k = (float)Math.Clamp((TroveRun.PlayTime - firedAt) / (landAt - firedAt), 0, 1);
+            var tc = ToScreen(to);
+            float rr = Math.Max(10f, Vector2.Distance(tc, ToScreen(to + new Vector2(42f, 0))));
+            float blink = (int)(tnow * (6 + 10 * k)) % 2 == 0 ? 1f : 0.6f;
+            ToggleSwitch.DrawDisc(sb, tc, rr, new Color(255, 40, 30) * (0.12f + 0.2f * k));
+            ToggleSwitch.DrawDisc(sb, tc, rr * k, new Color(255, 60, 40) * (0.3f * blink));
+            for (int i = 0; i < 24; i++) {
+                float a0 = i * MathHelper.TwoPi / 24f, a1 = a0 + MathHelper.TwoPi / 48f;
+                ToggleSwitch.DrawLine(sb, tc + new Vector2(MathF.Cos(a0), MathF.Sin(a0)) * rr, tc + new Vector2(MathF.Cos(a1), MathF.Sin(a1)) * rr, 2.5f * s, new Color(255, 70, 50) * blink);
+            }
+            ToggleSwitch.DrawLine(sb, tc - new Vector2(rr * 0.3f, 0), tc + new Vector2(rr * 0.3f, 0), 2f * s, new Color(255, 70, 50) * blink);
+            ToggleSwitch.DrawLine(sb, tc - new Vector2(0, rr * 0.3f), tc + new Vector2(0, rr * 0.3f), 2f * s, new Color(255, 70, 50) * blink);
+            // the shell: along the line, lifted into an arc, with its shadow on the ground
+            var fc = ToScreen(from);
+            var ground = Vector2.Lerp(fc, tc, k);
+            float lift = MathF.Sin(k * MathF.PI) * 140f * s;
+            ToggleSwitch.DrawDisc(sb, ground, 6f * s * (1 - 0.4f * MathF.Sin(k * MathF.PI)), Color.Black * 0.35f);
+            ToggleSwitch.DrawDisc(sb, ground - new Vector2(0, lift), 8f * s, new Color(40, 40, 40));
+            ToggleSwitch.DrawDisc(sb, ground - new Vector2(0, lift) - new Vector2(2, 2) * s, 3.5f * s, new Color(150, 150, 150));
+        }
         foreach (var (sn, angle, fireAt) in TroveEnemies.SniperLines) {
             var a0 = ToScreen(sn.Position);
             var a1 = ToScreen(sn.Position + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 500f);
@@ -420,6 +442,8 @@ public static class TroveHud {
                 EnemyVariant.Sniper => ("SNIPER", new Color(255, 90, 80)),
                 EnemyVariant.Kamikaze => ((int)(tnow * 4) % 2 == 0 ? "! ! !" : "", new Color(255, 70, 40)),
                 EnemyVariant.Splitter => ("SPLITTER", new Color(255, 170, 230)),
+                EnemyVariant.Bunker => ("MORTAR", new Color(255, 120, 60)),
+                EnemyVariant.Nest => ("NEST", new Color(230, 110, 170)),
                 _ => null,
             };
             if (tag is { } tg && tg.label.Length > 0)
