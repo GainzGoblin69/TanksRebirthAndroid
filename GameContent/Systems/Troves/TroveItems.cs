@@ -39,10 +39,12 @@ public enum TroveItemId {
 /// <summary>How an item works: used with the ITEM button, takes effect when picked up, or lasts the whole run.</summary>
 public enum TroveItemKind { Active, Instant, Passive }
 
-/// <param name="Recharge">Active items: rooms to clear before it can be used again (0 = used up).</param>
-/// <param name="RechargeSeconds">Active items that recharge over time instead of by rooms.</param>
+/// <param name="Recharge">Active items: how slow it is to recharge (0 = one use), as "rooms" - each is <see cref="TroveItems.SECONDS_PER_RECHARGE"/> seconds of play.</param>
+/// <param name="RechargeSeconds">Active items with their own (short) recharge time.</param>
 public sealed record TroveItemDef(TroveItemId Id, string Name, string Description, TroveItemKind Kind, Color Color, int Recharge = 0, float RechargeSeconds = 0) {
     /// <summary>ITEM-button items wear out: how many uses before it breaks (slower recharge = fewer uses).</summary>
+    /// <summary>Seconds of play before it can be used again.</summary>
+    public float CooldownSeconds => RechargeSeconds > 0 ? RechargeSeconds : Recharge * TroveItems.SECONDS_PER_RECHARGE;
     public int MaxUses => Kind != TroveItemKind.Active ? 0 : RechargeSeconds > 0 ? 15 : Recharge switch { 0 => 1, 1 => 4, 2 => 3, _ => 2 };
 }
 
@@ -333,20 +335,30 @@ public static class TroveItems {
         /// <summary>The ITEM-button items being carried, and which one the button uses.</summary>
         public readonly List<TroveItemId> Actives = [];
         public int Selected;
-        /// <summary>Rooms cleared since each carried item was last used (it's ready at its Recharge).</summary>
-        public readonly Dictionary<TroveItemId, int> Charges = [];
+        /// <summary>When each carried item can be used again (play time, see <see cref="TroveRun.PlayTime"/>).</summary>
+        public readonly Dictionary<TroveItemId, double> ReadyTimes = [];
         /// <summary>When the selection last changed (the description shows up bigger for a moment).</summary>
         public double SelectedAt = -10;
         public TroveItemId? Active => Actives.Count > 0 ? Actives[Math.Clamp(Selected, 0, Actives.Count - 1)] : null;
-        public int Charge {
-            get => Active is { } a && Charges.TryGetValue(a, out var c) ? c : 0;
-            set { if (Active is { } a) Charges[a] = value; }
+        public double ReadyTimeOf(TroveItemId id) => ReadyTimes.TryGetValue(id, out var t) ? t : -100;
+        public bool IsReady(TroveItemId id) => TroveRun.PlayTime >= ReadyTimeOf(id);
+        /// <summary>Seconds until it's ready (0 = ready).</summary>
+        public double SecondsLeft(TroveItemId id) => Math.Max(0, ReadyTimeOf(id) - TroveRun.PlayTime);
+        /// <summary>How far along its recharge is (1 = ready).</summary>
+        public float RechargeFraction(TroveItemId id) {
+            if (IsReady(id))
+                return 1f;
+            float total = CooldownFor(this, id);
+            return total <= 0 ? 1f : MathHelper.Clamp(1f - (float)(SecondsLeft(id) / total), 0f, 1f);
         }
-        public int ChargeOf(TroveItemId id) => Charges.TryGetValue(id, out var c) ? c : 0;
-        public bool IsReady(TroveItemId id) => ChargeOf(id) >= Def(id).Recharge && (Def(id).RechargeSeconds <= 0 || TroveRun.PlayTime >= ReadyAt);
+        /// <summary>It came back within the last few seconds (it blinks so you notice).</summary>
+        public bool JustReady(TroveItemId id) {
+            double since = TroveRun.PlayTime - ReadyTimeOf(id);
+            return ReadyTimes.ContainsKey(id) && ReadyTimeOf(id) > 0 && since >= 0 && since < READY_BLINK_SECONDS;
+        }
         /// <summary>Picks up an ITEM-button item: a free slot if there is one, otherwise it replaces the selected one.</summary>
         public void AddActive(TroveItemId id) {
-            Charges[id] = Def(id).Recharge; // comes charged
+            ReadyTimes[id] = -100; // comes charged
             UsesLeft[id] = Def(id).MaxUses; // and new (picking up one you carry repairs it)
             int have = Actives.IndexOf(id);
             if (have >= 0)
@@ -364,7 +376,7 @@ public static class TroveItems {
             if (Active is not { } a)
                 return;
             Actives.RemoveAt(Math.Clamp(Selected, 0, Actives.Count - 1));
-            Charges.Remove(a);
+            ReadyTimes.Remove(a);
             UsesLeft.Remove(a);
             Selected = Actives.Count == 0 ? 0 : Math.Min(Selected, Actives.Count - 1);
             SelectedAt = TroveRun.PlayTime;
@@ -388,7 +400,6 @@ public static class TroveItems {
         /// <summary>Boost (found in cork): how much is left and how big the bar is (0 = no boost), and whether it's on right now.</summary>
         public float BoostFuel, BoostMax;
         public bool Boosting;
-        public double ReadyAt = -1;     // time-based actives (Dash)
         public int RoomsForRegen, KillsForVampire;
         public double DashUntil = -1, TeslaAt;
         public double MirrorUntil = -1, CloneUntil = -1, LastFireDrop;
@@ -562,6 +573,39 @@ public static class TroveItems {
             fire *= 1f + 1.8f * Math.Min(1f, p.GatlingHold / 2f);
         t.Properties.MaxSpeed = p.BaseSpeed * speed;
         t.Properties.ShellCooldown = (uint)Math.Max(1, MathF.Round(p.BaseCooldown / fire));
+    }
+
+    /// <summary>Active items recharge over time: this many seconds of play for each step of their recharge
+    /// (Shell Burst 1 step = 20s, Stopwatch 2 = 40s, Airstrike 3 = 60s, Convert 4 = 80s).</summary>
+    public const float SECONDS_PER_RECHARGE = 20f;
+    /// <summary>How long an item blinks after it's ready again.</summary>
+    public const float READY_BLINK_SECONDS = 3f;
+
+    /// <summary>This player's recharge time for an item (Fortune Teller halves Reroll's).</summary>
+    public static float CooldownFor(PlayerItems p, TroveItemId id) {
+        float sec = Def(id).CooldownSeconds;
+        if (id == TroveItemId.Reroll && p.Has(Syn("Fortune Teller")))
+            sec /= 2f;
+        return sec;
+    }
+
+    /// <summary>The ITEM button's selected item just recharged (the button blinks).</summary>
+    public static bool SelectedJustReady(int playerId) =>
+        TroveRun.Active && playerId is >= 0 and < 4 && Players[playerId].Active is { } a && Players[playerId].JustReady(a);
+
+    // which of this phone's items were recharging last frame (a tick when one comes back)
+    private static readonly HashSet<TroveItemId> _recharging = [];
+    private static void ReadyChimes() {
+        var p = Players[MyPlayer];
+        foreach (var id in p.Actives) {
+            if (!p.IsReady(id))
+                _recharging.Add(id);
+            else if (_recharging.Remove(id)) {
+                SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.9f, pitchOverride: 0.4f);
+                TanksRebirth.Internals.Common.Framework.Input.Haptics.Tap();
+            }
+        }
+        _recharging.RemoveWhere(id => !p.Actives.Contains(id));
     }
 
     /// <summary>A full Boost bar lasts this many seconds of boosting.</summary>
@@ -949,8 +993,7 @@ public static class TroveItems {
                     p.Shields++;
                 else if (id == TroveItemId.Battery && p.Active is { } charged) {
                     // the carried ITEM is ready again
-                    p.Charges[charged] = Def(charged).Recharge;
-                    p.ReadyAt = Now;
+                    p.ReadyTimes[charged] = -100;
                 }
                 else if (id == TroveItemId.Boost) {
                     // a full bar; finding more makes the bar bigger (up to twice as long)
@@ -1070,10 +1113,6 @@ public static class TroveItems {
         }
         for (int i = 0; i < 4; i++) {
             var p = Players[i];
-            // every carried item recharges, not just the selected one
-            foreach (var a in p.Actives)
-                if (p.ChargeOf(a) < Def(a).Recharge)
-                    p.Charges[a] = Math.Min(Def(a).Recharge, p.ChargeOf(a) + (a == TroveItemId.Reroll && p.Has(Syn("Fortune Teller")) ? 2 : 1));
             // regen plating: a shield every few rooms
             int n = p.Count(TroveItemId.RegenPlating);
             if (n > 0 && IsLocal(i)) {
@@ -1358,10 +1397,8 @@ public static class TroveItems {
                 SoundPlayer.PlaySoundInstance("Assets/sounds/bullet_destroy.ogg", SoundContext.Effect, 1f, pitchOverride: -0.5f);
             }
         }
-        else if (Def(id).RechargeSeconds > 0)
-            p.ReadyAt = Now + Def(id).RechargeSeconds;
-        else if (Def(id).Recharge > 0)
-            p.Charge = 0;
+        else
+            p.ReadyTimes[id] = Now + CooldownFor(p, id);
         SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_shoot_rocket.ogg", SoundContext.Effect, 0.7f);
         if (tank is { IsDestroyed: false })
             ApplyTo(tank);
@@ -2145,6 +2182,8 @@ public static class TroveItems {
         }
         HandleRequests();
         UpdateUnderglow();
+        if (CampaignGlobals.InMission)
+            ReadyChimes();
         // the BOOST button shows this phone's player's bar
         var me = Players[MyPlayer];
         if (me.BoostFuel > 0 && me.BoostMax > 0 && CampaignGlobals.InMission)
@@ -2501,8 +2540,7 @@ public static class TroveItems {
         var p = Players[playerId];
         if (p.Active is { } a)
             return p.ActiveReady ? (ShortName(a), "tap to use", true)
-                : Def(a).RechargeSeconds > 0 ? (ShortName(a), $"{Math.Ceiling(p.ReadyAt - Now)}s", false)
-                : (ShortName(a), $"charging {p.Charge}/{Def(a).Recharge}", false);
+                : (ShortName(a), $"ready in {Math.Ceiling(p.SecondsLeft(a))}s", false);
         if (MissileUpgrade.ShotsLeft(playerId) > 0)
             return ("ROCKETS", $"{MissileUpgrade.ShotsLeft(playerId)} shots", false);
         if (p.SliderBombs > 0)

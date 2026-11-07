@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.Xna.Framework;
 using TanksRebirth.GameContent.ID;
 using TanksRebirth.GameContent.Globals;
@@ -62,8 +62,11 @@ public static class MissileUpgrade {
     public static void Update() {
         int me = LocalCoop.Active ? 0 : NetPlay.GetMyClientId();
         // what the button shows: a Tank Troves item first, else Gears of War missile upgrades
-        if (Troves.TroveItems.ButtonFor(me) is { } tb)
+        TouchControls.MissileBlink = false;
+        if (Troves.TroveItems.ButtonFor(me) is { } tb) {
             TouchControls.MissileButton = tb;
+            TouchControls.MissileBlink = Troves.TroveItems.SelectedJustReady(me);
+        }
         else if (Charges(me) > 0 || ShotsLeft(me) > 0)
             TouchControls.MissileButton = ("MISSILE", ShotsLeft(me) > 0 ? $"{ShotsLeft(me)} shots" : $"x{Charges(me)}", ShotsLeft(me) == 0);
         else

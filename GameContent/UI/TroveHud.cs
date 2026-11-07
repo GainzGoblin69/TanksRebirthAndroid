@@ -580,14 +580,25 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, at, r * 1.32f, new Color(255, 215, 80));
                 ToggleSwitch.DrawDisc(sb, at, r * 1.16f, new Color(40, 30, 20));
             }
-            DrawItemIcon(sb, id, at, r);
             bool ready = p.IsReady(id);
+            if (ready && p.JustReady(id)) {
+                // just came back: it blinks with a bright ring for a few seconds
+                bool flash = (int)((TroveRun.PlayTime - p.ReadyTimeOf(id)) * 6) % 2 == 0;
+                if (flash)
+                    ToggleSwitch.DrawDisc(sb, at, r * 1.45f, new Color(255, 255, 200) * 0.85f);
+            }
+            DrawItemIcon(sb, id, at, r);
             if (!ready) {
-                // dimmed while recharging, with how far along it is
+                // dimmed while recharging, with a ring filling up and the seconds left
                 ToggleSwitch.DrawDisc(sb, at, r * 1.02f, Color.Black * 0.55f);
-                var def = TroveItems.Def(id);
-                string c = def.RechargeSeconds > 0 ? $"{Math.Ceiling(p.ReadyAt - TroveRun.PlayTime)}s" : $"{p.ChargeOf(id)}/{def.Recharge}";
-                Text(sb, c, at, 0.38f * s, Color.White, border: true);
+                float f = p.RechargeFraction(id);
+                const int segs = 24;
+                for (int k = 0; k < segs; k++) {
+                    float a0 = -MathHelper.PiOver2 + k * MathHelper.TwoPi / segs, a1 = a0 + MathHelper.TwoPi / segs * 1.1f;
+                    ToggleSwitch.DrawLine(sb, at + new Vector2(MathF.Cos(a0), MathF.Sin(a0)) * r * 1.12f, at + new Vector2(MathF.Cos(a1), MathF.Sin(a1)) * r * 1.12f,
+                        Math.Max(2f, r * 0.13f), k < (int)(f * segs) ? new Color(255, 215, 80) : Color.Black * 0.45f);
+                }
+                Text(sb, $"{Math.Ceiling(p.SecondsLeft(id))}s", at, 0.38f * s, Color.White, border: true);
             }
             // uses left before it breaks (red when it's the last one)
             int uses = p.UsesOf(id);
@@ -657,7 +668,7 @@ public static class TroveHud {
         string kind = def.Kind switch {
             TroveItemKind.Active => def.MaxUses <= 1 ? "ITEM button  -  one use"
                 : def.RechargeSeconds > 0 ? $"ITEM button  -  {def.MaxUses} uses, ready again after {def.RechargeSeconds:0}s"
-                : $"ITEM button  -  {def.MaxUses} uses, recharges every {def.Recharge} room{(def.Recharge > 1 ? "s" : "")}",
+                : $"ITEM button  -  {def.MaxUses} uses, ready again after {def.CooldownSeconds:0}s",
             TroveItemKind.Passive => TroveItems.Stacks(def.Id) ? "Lasts the whole run  -  stacks" : "Lasts the whole run",
             _ => "Takes effect right away",
         };

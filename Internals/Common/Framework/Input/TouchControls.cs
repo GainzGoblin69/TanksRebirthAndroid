@@ -35,6 +35,8 @@ public static class TouchControls {
     /// <summary>The ITEM / MISSILE button next to MINE, while there's something to show (title, small text, tappable).</summary>
     public static (string Title, string Sub, bool Usable)? MissileButton { get; set; }
     public static bool MissileJustPressed { get; private set; }
+    /// <summary>The ITEM button blinks (its item just recharged).</summary>
+    public static bool MissileBlink { get; set; }
     /// <summary>Boost: whether the BOOST button is held down (it shows while Tank Troves reports a bar).</summary>
     public static bool BoostHeld { get; private set; }
     private static float _boostFill;
@@ -381,6 +383,8 @@ public static class TouchControls {
         // missile upgrade (Gears of War): shows how many are waiting, or the missile shots left while one is on
         if (MissileButton is { } mb) {
             // ready to use: orange; something already running: red; otherwise dim
+            if (MissileBlink && (int)(_clock.Elapsed.TotalSeconds * 6) % 2 == 0)
+                DrawCircle(sb, _disc!, MissileButtonCenter, ButtonRadius * 1.22f, new Color(255, 255, 200) * 0.8f);
             DrawCircle(sb, _disc!, MissileButtonCenter, ButtonRadius, (mb.Usable ? Color.DarkOrange : Color.OrangeRed) * 0.5f);
             DrawCircle(sb, _ring!, MissileButtonCenter, ButtonRadius, Color.White * 0.6f);
             DrawLabel(sb, mb.Title, MissileButtonCenter - new Vector2(0, ButtonRadius * 0.18f), mb.Title.Length > 7 ? 0.38f : 0.45f);

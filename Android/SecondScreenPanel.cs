@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Android.App;
 using Android.Content;
@@ -226,7 +226,8 @@ internal sealed class SecondScreenPanel : Presentation {
             var id = items.Actives[i];
             var def = TanksRebirth.GameContent.Systems.Troves.TroveItems.Def(id);
             bool ready = items.IsReady(id);
-            string state = ready ? "READY" : def.RechargeSeconds > 0 ? "recharging..." : $"charging {items.ChargeOf(id)}/{def.Recharge}";
+            string state = ready ? (items.JustReady(id) && (int)(TanksRebirth.GameContent.Systems.Troves.TroveRun.PlayTime * 6) % 2 == 0 ? "** READY **" : "READY")
+                : $"ready in {Math.Ceiling(items.SecondsLeft(id))}s";
             bool picked = i == Math.Clamp(items.Selected, 0, items.Actives.Count - 1);
             _activeButtons[i].Text = $"{(picked ? "> " : "")}{def.Name}{(picked ? " <" : "")}\n{state}  -  {items.UsesOf(id)} use{(items.UsesOf(id) == 1 ? "" : "s")} left";
             _activeButtons[i].Background?.SetTint(picked ? Android.Graphics.Color.Rgb(255, 214, 120) : Android.Graphics.Color.Rgb(225, 218, 205));
