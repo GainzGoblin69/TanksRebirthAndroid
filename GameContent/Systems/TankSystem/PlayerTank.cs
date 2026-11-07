@@ -659,15 +659,16 @@ public class PlayerTank : Tank {
 
         base.Destroy(context, netSend);
 
-        if (context.Source is not PlayerTank player) return;
-
-        // only increment these data values on the destroyed player's system
-        // ensure the source tank is 
-        if (NetPlay.IsClientMatched(player.PlayerId)) {
+        // your deaths count on your phone (offline: any player on this phone), however you died
+        bool mineDied = !Client.IsConnected() || NetPlay.IsClientMatched(PlayerId);
+        if (!mineDied || MainMenuUI.IsActive)
+            return;
+        TankGame.SaveFile.Deaths++;
+        // a suicide: your own shell or mine
+        if (context.Source == this) {
             TankGame.SaveFile.Suicides++;
             PlayerStatistics.Suicides++;
         }
-        TankGame.SaveFile.Deaths++;
     }
     private void DrawShootPath() {
         const int MAX_PATH_UNITS = 10000;

@@ -236,6 +236,25 @@ public class TankGame : Game {
 
         base.Initialize();
     }
+    private static readonly object _statsLock = new();
+    private static double _lastStatsSave;
+    /// <summary>Saves the stats (kills, missions, time played...). Phones close apps without warning, so this happens
+    /// every so often and whenever the app goes to the background, not just on exit.</summary>
+    public static void SaveStats() {
+        lock (_statsLock) {
+            try {
+                var before = SaveFile.TimePlayed;
+                SaveFile.TimePlayed = before + CurrentSessionTimer.Elapsed;
+                SaveFile.ExpLevel = GameHandler.ExperienceBar is { } xp ? xp.Level + xp.Value : SaveFile.ExpLevel;
+                try { SaveFile.Serialize(); }
+                finally { SaveFile.TimePlayed = before; }
+            }
+            catch (Exception e) {
+                ClientLog.Write($"Couldn't save stats: {e.Message}", LogType.Warn);
+            }
+        }
+    }
+
     protected override void OnExiting(object sender, EventArgs args) {
         ClientLog.Write($"Handling termination process...", LogType.Info);
 
@@ -599,6 +618,11 @@ public class TankGame : Game {
     }
     // FIXME: this method is a clusterfuck
     protected override void Update(GameTime gameTime) {
+        // stats are saved every 20 seconds
+        if (CurrentSessionTimer.Elapsed.TotalSeconds - _lastStatsSave > 20) {
+            _lastStatsSave = CurrentSessionTimer.Elapsed.TotalSeconds;
+            System.Threading.Tasks.Task.Run(SaveStats);
+        }
         try {
             /*if (Debugger.IsAttached) {
                 SteamworksUtils.SetSteamStatus("balls", "inspector");

@@ -82,6 +82,8 @@ public partial class AITank : Tank {
     /// <summary>Change the texture of this <see cref="AITank"/>.</summary>
     /// <param name="texture">The new texture.</param>
     public void SwapTankTexture(Texture2D texture) => _tankTexture = texture;
+    /// <summary>The texture this tank is drawn with (its own copy, unless swapped).</summary>
+    public Texture2D? TankTexture => _tankTexture;
     /// <summary>The AI parameter collection of this AI Tank.</summary>
     public AIParameters Parameters { get; set; } = new();
     /// <summary>The position of the target this <see cref="AITank"/> is currently attempting to aim at.</summary>
@@ -312,6 +314,14 @@ public partial class AITank : Tank {
         // this code lowkey hurts to read
         // check if less than certain values for different value coins
 
+        // your stats only count your own kills (a player on this phone; offline, any player tank)
+        bool mine = context.Source is PlayerTank pk && (!Client.IsConnected() || pk.PlayerId == NetPlay.GetMyClientId());
+        if (!mine) {
+            GiveXP();
+            return;
+        }
+        TankGame.SaveFile.TotalKills++;
+
         if (context is TankHurtContextShell cxtShell) {
             TankGame.SaveFile.BulletKills++;
 
@@ -335,8 +345,6 @@ public partial class AITank : Tank {
         // hardcoded for now until local multiplayer exists
         else if (!Client.IsConnected()) {
             PlayerTank.KillCounts[0]++;
-
-            TankGame.SaveFile.TotalKills++;
         }
 
         if (TankGame.SaveFile.TankKills.TryGetValue(AiTankType, out uint value))

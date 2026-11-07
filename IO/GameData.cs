@@ -53,7 +53,15 @@ public class GameData : IFileSerializable {
         }
     }
     public void Serialize() {
-        using var writer = new BinaryWriter(File.Open(Path.Combine(Directory, Name), FileMode.OpenOrCreate));
+        // written to a temporary file first, so a phone that kills the app mid-save never loses the stats
+        var final = Path.Combine(Directory, Name);
+        var tmp = final + ".tmp";
+        using (var writer = new BinaryWriter(File.Open(tmp, FileMode.Create)))
+            Write(writer);
+        File.Move(tmp, final, true);
+    }
+
+    private void Write(BinaryWriter writer) {
         /* File Serialization Order:
          * Do note: If you edit the game's data, you are scum
          * 

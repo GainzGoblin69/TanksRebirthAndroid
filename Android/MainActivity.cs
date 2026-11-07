@@ -347,6 +347,7 @@ public class MainActivity : AndroidGameActivity {
 
     protected override void OnPause() {
         _resumed = false;
+        try { TankGame.SaveStats(); } catch { } // (the app may never come back)
         try { _tilt?.Stop(); } catch { }
         base.OnPause();
     }

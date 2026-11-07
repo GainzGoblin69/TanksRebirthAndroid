@@ -21,6 +21,7 @@ public static partial class MainMenuUI {
             LoadTemplateMission();
             return;
         }
+        MenuBattle.Update();
         // do not count player tanks into the check
         var missionComplete = IntermissionHandler.NothingCanHappenAnymore(curMenuMission, out _, (t) => t is not PlayerTank);
 
@@ -96,6 +97,7 @@ public static partial class MainMenuUI {
             if (autoSetup) {
                 CampaignGlobals.LoadedCampaign.LoadMission(mission);
                 CampaignGlobals.LoadedCampaign.SetupLoadedMission(true);
+                MenuBattle.Decorate(); // teams in colors, specials and items
             }
             if (loadForMenu)
                 curMenuMission = mission;
