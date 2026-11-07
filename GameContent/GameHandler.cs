@@ -152,7 +152,8 @@ public class GameHandler {
         _menuStillTankCount = liveAi;
         if (menuStill && liveAi > 0 && !IntermissionSystem.IsAwaitingNewMission)
             _menuStillFrames++;
-        bool freezeEntities = menuStill && _menuStillFrames > 10;
+        // (the menu battle now plays out live behind the menu; it used to freeze into a still)
+        bool freezeEntities = false;
 
         if (!IntermissionSystem.IsAwaitingNewMission && !freezeEntities) {
             foreach (var pTank in AllPlayerTanks)
