@@ -122,6 +122,7 @@ public static class TroveRun {
         LevelProgress.CurrentCampaignKey = "TankTroves";
         MissileUpgrade.Reset();
         TroveItems.Reset();
+        TroveItems.StartingKit(); // a Shield and a Boost to start with
         TestSetup();
         RevealMap();
         BossTank = null;

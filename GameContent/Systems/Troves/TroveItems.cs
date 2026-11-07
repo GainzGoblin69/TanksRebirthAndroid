@@ -492,6 +492,15 @@ public static class TroveItems {
     private static double Now => TroveRun.PlayTime;
     public static bool Frozen => TroveRun.Active && Now < FrozenUntil;
 
+    /// <summary>A new Tank Troves run: everyone starts with a Shield and a full Boost bar.</summary>
+    public static void StartingKit() {
+        foreach (var p in Players) {
+            p.Shields = 1;
+            p.BoostMax = 1f;
+            p.BoostFuel = 1f;
+        }
+    }
+
     public static void Reset() {
         for (int i = 0; i < 4; i++)
             Players[i] = new PlayerItems { Id = i };
