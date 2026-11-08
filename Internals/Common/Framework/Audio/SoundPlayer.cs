@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 using System;
 using System.Collections.Generic;
@@ -39,6 +39,9 @@ public static class SoundPlayer
     }
 
     /// <param name="position">Where in the world the sound happens (pans it left/right). Null plays it centred.</param>
+    /// <summary>How loud the main menu's background battle is, compared to a real game.</summary>
+    public const float MenuBattleVolume = 0.18f;
+
     public static OggAudio PlaySoundInstance(string audioPath, SoundContext context, float volume = 1f, float maxVolume = 1f, float panOverride = 0f, float pitchOverride = 0f, bool rememberMe = false, Vector3? position = null) {
         if (position is { } at)
             panOverride += PanFor(at);
@@ -53,6 +56,10 @@ public static class SoundPlayer
             SoundContext.Ambient => AmbientVolume,
             _ => throw new ArgumentOutOfRangeException(nameof(context), context, "Uh oh! Seems like a new sound type was implemented, but I was not given a way to handle it!"),
         };
+        // the main menu's background battle plays quietly (menu clicks and fanfares stay at full volume)
+        if (context != SoundContext.Music && GameContent.UI.MainMenu.MainMenuUI.IsActive
+            && !audioPath.Replace('\\', '/').Contains("sounds/menu/") && !audioPath.Contains("fanfares"))
+            volume *= MenuBattleVolume;
 
         OggAudio sfx;
 
