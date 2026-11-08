@@ -89,6 +89,9 @@ public static class TroveBosses {
     private static Vector2 _dashFrom, _dashTo;
     private static double _dashStart = -1, _dashEnd = -1;
     private static Vector2 _bounceVel;
+    // Jelly Roller: shots in the current volley, and when its rest ends
+    private static int _jellyShots;
+    private static double _jellyRestUntil;
     // batch 2 bosses
     /// <summary>Pyro Baron's burning trail and Chrono Tank's time bubbles (every phone).</summary>
     public static readonly List<(Vector2 At, double Until)> Fires = [], Bubbles = [];
@@ -234,6 +237,8 @@ public static class TroveBosses {
             case BossKind.MirrorTank:
                 props.Stationary = true; // these move the way their fight says, not by the usual AI
                 _bounceVel = new Vector2(1.6f, 1.2f);
+                _jellyShots = 0;
+                _jellyRestUntil = 0;
                 break;
             case BossKind.TwinAsh: {
                 // a second, equal tank next to it; they share the health bar
@@ -509,6 +514,14 @@ public static class TroveBosses {
                 DoDash(b);
                 break;
             case BossKind.JellyRoller: {
+                // after a volley of bounce shots it stops to rest (wobbling), then rolls on
+                if (Now < _jellyRestUntil) {
+                    float wob = MathF.Sin((float)Now * 14f) * 0.12f;
+                    b.ChassisRotation += wob * Dt * 0.3f;
+                    if (Random.Shared.NextDouble() < 0.15 * Dt)
+                        GameHandler.Particles.MakeShineSpot(b.Position3D + new Vector3(0, 18, 0), new Color(255, 160, 210), 0.5f);
+                    break;
+                }
                 float speed = hurt ? 3f : 2.2f;
                 if (_bounceVel.LengthSquared() < 0.1f)
                     _bounceVel = new Vector2(1, 0.8f);
@@ -526,8 +539,13 @@ public static class TroveBosses {
                 if (!bounced)
                     b.Position = next;
                 b.ChassisRotation = MathF.Atan2(_bounceVel.Y, _bounceVel.X) - MathHelper.PiOver2;
-                if (bounced && Every("bounceShot", 0.25))
+                if (bounced && Every("bounceShot", 0.3)) {
                     Fire(b, aim, 7);
+                    if (++_jellyShots >= (hurt ? 8 : 6)) {
+                        _jellyShots = 0;
+                        _jellyRestUntil = Now + (hurt ? 2.2 : 3.0);
+                    }
+                }
                 break;
             }
             case BossKind.PepperPot:
