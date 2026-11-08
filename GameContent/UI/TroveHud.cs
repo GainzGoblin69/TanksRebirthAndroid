@@ -198,6 +198,15 @@ public static class TroveHud {
             ToggleSwitch.DrawDisc(sb, c, 9 * s, col * 0.16f);
             ToggleSwitch.DrawDisc(sb, c, 5 * s, col * 0.28f);
         }
+        // boost flames glow orange behind the tank
+        for (int i = 0; i < 4; i++) {
+            if (!TroveItems.Players[i].Boosting || GameHandler.AllPlayerTanks[i] is not { IsDestroyed: false } bt)
+                continue;
+            var back = bt.Velocity.LengthSquared() > 0.01f ? -Vector2.Normalize(bt.Velocity) : Vector2.Zero;
+            var bc = ToScreen(bt.Position + back * 16f);
+            ToggleSwitch.DrawDisc(sb, bc, 30 * s, new Color(255, 140, 40) * 0.12f);
+            ToggleSwitch.DrawDisc(sb, bc, 16 * s, new Color(255, 180, 80) * 0.18f);
+        }
         // mines glow yellow (red while about to go off), explosions light up the dark while they burn
         foreach (var mine in Mine.AllMines) {
             if (mine is null)

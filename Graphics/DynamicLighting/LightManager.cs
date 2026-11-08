@@ -448,6 +448,17 @@ public static class LightManager {
             }
         }
 
+        // a boosting tank's flame trail lights up the ground behind it (flickering)
+        if (GameContent.Systems.Troves.TroveRun.Active) {
+            foreach (var t in GameContent.GameHandler.AllPlayerTanks) {
+                if (t is not { IsDestroyed: false } pt || pt.PlayerId is < 0 or > 3 || !GameContent.Systems.Troves.TroveItems.Players[pt.PlayerId].Boosting)
+                    continue;
+                var back = pt.Velocity.LengthSquared() > 0.01f ? -Vector2.Normalize(pt.Velocity) : Vector2.Zero;
+                float flicker = 0.85f + 0.15f * MathF.Sin((float)GameContent.Systems.Troves.TroveRun.PlayTime * 31f + pt.PlayerId);
+                GameplayLights.AddGlow(pt.Position3D + new Vector3(back.X * 16f, 5f, back.Y * 16f), new Color(255, 140, 40), 1.5f * flicker, 70f);
+            }
+        }
+
         // neon and rainbow tank skins light up around them in the dark
         if (darkScene) {
             foreach (var t in GameContent.GameHandler.AllPlayerTanks) {
