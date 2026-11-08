@@ -770,8 +770,10 @@ public static class TroveRun {
     }
 
     private static void NextFloor() {
-        if (!Battle)
+        if (!Battle) {
             Unlocks.Count("floors");
+            TroveItems.FloorBoost(); // a full Boost bar for every floor
+        }
         FloorNumber++;
         ReadyUntil = -1;
         TroveItems.NewFloor();

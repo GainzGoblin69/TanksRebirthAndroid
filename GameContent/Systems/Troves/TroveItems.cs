@@ -501,6 +501,14 @@ public static class TroveItems {
         }
     }
 
+    /// <summary>A new floor: everyone's Boost bar is full again (and everyone has one).</summary>
+    public static void FloorBoost() {
+        foreach (var p in Players) {
+            p.BoostMax = Math.Max(p.BoostMax, 1f);
+            p.BoostFuel = p.BoostMax;
+        }
+    }
+
     public static void Reset() {
         for (int i = 0; i < 4; i++)
             Players[i] = new PlayerItems { Id = i };
