@@ -62,8 +62,24 @@ internal sealed class SplashView : View {
         _p.SetStyle(Paint.Style.Fill);
     }
 
+    bool _broken;
     protected override void OnDraw(Canvas canvas) {
         base.OnDraw(canvas);
+        if (_broken) {
+            canvas.DrawColor(Color.White); // (a plain white screen rather than ever stopping the game from starting)
+            return;
+        }
+        try {
+            Animate(canvas);
+        }
+        catch (Exception e) {
+            _broken = true;
+            Android.Util.Log.Warn("TanksRebirth", "Intro animation failed: " + e);
+            Invalidate();
+        }
+    }
+
+    void Animate(Canvas canvas) {
         float t = (SystemClock.UptimeMillis() - _start) / 1000f;
         float w = Width, h = Height;
         float cx = w / 2f, cy = h * 0.43f;
@@ -72,7 +88,7 @@ internal sealed class SplashView : View {
 
         // a bright white room, a touch greyer at the edges
         Fill();
-        _p.SetShader(new RadialGradient(cx, cy, MathF.Max(w, h) * 0.75f, Argb(1, 255, 255, 255), Argb(1, 218, 226, 218), Clamp));
+        _p.SetShader(new RadialGradient(cx, cy, MathF.Max(w, h) * 0.75f, new int[] { Argb(1, 255, 255, 255), Argb(1, 218, 226, 218) }, null, Clamp));
         canvas.DrawRect(0, 0, w, h, _p);
 
         // ribbons of light sweeping in to the middle: tapered bands, each with a soft glow and a bright core
@@ -104,7 +120,7 @@ internal sealed class SplashView : View {
                         _path.LineTo(_mid[s].X - _nx[s] * _half[s] * scale, _mid[s].Y - _ny[s] * _half[s] * scale);
                     _path.Close();
                     Fill();
-                    _p.SetShader(new LinearGradient(_mid[0].X, _mid[0].Y, _mid[N].X, _mid[N].Y, Argb(0, r, g, b2), Argb(alpha * ribbonFade, r, g, b2), Clamp));
+                    _p.SetShader(new LinearGradient(_mid[0].X, _mid[0].Y, _mid[N].X, _mid[N].Y, new int[] { Argb(0, r, g, b2), Argb(alpha * ribbonFade, r, g, b2) }, null, Clamp));
                     canvas.DrawPath(_path, _p);
                 }
                 Fill();
@@ -124,8 +140,7 @@ internal sealed class SplashView : View {
         if (gather > 0f) {
             float rr = orbR * (0.6f + 0.8f * gather);
             Fill();
-            _p.SetShader(new RadialGradient(cx, cy, rr, new[] { Argb(0.85f * gather, 255, 255, 255), Argb(0.35f * gather, 150, 220, 90), Argb(0, 150, 220, 90) },
-                new[] { 0f, 0.4f, 1f }, Clamp));
+            _p.SetShader(new RadialGradient(cx, cy, rr, new int[] { Argb(0.85f * gather, 255, 255, 255), Argb(0.35f * gather, 150, 220, 90), Argb(0, 150, 220, 90) }, new[] { 0f, 0.4f, 1f }, Clamp));
             canvas.DrawCircle(cx, cy, rr, _p);
         }
 
@@ -134,8 +149,7 @@ internal sealed class SplashView : View {
         if (flash is > 0f and < 1f) {
             float fr = unit * (0.12f + 0.95f * EaseOut(flash)), fa = 1f - flash;
             Fill();
-            _p.SetShader(new RadialGradient(cx, cy, fr, new[] { Argb(fa, 255, 255, 255), Argb(0.45f * fa, 150, 220, 90), Argb(0, 150, 220, 90) },
-                new[] { 0f, 0.45f, 1f }, Clamp));
+            _p.SetShader(new RadialGradient(cx, cy, fr, new int[] { Argb(fa, 255, 255, 255), Argb(0.45f * fa, 150, 220, 90), Argb(0, 150, 220, 90) }, new[] { 0f, 0.45f, 1f }, Clamp));
             canvas.DrawCircle(cx, cy, fr, _p);
             Fill();
             _p.SetStyle(Paint.Style.Stroke);
@@ -166,18 +180,16 @@ internal sealed class SplashView : View {
             canvas.Save();
             canvas.Scale(1f, 0.2f, cx, sy);
             Fill();
-            _p.SetShader(new RadialGradient(cx, sy, sr, Argb(0.26f, 0, 40, 0), Argb(0, 0, 40, 0), Clamp));
+            _p.SetShader(new RadialGradient(cx, sy, sr, new int[] { Argb(0.26f, 0, 40, 0), Argb(0, 0, 40, 0) }, null, Clamp));
             canvas.DrawCircle(cx, sy, sr, _p);
             canvas.Restore();
             // a green halo around it
             Fill();
-            _p.SetShader(new RadialGradient(cx, cy, r * 1.35f, new[] { Argb(0, 122, 205, 60), Argb(0.35f, 122, 205, 60), Argb(0, 122, 205, 60) },
-                new[] { 0.7f, 0.76f, 1f }, Clamp));
+            _p.SetShader(new RadialGradient(cx, cy, r * 1.35f, new int[] { Argb(0, 122, 205, 60), Argb(0.35f, 122, 205, 60), Argb(0, 122, 205, 60) }, new[] { 0.7f, 0.76f, 1f }, Clamp));
             canvas.DrawCircle(cx, cy, r * 1.35f, _p);
             // the ball: lit from the upper left
             Fill();
-            _p.SetShader(new RadialGradient(cx - r * 0.3f, cy - r * 0.38f, r * 1.45f,
-                new[] { Argb(1, 178, 240, 120), Argb(1, 76, 176, 44), Argb(1, 14, 96, 14), Argb(1, 5, 46, 8) }, new[] { 0f, 0.32f, 0.72f, 1f }, Clamp));
+            _p.SetShader(new RadialGradient(cx - r * 0.3f, cy - r * 0.38f, r * 1.45f, new int[] { Argb(1, 178, 240, 120), Argb(1, 76, 176, 44), Argb(1, 14, 96, 14), Argb(1, 5, 46, 8) }, new[] { 0f, 0.32f, 0.72f, 1f }, Clamp));
             canvas.DrawCircle(cx, cy, r, _p);
             // Larry
             float fr = r * 0.78f;
@@ -191,7 +203,7 @@ internal sealed class SplashView : View {
                 canvas.DrawBitmap(_face, null, new RectF(cx - fr, cy - fr, cx + fr, cy + fr), _p);
                 // a green shade at the rim, so he sits inside the ball
                 Fill();
-                _p.SetShader(new RadialGradient(cx, cy, fr, new[] { Argb(0, 10, 80, 10), Argb(0, 10, 80, 10), Argb(0.62f, 8, 60, 8) }, new[] { 0f, 0.7f, 1f }, Clamp));
+                _p.SetShader(new RadialGradient(cx, cy, fr, new int[] { Argb(0, 10, 80, 10), Argb(0, 10, 80, 10), Argb(0.62f, 8, 60, 8) }, new[] { 0f, 0.7f, 1f }, Clamp));
                 canvas.DrawCircle(cx, cy, fr, _p);
                 canvas.Restore();
             }
@@ -206,7 +218,7 @@ internal sealed class SplashView : View {
             canvas.DrawCircle(cx, cy, fr + r * 0.03f, _p);
             // glossy shine across the top
             Fill();
-            _p.SetShader(new LinearGradient(0, cy - r, 0, cy - r * 0.1f, Argb(0.62f, 255, 255, 255), Argb(0, 255, 255, 255), Clamp));
+            _p.SetShader(new LinearGradient(0, cy - r, 0, cy - r * 0.1f, new int[] { Argb(0.62f, 255, 255, 255), Argb(0, 255, 255, 255) }, null, Clamp));
             canvas.DrawOval(new RectF(cx - r * 0.66f, cy - r * 0.96f, cx + r * 0.66f, cy - r * 0.12f), _p);
             // one sweep of light across the ball, just after it lands
             float sweep = (t - 1.9f) / 0.6f;
@@ -218,8 +230,7 @@ internal sealed class SplashView : View {
                 canvas.Rotate(20f, cx, cy);
                 float sx = cx - r * 1.6f + r * 3.2f * sweep;
                 Fill();
-                _p.SetShader(new LinearGradient(sx - r * 0.3f, 0, sx + r * 0.3f, 0,
-                    new[] { Argb(0, 255, 255, 255), Argb(0.5f, 255, 255, 255), Argb(0, 255, 255, 255) }, null, Clamp));
+                _p.SetShader(new LinearGradient(sx - r * 0.3f, 0, sx + r * 0.3f, 0, new int[] { Argb(0, 255, 255, 255), Argb(0.5f, 255, 255, 255), Argb(0, 255, 255, 255) }, null, Clamp));
                 canvas.DrawRect(cx - r * 2f, cy - r * 2f, cx + r * 2f, cy + r * 2f, _p);
                 canvas.Restore();
             }
