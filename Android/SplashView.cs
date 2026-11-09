@@ -9,12 +9,12 @@ namespace TanksRebirth.Droid;
 /// <summary>
 /// The Larry Slop Software start-up animation, in the spirit of a mid-2000s console boot: a bright white room,
 /// green and silver ribbons of light sweeping in to the middle, a flash and a shockwave ring, then a glossy green
-/// orb with Larry's face pops in and the name fades in under it. Drawn with plain Android graphics, so it plays
-/// while the game is still loading.
+/// orb with Larry's face pops in and the name fades in under it. It has its own surface and draws from its own
+/// thread, so it keeps playing smoothly while the game loads (which keeps the main thread busy).
 /// </summary>
-internal sealed class SplashView : View {
+internal sealed class SplashView : SurfaceView, ISurfaceHolderCallback {
     readonly Bitmap? _face;
-    readonly long _start = SystemClock.UptimeMillis();
+    long _start = SystemClock.UptimeMillis();
     readonly Paint _p = new(PaintFlags.AntiAlias);
     readonly Path _path = new();
     readonly (float Angle, float Dir, float Delay, float Width, float Turns, int Kind)[] _ribbons;
@@ -31,6 +31,18 @@ internal sealed class SplashView : View {
 
     /// <summary>How long the animation runs (seconds); it holds its last frame after that.</summary>
     public const float Length = 2.6f;
+    const float FadeSeconds = 0.45f;
+
+    // the drawing thread
+    System.Threading.Thread? _thread;
+    volatile bool _running;
+    volatile int _w, _h;
+    long _fadeStart = -1;
+    Action? _onGone;
+    bool _started;
+
+    /// <summary>Seconds since the animation started playing (0 until its surface exists).</summary>
+    public float Elapsed => _started ? (SystemClock.UptimeMillis() - _start) / 1000f : 0f;
 
     public SplashView(Context context, Bitmap? face) : base(context) {
         _face = face;
@@ -42,6 +54,91 @@ internal sealed class SplashView : View {
         _sparks = new (float, float, float, bool)[40];
         for (int i = 0; i < _sparks.Length; i++)
             _sparks[i] = ((float)rng.NextDouble() * MathF.Tau, 0.3f + (float)rng.NextDouble(), 0.4f + (float)rng.NextDouble(), rng.Next(3) == 0);
+        // above the game's own surface, and see-through (so it can fade out to reveal the game)
+        SetZOrderOnTop(true);
+        Holder!.SetFormat(Format.Translucent);
+        Holder.AddCallback(this);
+    }
+
+    /// <summary>Fades the intro out, then calls <paramref name="gone"/> (on the drawing thread) once nothing is left.</summary>
+    public void FadeOut(Action gone) {
+        _onGone = gone;
+        _fadeStart = SystemClock.UptimeMillis();
+        if (!_running)
+            gone(); // (never got a surface)
+    }
+
+    public void SurfaceCreated(ISurfaceHolder holder) {
+        if (_running)
+            return;
+        if (!_started) {
+            _started = true;
+            _start = SystemClock.UptimeMillis();
+        }
+        _running = true;
+        _thread = new System.Threading.Thread(Loop) { IsBackground = true, Name = "Intro" };
+        _thread.Start();
+    }
+
+    public void SurfaceChanged(ISurfaceHolder holder, Format format, int width, int height) {
+        _w = width;
+        _h = height;
+    }
+
+    public void SurfaceDestroyed(ISurfaceHolder holder) {
+        _running = false;
+        try { _thread?.Join(500); } catch { }
+    }
+
+    void Loop() {
+        var holder = Holder!;
+        bool hardware = Build.VERSION.SdkInt >= BuildVersionCodes.O;
+        bool broken = false;
+        while (_running) {
+            float fade = _fadeStart < 0 ? 1f : 1f - (SystemClock.UptimeMillis() - _fadeStart) / 1000f / FadeSeconds;
+            Canvas? canvas = null;
+            try {
+                try { canvas = hardware ? holder.LockHardwareCanvas() : holder.LockCanvas(); }
+                catch { hardware = false; }
+                if (canvas is null) {
+                    System.Threading.Thread.Sleep(16);
+                    continue;
+                }
+                canvas.DrawColor(Color.Transparent, PorterDuff.Mode.Clear!);
+                if (fade > 0f) {
+                    int w = canvas.Width, h = canvas.Height;
+                    bool layer = fade < 1f;
+                    if (layer)
+                        canvas.SaveLayerAlpha(0, 0, w, h, (int)(255 * Clamp01(fade)));
+                    if (broken)
+                        canvas.DrawColor(Color.White); // (a plain white screen rather than ever stopping the game from starting)
+                    else {
+                        try { Animate(canvas, w, h); }
+                        catch (Exception e) {
+                            broken = true;
+                            Android.Util.Log.Warn("TanksRebirth", "Intro animation failed: " + e);
+                        }
+                    }
+                    if (layer)
+                        canvas.Restore();
+                }
+            }
+            catch (Exception e) {
+                Android.Util.Log.Warn("TanksRebirth", "Intro surface failed: " + e.Message);
+                fade = 0f;
+            }
+            finally {
+                if (canvas is not null) {
+                    try { holder.UnlockCanvasAndPost(canvas); } catch { }
+                }
+            }
+            if (fade <= 0f) {
+                _running = false;
+                try { _onGone?.Invoke(); } catch { }
+                return;
+            }
+            System.Threading.Thread.Sleep(hardware ? 6 : 12);
+        }
     }
 
     static float Clamp01(float v) => MathF.Max(0f, MathF.Min(1f, v));
@@ -60,28 +157,11 @@ internal sealed class SplashView : View {
         _p.Reset();
         _p.AntiAlias = true;
         _p.SetStyle(Paint.Style.Fill);
+        _p.LetterSpacing = 0f;
     }
 
-    bool _broken;
-    protected override void OnDraw(Canvas canvas) {
-        base.OnDraw(canvas);
-        if (_broken) {
-            canvas.DrawColor(Color.White); // (a plain white screen rather than ever stopping the game from starting)
-            return;
-        }
-        try {
-            Animate(canvas);
-        }
-        catch (Exception e) {
-            _broken = true;
-            Android.Util.Log.Warn("TanksRebirth", "Intro animation failed: " + e);
-            Invalidate();
-        }
-    }
-
-    void Animate(Canvas canvas) {
+    void Animate(Canvas canvas, float w, float h) {
         float t = (SystemClock.UptimeMillis() - _start) / 1000f;
-        float w = Width, h = Height;
         float cx = w / 2f, cy = h * 0.43f;
         float unit = MathF.Min(w, h);
         float orbR = unit * 0.2f;
@@ -259,7 +339,6 @@ internal sealed class SplashView : View {
             canvas.DrawText("SOFTWARE", cx + _p.TextSize * 0.25f, ty + unit * 0.083f, _p);
         }
 
-        PostInvalidateOnAnimation(); // (keeps breathing until the game takes over)
     }
 
     /// <summary>A point along a ribbon: from off-screen (u = 0), spiralling in to the middle (u = 1).</summary>

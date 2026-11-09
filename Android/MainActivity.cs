@@ -260,9 +260,8 @@ public class MainActivity : AndroidGameActivity {
     private TiltSensor? _tilt;
 
     // ---- the Larry Slop Software splash: over the game while it loads, at least a couple of seconds, then fades out
-    private View? _splash;
+    private SplashView? _splash;
     private long _splashShownAt;
-    private const long SPLASH_MIN_MS = 3400; // the whole animation, plus a moment on the finished logo
 
     private void AddSplash(FrameLayout frame) {
         try {
@@ -285,16 +284,15 @@ public class MainActivity : AndroidGameActivity {
     private void HideSplashWhenReady() {
         if (_splash is not { } splash)
             return;
-        bool ready = _firstFrameAt is not null && SystemClock.UptimeMillis() - _splashShownAt >= SPLASH_MIN_MS;
+        // the whole animation, plus a moment on the finished logo
+        bool ready = _firstFrameAt is not null && splash.Elapsed >= SplashView.Length + 0.8f;
         bool tooLong = SystemClock.UptimeMillis() - _splashShownAt > 20000; // never hide the game for good
         if (!ready && !tooLong) {
             new Handler(Looper.MainLooper!).PostDelayed(HideSplashWhenReady, 100);
             return;
         }
         _splash = null;
-        splash.Animate()!.Alpha(0f).SetDuration(450).WithEndAction(new Java.Lang.Runnable(() => {
-            (splash.Parent as ViewGroup)?.RemoveView(splash);
-        }))!.Start();
+        splash.FadeOut(() => RunOnUiThread(() => (splash.Parent as ViewGroup)?.RemoveView(splash)));
     }
 
     protected override void OnResume() {
