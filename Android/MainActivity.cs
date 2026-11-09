@@ -262,20 +262,16 @@ public class MainActivity : AndroidGameActivity {
     // ---- the Larry Slop Software splash: over the game while it loads, at least a couple of seconds, then fades out
     private View? _splash;
     private long _splashShownAt;
-    private const long SPLASH_MIN_MS = 2200;
+    private const long SPLASH_MIN_MS = 3400; // the whole animation, plus a moment on the finished logo
 
     private void AddSplash(FrameLayout frame) {
         try {
-            int id = Resources!.GetIdentifier("splash_logo", "drawable", PackageName);
-            if (id == 0)
-                return;
-            var splash = new FrameLayout(this);
-            splash.SetBackgroundColor(Android.Graphics.Color.White);
-            var img = new ImageView(this);
-            img.SetImageResource(id);
-            img.SetScaleType(ImageView.ScaleType.FitCenter);
-            int h = (int)(Resources.DisplayMetrics!.HeightPixels * 0.55f);
-            splash.AddView(img, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, h) { Gravity = GravityFlags.Center });
+            // Larry's head shot (the old logo picture if it's missing)
+            Android.Graphics.Bitmap? face = null;
+            int id = Resources!.GetIdentifier("larry_head", "drawable", PackageName);
+            if (id != 0)
+                face = Android.Graphics.BitmapFactory.DecodeResource(Resources, id);
+            var splash = new SplashView(this, face);
             frame.AddView(splash, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
             _splash = splash;
             _splashShownAt = SystemClock.UptimeMillis();

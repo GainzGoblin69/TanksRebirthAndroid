@@ -13,7 +13,7 @@ adb logcat -c
 launch() {  # $1 = label, $2 = seconds to wait
   adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 > /dev/null
   local elapsed=0
-  for t in 3 10 25 45 $2; do
+  for t in 1 2 3 10 25 45 $2; do
     sleep $((t - elapsed)); elapsed=$t
     adb exec-out screencap -p > "diag/$1-${t}s.png"
   done
