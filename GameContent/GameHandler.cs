@@ -78,6 +78,7 @@ public class GameHandler {
     /// <summary>True once the menu's battlefield has been positioned and frozen.</summary>
     public static bool MenuStillReady => _menuStillFrames > 10;
     private static int _menuStillTankCount;
+    private static bool _musicWasOn = true;
     internal static void UpdateAll(GameTime gameTime) {
         /*void doTestWithFont() {
             var str = 
@@ -155,11 +156,14 @@ public class GameHandler {
         // (the menu battle now plays out live behind the menu; it used to freeze into a still)
         bool freezeEntities = false;
 
+        Internals.Perf.Mark(Internals.Perf.S.UpdMisc);
         if (!IntermissionSystem.IsAwaitingNewMission && !freezeEntities) {
             foreach (var pTank in AllPlayerTanks)
                 pTank?.Update();
+            Internals.Perf.Mark(Internals.Perf.S.Players);
 
             AIManager.ProcessAITanks();
+            Internals.Perf.Mark(Internals.Perf.S.AI);
 
             foreach (var mine in Mine.AllMines)
                 mine?.Update();
@@ -174,6 +178,7 @@ public class GameHandler {
                 p?.Update();
         }
         if (CampaignGlobals.InMission) {
+            _musicWasOn = true;
             TankMusicSystem.Update();
 
             foreach (var crate in Crate.crates)
@@ -183,13 +188,19 @@ public class GameHandler {
                 pu?.Update();
         }
         else {
-            foreach (var audio in TankMusicSystem.Audio.ToList()) {
-                audio.Value.Volume = 0;
-                audio.Value.Stop();
+            // silence the mission music: right when a mission ends, then only now and then
+            // (it used to stop every track on every frame between missions and on the menu)
+            if (_musicWasOn || RuntimeData.UpdateCount % 30 == 0) {
+                foreach (var audio in TankMusicSystem.Audio) {
+                    audio.Value.Volume = 0;
+                    audio.Value.Stop();
+                }
             }
+            _musicWasOn = false;
         }
 
         LevelEditorUI.Update();
+        Internals.Perf.Mark(Internals.Perf.S.Shots);
 
         foreach (var expl in Explosion.Explosions)
             expl?.Update();
@@ -204,11 +215,14 @@ public class GameHandler {
             foreach (var sq in PlacementSquare.Placements)
                 sq?.Update();
 
+        Internals.Perf.Mark(Internals.Perf.S.Blocks);
         Particles.UpdateParticles();
+        Internals.Perf.Mark(Internals.Perf.S.Particles);
 
         var mmActive = MainMenuUI.IsActive;
         if (mmActive)
             MainMenuUI.Update();
+        Internals.Perf.Mark(Internals.Perf.S.MenuUpd);
         // I AM PUTTING THIS HERE BECAUSE FUCK YOU.
         MainMenuUI.UpdateCampaignButton.IsVisible = MainMenuUI.MenuState == MainMenuUI.UIState.Campaigns && mmActive && !Internals.Common.Framework.Input.TouchControls.Enabled;
 
@@ -225,7 +239,9 @@ public class GameHandler {
         if (CameraGlobals.OverheadView)
             LevelEditorUI.HandleLevelEditorModifications();
 
+        Internals.Perf.Mark(Internals.Perf.S.Logic);
         OnPostUpdate?.Invoke();
+        Internals.Perf.Mark(Internals.Perf.S.PostUpd);
     }
 
     internal static void RenderAll() {
@@ -242,15 +258,19 @@ public class GameHandler {
             ExperienceBar.Render(TankGame.SpriteRenderer);
         }
         
+        Internals.Perf.Mark(Internals.Perf.S.Room);
         // CHECK: move this back if necessary
         GameScene.RenderWorldModels();
         // TankFootprint.Draw();
+        Internals.Perf.Mark(Internals.Perf.S.World);
 
         foreach (var tank in AllTanks)
             tank?.Render();
+        Internals.Perf.Mark(Internals.Perf.S.Tanks);
 
         foreach (var cube in Block.AllBlocks)
             cube?.OnRender();
+        Internals.Perf.Mark(Internals.Perf.S.BlocksDraw);
 
         foreach (var mine in Mine.AllMines)
             mine?.Render();
@@ -276,6 +296,7 @@ public class GameHandler {
         foreach (var powerup in Powerup.Powerups)
             powerup?.Render();
 
+        Internals.Perf.Mark(Internals.Perf.S.ShotsDraw);
         Particles.RenderModelParticles();
 
         if ((DebugManager.DebugLevel == DebugManager.Id.LevelEditDebug && CameraGlobals.OverheadView) || LevelEditorUI.IsActive)
@@ -285,9 +306,11 @@ public class GameHandler {
         TankGame.Instance.GraphicsDevice.BlendState = BlendState.NonPremultiplied;
 
         Particles.RenderParticles();
+        Internals.Perf.Mark(Internals.Perf.S.PartDraw);
 
         // (1.9) shadows + lights, multiplied onto the world drawn so far. Everything after this stays unlit.
         Graphics.DynamicLighting.LightingSystem.EndFrame(TankGame.GameFrameBuffer);
+        Internals.Perf.Mark(Internals.Perf.S.Lights);
 
         // only render the level editor if it's active
         // change depth stencil...?
@@ -305,6 +328,7 @@ public class GameHandler {
         IntermissionHandler.RenderCountdownGraphics();
 
         OnPostRender?.Invoke();
+        Internals.Perf.Mark(Internals.Perf.S.PostDraw);
     }
 
     public static void RenderUI() {

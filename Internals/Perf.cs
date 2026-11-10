@@ -9,9 +9,16 @@ namespace TanksRebirth.Internals;
 /// the slowest frame, and how much memory a frame allocates (garbage means collector pauses, felt as stutter).
 /// </summary>
 public static class Perf {
-    public enum S { Logic, Physics, UpdateRest, Scene3D, MenuText, Present, MenuUI, GameUI, Touch, Count }
+    public enum S {
+        // update
+        UpdMisc, Players, AI, Shots, Blocks, Particles, MenuUpd, PostUpd, Logic, Physics, UpdateRest,
+        // draw
+        Room, World, Tanks, BlocksDraw, ShotsDraw, PartDraw, Lights, PostDraw, Scene3D, MenuText, Present, MenuUI, GameUI, Touch, Count
+    }
 
     static readonly long[] _ticks = new long[(int)S.Count];
+    static readonly long[] _bytes = new long[(int)S.Count];
+    static long _markAlloc;
     static long _mark, _worstFrame, _alloc;
     static int _frames, _gen0, _gen1;
     static double _sinceLog;
@@ -23,6 +30,9 @@ public static class Perf {
         long now = Stopwatch.GetTimestamp();
         _ticks[(int)s] += now - _mark;
         _mark = now;
+        long mem = GC.GetAllocatedBytesForCurrentThread();
+        _bytes[(int)s] += mem - _markAlloc;
+        _markAlloc = mem;
     }
 
     static long _openAt, _openAlloc, _frameTicks;
@@ -30,7 +40,7 @@ public static class Perf {
     /// <summary>Starts timing a stretch of the frame (the update, or the draw).</summary>
     public static void Open() {
         _openAt = _mark = Stopwatch.GetTimestamp();
-        _openAlloc = GC.GetAllocatedBytesForCurrentThread();
+        _openAlloc = _markAlloc = GC.GetAllocatedBytesForCurrentThread();
     }
 
     public static void Close() {
@@ -55,7 +65,10 @@ public static class Perf {
             double v = _ticks[i] * ms / _frames;
             total += v;
             sb.Append(' ').Append((S)i).Append('=').Append(v.ToString("0.00"));
+            if (_bytes[i] / _frames >= 512)
+                sb.Append('(').Append((_bytes[i] / 1024.0 / _frames).ToString("0.0")).Append("KB)");
             _ticks[i] = 0;
+            _bytes[i] = 0;
         }
         int g0 = GC.CollectionCount(0), g1 = GC.CollectionCount(1);
         sb.Append(" | total=").Append(total.ToString("0.00")).Append("ms worst=").Append((_worstFrame * ms).ToString("0.0")).Append("ms alloc=")

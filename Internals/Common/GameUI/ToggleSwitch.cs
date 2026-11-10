@@ -108,20 +108,21 @@ public static class ToggleSwitch {
             return;
         }
         const int H = TexSize / 2;
+        var circle = CircleFor(sb);
         int midW = r.Width - 2 * ri, midH = r.Height - 2 * ri;
         // corners: the four quarters of the circle
-        sb.Draw(Circle, new Rectangle(r.X, r.Y, ri, ri), new Rectangle(0, 0, H, H), color);
-        sb.Draw(Circle, new Rectangle(r.Right - ri, r.Y, ri, ri), new Rectangle(H, 0, H, H), color);
-        sb.Draw(Circle, new Rectangle(r.X, r.Bottom - ri, ri, ri), new Rectangle(0, H, H, H), color);
-        sb.Draw(Circle, new Rectangle(r.Right - ri, r.Bottom - ri, ri, ri), new Rectangle(H, H, H, H), color);
+        sb.Draw(circle, new Rectangle(r.X, r.Y, ri, ri), new Rectangle(0, 0, H, H), color);
+        sb.Draw(circle, new Rectangle(r.Right - ri, r.Y, ri, ri), new Rectangle(H, 0, H, H), color);
+        sb.Draw(circle, new Rectangle(r.X, r.Bottom - ri, ri, ri), new Rectangle(0, H, H, H), color);
+        sb.Draw(circle, new Rectangle(r.Right - ri, r.Bottom - ri, ri, ri), new Rectangle(H, H, H, H), color);
         // edges: a one-texel slice through the circle's middle, stretched
         if (midW > 0) {
-            sb.Draw(Circle, new Rectangle(r.X + ri, r.Y, midW, ri), new Rectangle(H, 0, 1, H), color);
-            sb.Draw(Circle, new Rectangle(r.X + ri, r.Bottom - ri, midW, ri), new Rectangle(H, H, 1, H), color);
+            sb.Draw(circle, new Rectangle(r.X + ri, r.Y, midW, ri), new Rectangle(H, 0, 1, H), color);
+            sb.Draw(circle, new Rectangle(r.X + ri, r.Bottom - ri, midW, ri), new Rectangle(H, H, 1, H), color);
         }
         if (midH > 0) {
-            sb.Draw(Circle, new Rectangle(r.X, r.Y + ri, ri, midH), new Rectangle(0, H, H, 1), color);
-            sb.Draw(Circle, new Rectangle(r.Right - ri, r.Y + ri, ri, midH), new Rectangle(H, H, H, 1), color);
+            sb.Draw(circle, new Rectangle(r.X, r.Y + ri, ri, midH), new Rectangle(0, H, H, 1), color);
+            sb.Draw(circle, new Rectangle(r.Right - ri, r.Y + ri, ri, midH), new Rectangle(H, H, H, 1), color);
         }
         if (midW > 0 && midH > 0)
             sb.Draw(_pixel!, new Rectangle(r.X + ri, r.Y + ri, midW, midH), color);
@@ -140,14 +141,29 @@ public static class ToggleSwitch {
     }
 
     private static void DrawCircle(SpriteBatch sb, Vector2 center, float radius, Color color) {
-        var tex = Circle;
+        var tex = CircleFor(sb);
         var scale = radius * 2f / tex.Width;
         sb.Draw(tex, center, null, color, 0f, new Vector2(tex.Width / 2f), scale, SpriteEffects.None, 0f);
     }
 
     private const int TexSize = 256;
     private static Texture2D? _circleStraight;
-    private static Texture2D Circle => StraightAlpha ? _circleStraight! : _circle!;
+    // which blending the sprite batch was started with (it doesn't say, so it's read from inside it)
+    private static readonly System.Reflection.FieldInfo? _blendField =
+        typeof(SpriteBatch).GetField("_blendState", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+    /// <summary>The circle picture that blends correctly in this batch: straight alpha for NonPremultiplied batches
+    /// (the premultiplied one left a thin dark line around every shape there), premultiplied otherwise.</summary>
+    private static Texture2D CircleFor(SpriteBatch sb) {
+        if (StraightAlpha)
+            return _circleStraight!;
+        try {
+            if (ReferenceEquals(_blendField?.GetValue(sb), BlendState.NonPremultiplied))
+                return _circleStraight!;
+        }
+        catch { }
+        return _circle!;
+    }
 
     private static void EnsureTextures(GraphicsDevice gd) {
         if (_circle is { IsDisposed: false } && _pixel is { IsDisposed: false } && _circleStraight is { IsDisposed: false })

@@ -514,7 +514,7 @@ public static partial class MainMenuUI {
             var r = new Rectangle((int)(x0 + (i % 3) * (kw + 10 * s)), (int)(y0 + (i / 3) * (kh + 10 * s)), (int)kw, (int)kh);
             if (keys[i].Length == 0)
                 continue;
-            if (PButton(sb, r, keys[i] == "<" ? "Delete" : keys[i])) {
+            if (PButton(sb, r, keys[i] == "<" ? "Delete" : keys[i], fill: new Color(240, 233, 218))) {
                 if (keys[i] == "<") {
                     if (_keypadText.Length > 0)
                         _keypadText = _keypadText[..^1];
