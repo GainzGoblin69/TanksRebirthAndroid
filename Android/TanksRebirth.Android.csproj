@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <!--
     Android build of Tanks! Rebirth.
     It compiles the same game source as the desktop project (everything under the repo root),
@@ -78,7 +78,6 @@
                   Link="Assets\Content\Assets\%(RecursiveDir)%(Filename)%(Extension)" />
     <AndroidAsset Include="..\Content\MenuMissions\*.mission"
                   Link="Assets\Content\MenuMissions\%(Filename)%(Extension)" />
-    <AndroidAsset Include="Splash\*.ttf" Link="Assets\Splash\%(Filename)%(Extension)" />
     <AndroidAsset Include="..\Localization\*.loc"
                   Link="Assets\Localization\%(Filename)%(Extension)" />
 
