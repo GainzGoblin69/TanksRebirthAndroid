@@ -69,22 +69,31 @@ internal sealed class SplashView : SurfaceView, ISurfaceHolderCallback {
     }
 
     /// <summary>The start-up chime (an original whoosh into a bright chord, timed to the ribbons and the flash).
-    /// Quiet, and skipped when the phone is on silent or vibrate.</summary>
+    /// Plays on the media volume, like the game's own sounds.</summary>
     static Android.Media.MediaPlayer? _chime;
     void PlayChime() {
         try {
-            var am = (Android.Media.AudioManager?)Context?.GetSystemService(Context.AudioService);
-            if (am is not null && am.RingerMode != Android.Media.RingerMode.Normal)
+            var ctx = Context!;
+            int id = ctx.Resources!.GetIdentifier("intro_chime", "raw", ctx.PackageName);
+            Android.Util.Log.Info("IntroChime", $"resource id {id}");
+            if (id == 0)
                 return;
-            int id = Context!.Resources!.GetIdentifier("intro_chime", "raw", Context.PackageName);
-            if (id == 0 || Android.Media.MediaPlayer.Create(Context, id) is not { } mp)
-                return;
+            using var fd = ctx.Resources.OpenRawResourceFd(id)!;
+            var mp = new Android.Media.MediaPlayer();
+            mp.SetAudioAttributes(new Android.Media.AudioAttributes.Builder()!
+                .SetUsage(Android.Media.AudioUsageKind.Game)!
+                .SetContentType(Android.Media.AudioContentType.Sonification)!
+                .Build()!);
+            mp.SetDataSource(fd.FileDescriptor, fd.StartOffset, fd.Length);
+            mp.Prepare();
             _chime = mp; // (held, so it isn't collected mid-play)
-            mp.SetVolume(0.55f, 0.55f);
-            mp.Completion += (_, _) => { mp.Release(); _chime = null; };
+            mp.Completion += (_, _) => { Android.Util.Log.Info("IntroChime", "done"); mp.Release(); _chime = null; };
             mp.Start();
+            Android.Util.Log.Info("IntroChime", $"playing ({mp.Duration} ms)");
         }
-        catch { }
+        catch (Exception e) {
+            Android.Util.Log.Warn("IntroChime", e.ToString());
+        }
     }
 
     public void SurfaceCreated(ISurfaceHolder holder) {
