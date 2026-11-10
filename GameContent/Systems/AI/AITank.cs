@@ -493,6 +493,8 @@ public partial class AITank : Tank {
     }
 
     public BasicEffect TankBasicEffectHandler = new(TankGame.Instance.GraphicsDevice);
+    /// <summary>Set by Tank Troves: draws a tank its own way and returns true, or false for the usual model.</summary>
+    public static Func<AITank, bool>? CustomRender;
     public override void Render() {
         base.Render();
         if (IsDestroyed || !GameScene.ShouldRenderAll)
@@ -500,6 +502,9 @@ public partial class AITank : Tank {
         TankGame.Instance.GraphicsDevice.BlendState = BlendState.AlphaBlend;
         DrawExtras();
         if (MainMenuUI.IsActive && Properties.Invisible || Properties.Invisible && CampaignGlobals.InMission)
+            return;
+        // Tank Troves' turrets, bunkers, nests and crawlers have shapes of their own
+        if (CustomRender?.Invoke(this) == true)
             return;
 
         for (int i = 0; i < (Lighting.AccurateShadows ? 2 : 1); i++) {

@@ -68,15 +68,40 @@ public static partial class MainMenuUI {
         return tapped;
     }
 
+    /// <summary>How much bigger the phone screens' text is than the desktop's.</summary>
+    private const float PTextK = 1.6f;
     private static void PText(SpriteBatch sb, string text, Vector2 pos, float scale, Color color, bool center = true, float maxWidth = 0) {
         var font = FontGlobals.RebirthFont;
         var m = font.MeasureString(text);
         // a bit larger than the desktop text for phones, but always fitting inside the right-hand panel
-        float sc = scale * 1.35f * PhoneScale;
+        float sc = scale * PTextK * PhoneScale;
         float maxW = maxWidth > 0 ? maxWidth : RightPanel().Width * 0.92f;
         if (m.X * sc > maxW)
             sc = maxW / Math.Max(1f, m.X);
         sb.DrawString(font, text, pos, color, new Vector2(sc), 0f, center ? m / 2f : new Vector2(0, m.Y / 2f));
+    }
+
+    /// <summary>Text wrapped to a width, centered on <paramref name="x"/>, starting at <paramref name="y"/>; returns the y after it.</summary>
+    private static float PWrap(SpriteBatch sb, string text, float x, float y, float scale, Color color, float maxWidth, bool center = true) {
+        var font = FontGlobals.RebirthFont;
+        float sc = scale * PTextK * PhoneScale;
+        float lineH = font.MeasureString("Ag").Y * sc * 1.12f;
+        var line = "";
+        foreach (var word in text.Split(' ')) {
+            var test = line.Length == 0 ? word : line + " " + word;
+            if (line.Length > 0 && font.MeasureString(test).X * sc > maxWidth) {
+                PText(sb, line, new Vector2(x, y + lineH / 2f), scale, color, center, maxWidth);
+                y += lineH;
+                line = word;
+            }
+            else
+                line = test;
+        }
+        if (line.Length > 0) {
+            PText(sb, line, new Vector2(x, y + lineH / 2f), scale, color, center, maxWidth);
+            y += lineH;
+        }
+        return y;
     }
 
     /// <summary>The panel to the right of the button column.</summary>
@@ -274,12 +299,18 @@ public static partial class MainMenuUI {
         var cx = panel.Center.X;
         PText(sb, "Multiplayer", new Vector2(cx, panel.Y + 80 * s), 1.6f, Ink);
         var sub = UITextButton.PhoneEdge;
-        PText(sb, "Same Device", new Vector2(cx, panel.Y + 190 * s), 1.15f, Ink);
-        PText(sb, "Two players on this phone (touch + a controller, or two controllers).", new Vector2(cx, panel.Y + 245 * s), 0.8f, sub);
-        PText(sb, "Host", new Vector2(cx, panel.Y + 340 * s), 1.15f, Ink);
-        PText(sb, "Start a game. Phones on your Wi-Fi and players online can join.", new Vector2(cx, panel.Y + 395 * s), 0.8f, sub);
-        PText(sb, "Join", new Vector2(cx, panel.Y + 490 * s), 1.15f, Ink);
-        PText(sb, "Pick a game from the list. Same Wi-Fi connects directly (faster).", new Vector2(cx, panel.Y + 545 * s), 0.8f, sub);
+        float wrapW = panel.Width - 140 * s;
+        float step = (panel.Height - 170 * s) / 3f;
+        (string Head, string Body)[] modes = [
+            ("Same Device", "Two players on this phone: touch and a controller, or two controllers."),
+            ("Host", "Start a game. Phones on your Wi-Fi and players online can join."),
+            ("Join", "Pick a game from the list. On the same Wi-Fi it connects directly, which is faster."),
+        ];
+        for (int i = 0; i < modes.Length; i++) {
+            float top = panel.Y + 170 * s + i * step;
+            PText(sb, modes[i].Head, new Vector2(cx, top + 26 * s), 1.4f, Ink);
+            PWrap(sb, modes[i].Body, cx, top + 62 * s, 1.05f, sub, wrapW);
+        }
 
         if (PButton(sb, PhoneColumnSlot(0, n), "Same Device"))
             GoToState(UIState.MPLocal);
@@ -368,14 +399,14 @@ public static partial class MainMenuUI {
         float s = PhoneScale;
         var cx = panel.Center.X;
         int pads = LocalCoop.ConnectedPads;
-        PText(sb, "Same Device", new Vector2(cx, panel.Y + 70 * s), 1.3f, Ink);
-        PText(sb, $"Controllers connected: {pads}", new Vector2(cx, panel.Y + 160 * s), 0.85f, pads > 0 ? new Color(30, 130, 60) : new Color(170, 60, 40));
-        PText(sb, "Touch + Controller: player 1 uses the touch controls,", new Vector2(cx, panel.Y + 250 * s), 0.6f, Ink);
-        PText(sb, "player 2 uses the controller.", new Vector2(cx, panel.Y + 290 * s), 0.6f, Ink);
-        PText(sb, "Two Controllers: no touch controls, one controller each.", new Vector2(cx, panel.Y + 360 * s), 0.6f, Ink);
-        PText(sb, "Controller: left stick drive, right stick aim,", new Vector2(cx, panel.Y + 450 * s), 0.6f, UITextButton.PhoneEdge);
-        PText(sb, "RB shoot, LB mine, Start pause.", new Vector2(cx, panel.Y + 490 * s), 0.6f, UITextButton.PhoneEdge);
-        PText(sb, "Campaign, Level Select and modifiers work the same as single player.", new Vector2(cx, panel.Bottom - 60 * s), 0.5f, UITextButton.PhoneEdge);
+        float wrapW = panel.Width - 140 * s;
+        PText(sb, "Same Device", new Vector2(cx, panel.Y + 80 * s), 1.6f, Ink);
+        PText(sb, $"Controllers connected: {pads}", new Vector2(cx, panel.Y + 170 * s), 1.15f, pads > 0 ? new Color(30, 130, 60) : new Color(170, 60, 40));
+        float ty = panel.Y + 240 * s;
+        ty = PWrap(sb, "Touch + Controller: player 1 uses the touch controls, player 2 uses the controller.", cx, ty, 1.0f, Ink, wrapW) + 22 * s;
+        ty = PWrap(sb, "Two Controllers: no touch controls, one controller each.", cx, ty, 1.0f, Ink, wrapW) + 40 * s;
+        ty = PWrap(sb, "Controller: left stick drives, right stick aims, RB shoots, LB lays a mine, Start pauses.", cx, ty, 0.95f, UITextButton.PhoneEdge, wrapW);
+        PWrap(sb, "Campaign, Level Select and modifiers work the same as in single player.", cx, panel.Bottom - 130 * s, 0.85f, UITextButton.PhoneEdge, wrapW);
 
         if (PButton(sb, PhoneColumnSlot(0, n), "Touch + Controller", enabled: pads >= 1))
             StartLocalCoop(LocalCoop.Scheme.TouchAndController);
@@ -428,15 +459,16 @@ public static partial class MainMenuUI {
         var panel = RightPanel();
         DrawPanel(sb, panel);
         var cx = panel.Center.X;
-        PText(sb, "Join a Game", new Vector2(cx, panel.Y + 70 * s), 1.3f, Ink);
+        PText(sb, "Join a Game", new Vector2(cx, panel.Y + 80 * s), 1.6f, Ink);
         if (rows.Count == 0) {
             int dots = (int)(DateTime.UtcNow.TimeOfDay.TotalSeconds * 2) % 4;
-            PText(sb, "Looking for games" + new string('.', dots), new Vector2(cx, panel.Y + 220 * s), 0.9f, Ink);
-            PText(sb, "Ask a friend to tap Multiplayer > Host.", new Vector2(cx, panel.Y + 300 * s), 0.6f, UITextButton.PhoneEdge);
-            PText(sb, "Games on your Wi-Fi and online games both show up here.", new Vector2(cx, panel.Y + 340 * s), 0.6f, UITextButton.PhoneEdge);
-            PText(sb, "Have a code? Tap Enter Code.", new Vector2(cx, panel.Y + 420 * s), 0.6f, UITextButton.PhoneEdge);
+            float wrapW = panel.Width - 140 * s;
+            PText(sb, "Looking for games" + new string('.', dots), new Vector2(cx, panel.Y + 240 * s), 1.3f, Ink);
+            float ty = panel.Y + 320 * s;
+            ty = PWrap(sb, "Ask a friend to tap Multiplayer > Host. Games on your Wi-Fi and online games both show up here.", cx, ty, 1.0f, UITextButton.PhoneEdge, wrapW) + 36 * s;
+            ty = PWrap(sb, "Have a code? Tap Enter Code.", cx, ty, 1.0f, UITextButton.PhoneEdge, wrapW) + 36 * s;
             if (Net.Online.OnlineBrowser.Failed)
-                PText(sb, "(Online games can't be listed: no internet)", new Vector2(cx, panel.Y + 480 * s), 0.55f, new Color(170, 60, 40));
+                PWrap(sb, "Online games can't be listed: no internet.", cx, ty, 0.95f, new Color(170, 60, 40), wrapW);
             return;
         }
         for (int i = 0; i < Math.Min(rows.Count, 5); i++) {
@@ -474,7 +506,7 @@ public static partial class MainMenuUI {
         DrawPanel(sb, panel);
         var cx = panel.Center.X;
         string hint = _keypadForCode ? "Enter the 6-digit code" : "Host address (e.g. 192.168.1.20)";
-        PText(sb, _keypadText.Length == 0 ? hint : _keypadText, new Vector2(cx, panel.Y + 80 * s), _keypadText.Length == 0 ? 0.9f : 1.5f, Ink);
+        PText(sb, _keypadText.Length == 0 ? hint : _keypadText, new Vector2(cx, panel.Y + 80 * s), _keypadText.Length == 0 ? 1.1f : 1.6f, Ink);
         string[] keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", _keypadForCode ? "" : ".", "0", "<"];
         float kw = Math.Min(panel.Width / 3.6f, 260 * s), kh = (panel.Height - 190 * s) / 4.3f;
         float x0 = cx - kw * 1.5f - 10 * s, y0 = panel.Y + 150 * s;
@@ -500,33 +532,35 @@ public static partial class MainMenuUI {
         var panel = RightPanel();
         DrawPanel(sb, panel);
         var cx = panel.Center.X;
-        PText(sb, NetPlay.ServerName ?? "Wi-Fi game", new Vector2(cx, panel.Y + 70 * s), 1.2f, Ink);
+        PText(sb, NetPlay.ServerName ?? "Wi-Fi game", new Vector2(cx, panel.Y + 70 * s), 1.5f, Ink);
         bool showCode = Net.Online.OnlineSession.Active && host && Net.Online.OnlineSession.Code is not null;
         if (showCode) {
             // the code is what friends need: make it big
             var c = Net.Online.OnlineSession.Code!;
             PText(sb, $"Code  {c[..3]} {c[3..]}", new Vector2(cx, panel.Y + 150 * s), 1.7f, new Color(30, 110, 200));
-            PText(sb, "Friends: Multiplayer > Join (your game is in the list)", new Vector2(cx, panel.Y + 215 * s), 0.75f, UITextButton.PhoneEdge);
+            PText(sb, "Friends: Multiplayer > Join (your game is in the list)", new Vector2(cx, panel.Y + 218 * s), 0.95f, UITextButton.PhoneEdge);
         }
         else if (Net.Online.OnlineSession.Active) {
             var os = Net.Online.OnlineSession.Code is { } code && host
                 ? $"Code: {code}   (friends: Multiplayer > Join)"
                 : host ? Net.Online.OnlineSession.Status
                 : Net.Online.OnlineSession.Connection == Net.Online.OnlineSession.Link.Relay ? "Online, connected through the relay" : "Online, connected directly";
-            PText(sb, os, new Vector2(cx, panel.Y + 135 * s), host && Net.Online.OnlineSession.Code is not null ? 0.9f : 0.7f, host && Net.Online.OnlineSession.Code is not null ? new Color(30, 110, 200) : UITextButton.PhoneEdge);
+            PText(sb, os, new Vector2(cx, panel.Y + 135 * s), host && Net.Online.OnlineSession.Code is not null ? 1.1f : 0.95f, host && Net.Online.OnlineSession.Code is not null ? new Color(30, 110, 200) : UITextButton.PhoneEdge);
         }
         else if (host)
-            PText(sb, $"Others: Join on Wi-Fi (address {LanSession.LocalAddress()})", new Vector2(cx, panel.Y + 135 * s), 0.6f, UITextButton.PhoneEdge);
+            PText(sb, $"Others: Join on Wi-Fi (address {LanSession.LocalAddress()})", new Vector2(cx, panel.Y + 138 * s), 0.95f, UITextButton.PhoneEdge);
 
         int count = Math.Max(Server.CurrentClientCount, 0);
         for (int i = 0; i < 4; i++) {
-            var row = new Rectangle(panel.X + (int)(60 * s), panel.Y + (int)(((showCode ? 260 : 190) + i * (showCode ? 84 : 90)) * s), panel.Width - (int)(120 * s), (int)(70 * s));
+            float rowsTop = showCode ? 265 : 195, rowsBottom = panel.Height / s - 110;
+            float rowStep = Math.Min(128, (rowsBottom - rowsTop) / 4f), rowH = Math.Min(104, rowStep - 14);
+            var row = new Rectangle(panel.X + (int)(60 * s), panel.Y + (int)((rowsTop + i * rowStep) * s), panel.Width - (int)(120 * s), (int)(rowH * s));
             var c = Server.ConnectedClients is not null && i < Server.ConnectedClients.Length ? Server.ConnectedClients[i] : null;
             bool present = c is not null && i < count;
             var col = PlayerID.PlayerTankColors[i];
-            ToggleSwitch.DrawRoundedRect(sb, row, 20 * s, present ? Color.Lerp(col, Color.White, 0.75f) : new Color(225, 220, 210));
-            ToggleSwitch.DrawDisc(sb, new Vector2(row.X + 45 * s, row.Center.Y), 22 * s, present ? col : new Color(190, 184, 176));
-            PText(sb, present ? $"P{i + 1}  {c!.Name}" + (i == 0 ? "  (host)" : "") : $"P{i + 1}  waiting for player...", new Vector2(row.X + 90 * s, row.Center.Y), 0.75f, present ? Ink : new Color(140, 130, 120), center: false);
+            ToggleSwitch.DrawRoundedRect(sb, row, 26 * s, present ? Color.Lerp(col, Color.White, 0.75f) : new Color(225, 220, 210));
+            ToggleSwitch.DrawDisc(sb, new Vector2(row.X + 52 * s, row.Center.Y), row.Height * 0.3f, present ? col : new Color(190, 184, 176));
+            PText(sb, present ? $"P{i + 1}  {c!.Name}" + (i == 0 ? "  (host)" : "") : $"P{i + 1}  waiting for player...", new Vector2(row.X + 104 * s, row.Center.Y), 1.05f, present ? Ink : new Color(140, 130, 120), center: false);
         }
 
         if (host) {
@@ -542,7 +576,7 @@ public static partial class MainMenuUI {
             if (PButton(sb, PhoneColumnSlot(3, n), "Leave"))
                 PhoneScreenBack();
             if (count < 2)
-                PText(sb, "Waiting for others to join...", new Vector2(cx, panel.Bottom - 60 * s), 0.65f, UITextButton.PhoneEdge);
+                PText(sb, "Waiting for others to join...", new Vector2(cx, panel.Bottom - 58 * s), 0.95f, UITextButton.PhoneEdge);
         }
         else {
             // joined players see the host's difficulty choices (only the host can change them)
@@ -553,7 +587,7 @@ public static partial class MainMenuUI {
                 GoToState(UIState.TankColors);
             if (PButton(sb, PhoneColumnSlot(2, n), "Leave"))
                 PhoneScreenBack();
-            PText(sb, "Waiting for the host to start...", new Vector2(cx, panel.Bottom - 60 * s), 0.75f, Ink);
+            PText(sb, "Waiting for the host to start...", new Vector2(cx, panel.Bottom - 58 * s), 1.0f, Ink);
         }
     }
 
@@ -584,16 +618,34 @@ public static partial class MainMenuUI {
         float s = PhoneScale;
         RequestStats();
         var font = FontGlobals.RebirthFont;
-        PText(sb, "Game Stats", new Vector2(panel.Center.X, panel.Y + 55 * s), 1.3f, Ink);
-        float leftX = panel.X + 50 * s, rightX = panel.X + panel.Width * 0.58f;
-        float y = panel.Y + 130 * s, line = 54 * s;
-        foreach (var t in _info) {
-            PText(sb, t, new Vector2(leftX, y), 0.62f, Ink, center: false);
+        PText(sb, "Game Stats", new Vector2(panel.Center.X, panel.Y + 62 * s), 1.6f, Ink);
+        float leftX = panel.X + 60 * s, rightX = panel.X + panel.Width * 0.56f;
+        float top = panel.Y + 150 * s;
+        float line = Math.Min(78 * s, (panel.Bottom - 40 * s - top) / Math.Max(1, _info.Length));
+        float colW = rightX - leftX - 40 * s;
+        float y = top;
+        for (int i = 0; i < _info.Length; i++) {
+            // a faint band behind every other row, so the eye can follow a line across
+            if (i % 2 == 0)
+                ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(leftX - 24 * s), (int)(y - line / 2f + 4 * s), (int)(colW + 48 * s), (int)(line - 8 * s)), 16 * s, new Color(40, 30, 22, 14));
+            // "label: value" -> the label on the left, the value on the right in bold ink
+            var t = _info[i];
+            int cut = t.LastIndexOf(':');
+            if (cut > 0 && cut < t.Length - 1) {
+                PText(sb, t[..cut], new Vector2(leftX, y), 0.92f, UITextButton.PhoneEdge, center: false, maxWidth: colW * 0.68f);
+                var val = t[(cut + 1)..].Trim();
+                var font2 = FontGlobals.RebirthFont;
+                float vsc = 1.05f * PTextK * s;
+                PText(sb, val, new Vector2(leftX + colW - font2.MeasureString(val).X * vsc, y), 1.05f, Ink, center: false);
+            }
+            else
+                PText(sb, t, new Vector2(leftX, y), 0.92f, Ink, center: false, maxWidth: colW);
             y += line;
         }
-        y = panel.Y + 130 * s;
-        PText(sb, TankGame.GameLanguage.TankKillsPerType + ":", new Vector2(rightX, y), 0.7f, Ink, center: false);
-        y += line;
+        y = top;
+        line = 62 * s;
+        PText(sb, TankGame.GameLanguage.TankKillsPerType + ":", new Vector2(rightX, y), 1.05f, Ink, center: false, maxWidth: panel.Right - rightX - 40 * s);
+        y += line * 1.1f;
         int shown = 0;
         for (int i = 1; i < TankGame.SaveFile.TankKills.Count; i++) {
             var elem = TankGame.SaveFile.TankKills.ElementAt(i);
@@ -601,22 +653,22 @@ public static partial class MainMenuUI {
                 continue;
             var name = TankID.Collection.GetKey(elem.Key)!.SplitByCamel();
             var col = Systems.AI.AITank.TankDestructionColors.TryGetValue(elem.Key, out var c) ? Color.Lerp(c, Color.Black, 0.35f) : Ink;
-            PText(sb, $"{name}: {elem.Value}", new Vector2(rightX, y), 0.62f, col, center: false);
+            PText(sb, $"{name}: {elem.Value}", new Vector2(rightX, y), 0.9f, col, center: false, maxWidth: panel.Right - rightX - 40 * s);
             y += line * 0.9f;
-            if (++shown >= 14) break;
+            if (y > panel.Bottom - 50 * s || ++shown >= 14) break;
         }
         if (shown == 0)
-            PText(sb, "None yet!", new Vector2(rightX, y), 0.62f, UITextButton.PhoneEdge, center: false);
+            PText(sb, "None yet!", new Vector2(rightX, y), 0.9f, UITextButton.PhoneEdge, center: false);
     }
 
     private static void DrawAchievementsPanel(SpriteBatch sb, Rectangle panel) {
         float s = PhoneScale;
         var list = Achievements.VanillaAchievements.Repository.GetAchievements();
         int unlocked = list.Count(a => a.IsComplete);
-        PText(sb, $"Achievements   {unlocked} / {list.Count} unlocked", new Vector2(panel.Center.X, panel.Y + 50 * s), 1.1f, Ink);
+        PText(sb, $"Achievements   {unlocked} / {list.Count} unlocked", new Vector2(panel.Center.X, panel.Y + 56 * s), 1.4f, Ink);
 
         // grid: as big as fits above the details area
-        float gap = 14 * s, top = panel.Y + 100 * s, detailsH = 150 * s;
+        float gap = 14 * s, top = panel.Y + 112 * s, detailsH = 190 * s;
         float availW = panel.Width - 60 * s, availH = panel.Height - (top - panel.Y) - detailsH;
         float size = 110 * s;
         int cols = 1, rows = 1;
@@ -650,10 +702,10 @@ public static partial class MainMenuUI {
         if (list.Count > 0) {
             var sel = list[_achSelected];
             var desc = (sel as Achievements.Achievement)?.Description ?? "";
-            float y = panel.Bottom - detailsH + 35 * s;
-            PText(sb, (sel.IsComplete ? "Unlocked:  " : "Locked:  ") + sel.Name, new Vector2(panel.Center.X, y), 0.95f,
+            float y = panel.Bottom - detailsH + 48 * s;
+            PText(sb, (sel.IsComplete ? "Unlocked:  " : "Locked:  ") + sel.Name, new Vector2(panel.Center.X, y), 1.25f,
                 sel.IsComplete ? new Color(30, 130, 60) : Ink);
-            PText(sb, desc, new Vector2(panel.Center.X, y + 55 * s), 0.7f, UITextButton.PhoneEdge);
+            PWrap(sb, desc, panel.Center.X, y + 36 * s, 1.0f, UITextButton.PhoneEdge, panel.Width - 120 * s);
         }
     }
 
@@ -708,7 +760,7 @@ public static partial class MainMenuUI {
                 ToggleSwitch.DrawRoundedRect(sb, new Rectangle(tr.X, tr.Y + (int)(4 * s), tr.Width, tr.Height), tr.Height / 2f, new Color(0, 0, 0, 40));
                 ToggleSwitch.DrawRoundedRect(sb, tr, tr.Height / 2f, t == 1 ? new Color(255, 206, 84) : new Color(255, 250, 238));
             }
-            PText(sb, tabNames[t], tr.Center.ToVector2(), 0.7f, on ? Ink : Ink * 0.6f, maxWidth: tr.Width - 24 * s);
+            PText(sb, tabNames[t], tr.Center.ToVector2(), 0.95f, on ? Ink : Ink * 0.6f, maxWidth: tr.Width - 24 * s);
             if (Tapped(tr) && _colorTab != t) {
                 _colorTab = t;
                 SoundPlayer.PlaySoundInstance(TickSound, SoundContext.Effect);
@@ -736,7 +788,7 @@ public static partial class MainMenuUI {
         int cols = special ? 5 : 4, rows = (tileCount + cols - 1) / cols;
         float gap = (special ? 12 : 18) * s, top = panel.Y + 118 * s;
         // Special: a card under the grid tells the story of the skin you picked (and how to unlock it)
-        float cardH = special ? 270 * s : 0;
+        float cardH = special ? 310 * s : 0;
         var card = new Rectangle((int)(panel.X + 20 * s), (int)(panel.Bottom - 20 * s - cardH), (int)(panel.Width - 40 * s), (int)cardH);
         float gridBottom = special ? card.Y - 14 * s : panel.Bottom - 20 * s;
         float tw = (panel.Width - 40 * s - gap * (cols - 1)) / cols;
@@ -755,12 +807,12 @@ public static partial class MainMenuUI {
                 ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X - (int)(5 * s), r.Y - (int)(5 * s), r.Width + (int)(10 * s), r.Height + (int)(10 * s)), 22 * s,
                     sel ? new Color(52, 199, 89) : new Color(255, 180, 60));
             ToggleSwitch.DrawRoundedRect(sb, r, 18 * s, !open ? new Color(214, 208, 198) : sel ? new Color(255, 250, 238) : new Color(232, 226, 214));
-            float nameScale = special ? 0.62f : 0.6f;
-            PText(sb, PlayerColors.NameOf(i), new Vector2(r.Center.X, r.Bottom - (special ? 20 : 26) * s), nameScale, open ? Ink : Ink * 0.55f, maxWidth: r.Width - 16 * s);
+            float nameScale = special ? 0.8f : 0.9f;
+            PText(sb, PlayerColors.NameOf(i), new Vector2(r.Center.X, r.Bottom - (special ? 24 : 32) * s), nameScale, open ? Ink : Ink * 0.55f, maxWidth: r.Width - 16 * s);
             if (!open && PlayerColors.SkinAt(i) is { } lsk && Unlocks.GoalFor(lsk.Unlock) is { Target: > 1 } goal) {
                 // how far along you are
                 int have = Unlocks.Progress(goal.Key);
-                var bar = new Rectangle(r.X + (int)(16 * s), r.Bottom - (int)(44 * s), r.Width - (int)(32 * s), (int)(8 * s));
+                var bar = new Rectangle(r.X + (int)(16 * s), r.Bottom - (int)(54 * s), r.Width - (int)(32 * s), (int)(8 * s));
                 ToggleSwitch.DrawRoundedRect(sb, bar, 4 * s, new Color(190, 182, 170));
                 if (have > 0)
                     ToggleSwitch.DrawRoundedRect(sb, new Rectangle(bar.X, bar.Y, Math.Max(bar.Height, bar.Width * have / goal.Target), bar.Height), 4 * s, new Color(255, 180, 60));
@@ -789,7 +841,7 @@ public static partial class MainMenuUI {
             int i = first + k;
             var r = tiles[k];
             bool open = PlayerColors.IsUnlocked(i);
-            int textRoom = special ? (open ? 36 : 54) : 52;
+            int textRoom = special ? (open ? 46 : 62) : 62;
             var modelRect = new Rectangle(r.X, r.Y + (int)(2 * s), r.Width, r.Height - (int)(textRoom * s));
             DrawTankPreview(gd, modelRect, open ? _colorTex[i]! : _lockedTex, i == chosen || (special && i == _infoSkin) ? yaw : 0.6f);
         }
@@ -811,24 +863,24 @@ public static partial class MainMenuUI {
     private static void DrawSkinCard(SpriteBatch sb, Rectangle card, PlayerColors.Skin skin, bool open, float s) {
         ToggleSwitch.DrawRoundedRect(sb, card, 22 * s, new Color(255, 250, 238));
         var font = FontGlobals.RebirthFont;
-        float k = 1.35f * PhoneScale; // (the same text size as the rest of the phone menus)
+        float k = PTextK * PhoneScale; // (the same text size as the rest of the phone menus)
         float pad = 24 * s;
         float x = card.X + pad, y = card.Y + pad * 0.7f, maxW = card.Width - pad * 2;
         bool locked = !open && Unlocks.GoalFor(skin.Unlock) is not null;
 
         // name, then where and when it's from
-        float nameSc = 1.0f * k;
+        float nameSc = 1.2f * k;
         var nm = font.MeasureString(skin.Name) * nameSc;
         sb.DrawString(font, skin.Name, new Vector2(x, y), Ink, new Vector2(nameSc), 0f, Vector2.Zero);
         if (!string.IsNullOrEmpty(skin.Origin)) {
-            float oSc = 0.62f * k;
+            float oSc = 0.85f * k;
             var om = font.MeasureString(skin.Origin) * oSc;
             sb.DrawString(font, skin.Origin, new Vector2(x + nm.X + 16 * s, y + nm.Y - om.Y - 2 * s), Ink * 0.55f, new Vector2(oSc), 0f, Vector2.Zero);
         }
         y += nm.Y + 6 * s;
 
         // the story, as many lines as fit above the unlock line
-        float bodySc = 0.62f * k;
+        float bodySc = 0.86f * k;
         float lineH = font.LineHeight * bodySc;
         float bottom = card.Bottom - pad * 0.6f - (locked ? lineH + 10 * s : 0);
         var lines = WrapToWidth(skin.Blurb, bodySc, maxW);

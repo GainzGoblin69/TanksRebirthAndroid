@@ -149,11 +149,11 @@ public static partial class MainMenuUI {
 
     private static LsLayout GetLayout() {
         float s = LsScale, w = WindowUtils.WindowWidth, h = WindowUtils.WindowHeight;
-        int cols = 6;
-        float margin = 48 * s, gap = 18 * s, top = 130 * s;
+        int cols = 5;
+        float margin = 48 * s, gap = 20 * s, top = 130 * s;
         float tileW = (w - 2 * margin - (cols - 1) * gap) / cols;
         float thumbH = tileW * (h / Math.Max(w, 1f));
-        float tileH = thumbH + 46 * s;
+        float tileH = thumbH + 66 * s;
         int rows = (LsTileCount + cols - 1) / cols;
         float content = rows * (tileH + gap);
         float maxScroll = Math.Max(0, content - (h - top - 16 * s));
@@ -397,7 +397,7 @@ public static partial class MainMenuUI {
                 cleared = modRec!.Modifiers.Contains(m.Key);
             }
             var labelPos = new Vector2(r.Center.X, thumbRect.Bottom + (r.Bottom - thumbRect.Bottom) / 2f);
-            float labelScale = Math.Min(0.62f * s, (r.Width - 16 * s) / Math.Max(1f, font.MeasureString(label).X));
+            float labelScale = Math.Min(0.98f * s, (r.Width - 16 * s) / Math.Max(1f, font.MeasureString(label).X));
             DrawCentered(sb, font, label, labelPos, Color.Black, labelScale);
 
             float badge = 20 * s;
@@ -419,7 +419,7 @@ public static partial class MainMenuUI {
         DrawCentered(sb, font, "Back", new Vector2(back.Center.X, back.Center.Y - lip / 2f), new Color(40, 30, 22), 0.95f * s);
 
         string title = mods ? $"Mission {_lsModMission + 1}: Challenges" : "Level Select";
-        DrawCentered(sb, FontGlobals.RebirthFont, title, new Vector2(WindowUtils.WindowWidth / 2f, back.Center.Y), Color.White, 1.15f * s);
+        DrawCentered(sb, FontGlobals.RebirthFont, title, new Vector2(WindowUtils.WindowWidth / 2f, back.Center.Y), Color.White, 1.5f * s);
 
         string progress;
         if (mods) {
@@ -431,13 +431,13 @@ public static partial class MainMenuUI {
         }
         else
             progress = $"{LevelProgress.CompletedCount(LevelSelectCampaign)}/{_lsThumbs.Length} cleared";
-        var pm = font.MeasureString(progress) * 0.75f * s;
-        sb.DrawString(font, progress, new Vector2(WindowUtils.WindowWidth - 36 * s - pm.X, back.Center.Y - pm.Y / 2f), Color.White * 0.85f, new Vector2(0.75f * s));
+        var pm = font.MeasureString(progress) * 1.05f * s;
+        sb.DrawString(font, progress, new Vector2(WindowUtils.WindowWidth - 36 * s - pm.X, back.Center.Y - pm.Y / 2f), Color.White * 0.85f, new Vector2(1.05f * s));
 
         if (_bakeIdx >= 0 || _bakeQueue.Count > 0) {
             string baking = $"Preparing previews... {_lsThumbs.Length - _bakeQueue.Count}/{_lsThumbs.Length}";
-            var bm = font.MeasureString(baking) * 0.5f * s;
-            sb.DrawString(font, baking, new Vector2(WindowUtils.WindowWidth - 36 * s - bm.X, back.Bottom + 4 * s), Color.White * 0.6f, new Vector2(0.5f * s));
+            var bm = font.MeasureString(baking) * 0.8f * s;
+            sb.DrawString(font, baking, new Vector2(WindowUtils.WindowWidth - 36 * s - bm.X, back.Bottom + 4 * s), Color.White * 0.6f, new Vector2(0.8f * s));
         }
 
         sb.End();

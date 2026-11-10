@@ -272,26 +272,29 @@ public static partial class MainMenuUI {
             var m = font.MeasureString(t);
             sb.DrawString(font, t, new Vector2(cx, y), c, new Vector2(scale * s), 0f, m / 2f);
         }
-        Text("Start at mission", card.Y + 80 * s, 1.25f, ink);
-        Text($"{MissionCheckpoint + 1}", minusC.Y, 2.6f, ink);
+        Text("Start at mission", card.Y + 84 * s, 1.6f, ink);
+        Text($"{MissionCheckpoint + 1}", minusC.Y, 3.2f, ink);
 
         foreach (var (c, label, enabled) in new[] { (minusC, "-", MissionCheckpoint > 0), (plusC, "+", MissionCheckpoint < unlocked) }) {
             var fill = !enabled ? new Color(200, 196, 188) : OnBtn(c) && InputUtils.CurrentMouseSnapshot.LeftButton == Microsoft.Xna.Framework.Input.ButtonState.Pressed ? new Color(70, 110, 200) : new Color(96, 140, 230);
             ToggleSwitch.DrawDisc(sb, c + new Vector2(0, 6 * s), btnR, enabled ? new Color(50, 80, 150) : new Color(170, 165, 158));
             ToggleSwitch.DrawDisc(sb, c, btnR, fill);
-            var m = font.MeasureString(label);
-            sb.DrawString(font, label, c, Color.White, new Vector2(2.2f * s), 0f, m / 2f);
+            // the signs are drawn (the font's "-" and "+" are thin and small)
+            float arm = btnR * 0.42f, thick = btnR * 0.2f;
+            ToggleSwitch.DrawLine(sb, c - new Vector2(arm, 0), c + new Vector2(arm, 0), thick, Color.White);
+            if (label == "+")
+                ToggleSwitch.DrawLine(sb, c - new Vector2(0, arm), c + new Vector2(0, arm), thick, Color.White);
         }
 
         var rec = LevelProgress.Get(LevelSelectCampaign, MissionCheckpoint);
         float y = card.Y + 410 * s;
-        Text(rec.BestSolo > 0 ? $"Fastest time: {LevelProgress.FormatTime(rec.BestSolo)}" : "Fastest time: --", y, 1.05f, ink);
+        Text(rec.BestSolo > 0 ? $"Fastest time: {LevelProgress.FormatTime(rec.BestSolo)}" : "Fastest time: --", y, 1.3f, ink);
         if (rec.CoopAttempted) {
             y += 64 * s;
-            Text(rec.BestCoop > 0 ? $"Co-op fastest: {LevelProgress.FormatTime(rec.BestCoop)}" : "Co-op fastest: --", y, 1.05f, ink);
+            Text(rec.BestCoop > 0 ? $"Co-op fastest: {LevelProgress.FormatTime(rec.BestCoop)}" : "Co-op fastest: --", y, 1.3f, ink);
         }
         if (MissionCheckpoint == unlocked && (count == 0 || unlocked < count - 1))
-            Text($"Clear mission {unlocked + 1} to unlock the next one", card.Bottom - 50 * s, 0.8f, new Color(120, 96, 70));
+            Text($"Clear mission {unlocked + 1} to unlock the next one", card.Bottom - 56 * s, 1.05f, new Color(120, 96, 70));
 
         sb.End();
         sb.Begin();

@@ -814,6 +814,7 @@ public static class TroveItems {
             : TroveBosses.Twin is { } tw ? [bt, tw] : [bt];
         Graphics.DynamicLighting.LightManager.ExtraLights = () => { TroveThemes.AddLights(); if (TroveRun.Active && CampaignGlobals.InMission) AddUnderglowLights(); };
         Graphics.DynamicLighting.LightManager.SceneDarkness = SceneDarkness;
+        AITank.CustomRender = TroveEnemyModels.Render;
         AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady || IcedUntil.TryGetValue(t, out var iu) && Now < iu;
         // Smoke Bomb: enemies can't see you
         AITank.IsHidden = t => TroveRun.Active && t is PlayerTank pt && pt.PlayerId is >= 0 and < 4

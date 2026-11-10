@@ -299,11 +299,19 @@ public abstract partial class UIElement {
         var font = FontGlobals.RebirthFont;
         var scaleFont = font.MeasureString(Tooltip);
 
-        var width = (int)(scaleFont.X + 30).ToResolutionX();
-        var height = (int)(scaleFont.Y + 30).ToResolutionY();
+        // phones: bigger text (held at arm's length), but never wider than the screen
+        bool touch = TanksRebirth.Internals.Common.Framework.Input.TouchControls.Enabled;
+        float k = touch ? 1.45f : 1f;
+        if (touch) {
+            float fit = (WindowUtils.WindowWidth - 24f) / Math.Max(1f, (scaleFont.X * k + 30).ToResolutionX());
+            if (fit < 1f)
+                k = Math.Max(0.8f, k * fit);
+        }
+        var width = (int)(scaleFont.X * k + 30).ToResolutionX();
+        var height = (int)(scaleFont.Y * k + 30).ToResolutionY();
 
         int x, y;
-        if (TanksRebirth.Internals.Common.Framework.Input.TouchControls.Enabled) {
+        if (touch) {
             // phones: in the gap just under the button (above it if there's no room), so it never covers the button
             int gap = (int)(8 * WindowUtils.WindowHeight / 1080f);
             var hb = this.Hitbox;
@@ -318,7 +326,7 @@ public abstract partial class UIElement {
         var Hitbox = new Rectangle(x, y, width, height);
         DrawUtils.DrawNineSliced(spriteBatch, UIPanelBackground, 12, Hitbox, color, Vector2.Zero);
 
-        spriteBatch.DrawString(font, Tooltip, Hitbox.Center.ToVector2(), Color.Black, new Vector2(1f).ToResolution(), 0f, scaleFont * 0.5f, 0);
+        spriteBatch.DrawString(font, Tooltip, Hitbox.Center.ToVector2(), Color.Black, new Vector2(k).ToResolution(), 0f, scaleFont * 0.5f, 0);
     }
 
     public static void ResizeAndRelocate() {

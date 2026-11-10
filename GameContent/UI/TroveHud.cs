@@ -559,7 +559,7 @@ public static class TroveHud {
         }
         for (int i = 0; i < 4; i++)
             if (TroveItems.Buddies[i] is { IsDestroyed: false } b)
-                Text(sb, "BUDDY", ToScreen(b.Position) - new Vector2(0, 46 * s), 0.42f * s, new Color(150, 210, 255), border: true);
+                Text(sb, "BUDDY", ToScreen(b.Position) - new Vector2(0, 46 * s), 0.6f * s, new Color(150, 210, 255), border: true);
         for (int i = 0; i < 4; i++)
             if (TroveItems.Players[i].CloneTank is { IsDestroyed: false } cl)
                 Text(sb, "CLONE", ToScreen(cl.Position) - new Vector2(0, 52 * s), 0.45f * s, new Color(150, 200, 255), border: true);
@@ -650,13 +650,13 @@ public static class TroveHud {
         float lh = FontGlobals.RebirthFont.MeasureString("Ag").Y;
         int usesLeft = p.UsesOf(a);
         string usesText = d.MaxUses > 1 ? (usesLeft <= 1 ? "  (last use)" : $"  ({usesLeft} uses left)") : "";
-        Text(sb, d.Name + usesText, new Vector2(rowCenter.X, y), 0.6f * s, Color.Lerp(d.Color, Color.White, 0.5f) * alpha, border: true);
-        foreach (var line in Wrap(d.Description, 0.5f * s, 560 * s)) {
-            y += lh * 0.5f * s * 1.05f;
-            Text(sb, line, new Vector2(rowCenter.X, y), 0.5f * s, Color.White * alpha, border: true);
+        Text(sb, d.Name + usesText, new Vector2(rowCenter.X, y), 0.85f * s, Color.Lerp(d.Color, Color.White, 0.5f) * alpha, border: true);
+        foreach (var line in Wrap(d.Description, 0.7f * s, 760 * s)) {
+            y += lh * 0.7f * s * 1.05f;
+            Text(sb, line, new Vector2(rowCenter.X, y), 0.7f * s, Color.White * alpha, border: true);
         }
         if (n > 1 && since < 6)
-            Text(sb, "tap an icon or press X to switch", new Vector2(rowCenter.X, y + lh * 0.42f * s * 1.2f), 0.4f * s, new Color(220, 210, 190) * alpha, border: true);
+            Text(sb, "tap an icon or press X to switch", new Vector2(rowCenter.X, y + lh * 0.6f * s * 1.2f), 0.6f * s, new Color(220, 210, 190) * alpha, border: true);
     }
 
     /// <summary>Splits text into lines no wider than maxWidth at this scale.</summary>
@@ -706,8 +706,8 @@ public static class TroveHud {
             _ => "Takes effect right away",
         };
         var hint = TroveItems.SynergyHint(Net.NetPlay.GetMyClientId(), def.Id);
-        float nameScale = 0.95f * s, descScale = 0.62f * s, kindScale = 0.5f * s;
-        float maxW = 820 * s;
+        float nameScale = 1.15f * s, descScale = 0.82f * s, kindScale = 0.68f * s;
+        float maxW = 980 * s;
         var descLines = Wrap(def.Description, descScale, maxW);
         var font = FontGlobals.RebirthFont;
         float lineH = font.MeasureString("Ag").Y;
@@ -741,12 +741,21 @@ public static class TroveHud {
     // discs inside the game's HUD batch (premultiplied alpha)
     private static void DiscPM(SpriteBatch sb, Vector2 c, float r, Color col) => ToggleSwitch.DrawDisc(sb, c, r, col);
 
-    /// <summary>An item's picture: a colored disc with a simple symbol.</summary>
+    /// <summary>An item's picture: a round badge in the item's color with its symbol (from the icon sheet).</summary>
     public static void DrawItemIcon(SpriteBatch sb, TroveItemId id, Vector2 c, float r, bool premultiplied = false) {
+        if (TroveIcons.Draw(sb, id, c, r))
+            return;
+        // (no icon sheet: drawn shape by shape)
         var def = TroveItems.Def(id);
         ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.08f), r * 1.05f, Color.Black * 0.4f);
         ToggleSwitch.DrawDisc(sb, c, r, def.Color);
         ToggleSwitch.DrawDisc(sb, c, r * 0.82f, Color.Lerp(def.Color, Color.White, 0.25f));
+        DrawItemSymbol(sb, id, c, r);
+    }
+
+    /// <summary>The symbol in the middle of an item's badge.</summary>
+    internal static void DrawItemSymbol(SpriteBatch sb, TroveItemId id, Vector2 c, float r) {
+        var def = TroveItems.Def(id);
         var w = Color.White;
         float t = Math.Max(2f, r * 0.14f);
         switch (id) {
@@ -861,10 +870,16 @@ public static class TroveHud {
                 ToggleSwitch.DrawLine(sb, c + new Vector2(0, -r * 0.12f), c + new Vector2(r * 0.55f, -r * 0.35f), t * 0.8f, w);
                 break;
             }
-            case TroveItemId.HeavyShells:
-                ToggleSwitch.DrawLine(sb, c + new Vector2(0, r * 0.45f), c + new Vector2(0, -r * 0.2f), r * 0.5f, new Color(60, 55, 50));
-                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, -r * 0.22f), r * 0.25f, new Color(60, 55, 50));
+            case TroveItemId.HeavyShells: {
+                // a fat brass shell
+                var brass = new Color(222, 176, 78);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(0, r * 0.5f), c + new Vector2(0, -r * 0.18f), r * 0.52f, brass);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, -r * 0.2f), r * 0.26f, brass);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, -r * 0.36f), r * 0.16f, new Color(240, 205, 120));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.26f, r * 0.34f), c + new Vector2(r * 0.26f, r * 0.34f), r * 0.1f, new Color(150, 105, 40));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.12f, r * 0.2f), c + new Vector2(-r * 0.12f, -r * 0.2f), r * 0.07f, new Color(255, 235, 170));
                 break;
+            }
             case TroveItemId.ExplosiveShells:
                 for (int i = 0; i < 8; i++) {
                     float a = i * MathHelper.TwoPi / 8f;
@@ -1014,10 +1029,16 @@ public static class TroveHud {
                     ToggleSwitch.DrawDisc(sb, top + new Vector2(0, r * 0.65f), r * 0.12f, new Color(255, 220, 120));
                 }
                 break;
-            case TroveItemId.WallBuilder:
-                for (int i = -1; i <= 1; i++)
-                    ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(c.X + i * r * 0.36f - r * 0.16f), (int)(c.Y - r * 0.18f), (int)(r * 0.32f), (int)(r * 0.36f)), r * 0.04f, new Color(240, 210, 160));
+            case TroveItemId.WallBuilder: {
+                // three cork blocks: two below, one on top
+                var cork = new Color(150, 98, 56);
+                var top = new Color(205, 152, 96);
+                foreach (var o in new[] { new Vector2(-0.52f, 0.02f), new Vector2(0.04f, 0.02f), new Vector2(-0.24f, -0.46f) }) {
+                    ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(c.X + o.X * r), (int)(c.Y + o.Y * r), (int)(r * 0.48f), (int)(r * 0.42f)), r * 0.06f, cork);
+                    ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(c.X + (o.X + 0.05f) * r), (int)(c.Y + (o.Y + 0.05f) * r), (int)(r * 0.38f), (int)(r * 0.13f)), r * 0.04f, top);
+                }
                 break;
+            }
             case TroveItemId.Dash:
                 foreach (float dy in new[] { -0.3f, 0f, 0.3f })
                     ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.55f, dy * r), c + new Vector2(r * (dy == 0 ? 0.55f : 0.25f), dy * r), t * 0.8f, w);
@@ -1040,10 +1061,19 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.35f, -r * 0.2f), r * 0.14f, new Color(200, 255, 210));
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.55f, -r * 0.3f), r * 0.08f, new Color(200, 255, 210));
                 break;
-            case TroveItemId.GhostShells:
-                ToggleSwitch.DrawLine(sb, c + new Vector2(0, -r * 0.55f), c + new Vector2(0, r * 0.55f), r * 0.2f, new Color(255, 255, 255, 110));
-                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.6f, r * 0.15f), c + new Vector2(r * 0.6f, -r * 0.15f), r * 0.16f, w);
+            case TroveItemId.GhostShells: {
+                // a pale shell slipping through a wall
+                var wall = new Color(84, 90, 140);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.08f, -r * 0.6f), c + new Vector2(r * 0.08f, r * 0.6f), r * 0.26f, wall);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.08f, -r * 0.6f), c + new Vector2(r * 0.08f, r * 0.6f), r * 0.08f, new Color(120, 128, 180));
+                for (int i = 0; i < 3; i++)
+                    ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * (0.62f - i * 0.17f), 0), r * (0.07f + i * 0.02f), new Color(255, 255, 255, 120 + i * 40));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.12f, 0), c + new Vector2(r * 0.5f, 0), r * 0.24f, wall);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.1f, 0), c + new Vector2(r * 0.48f, 0), r * 0.16f, w);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.5f, 0), r * 0.12f, wall);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.5f, 0), r * 0.08f, w);
                 break;
+            }
             case TroveItemId.LastStand:
                 ToggleSwitch.DrawLine(sb, c + new Vector2(0, -r * 0.55f), c + new Vector2(0, r * 0.15f), r * 0.22f, w);
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.45f), r * 0.13f, w);
@@ -1065,13 +1095,23 @@ public static class TroveHud {
                 ToggleSwitch.DrawLine(sb, c + new Vector2(0, r * 0.2f), c + new Vector2(r * 0.5f, -r * 0.4f), t, w);
                 ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.45f, r * 0.5f), c + new Vector2(r * 0.45f, r * 0.5f), t, w);
                 break;
-            case TroveItemId.SecondWind:
+            case TroveItemId.SecondWind: {
+                // a heart with wings
+                var wing = new Color(214, 160, 70);
                 foreach (float k in new[] { -1f, 1f }) {
-                    ToggleSwitch.DrawLine(sb, c + new Vector2(k * r * 0.1f, 0), c + new Vector2(k * r * 0.6f, -r * 0.3f), t, w);
-                    ToggleSwitch.DrawLine(sb, c + new Vector2(k * r * 0.1f, r * 0.1f), c + new Vector2(k * r * 0.5f, r * 0.05f), t * 0.8f, w);
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(k * r * 0.14f, -r * 0.02f), c + new Vector2(k * r * 0.66f, -r * 0.36f), t * 1.1f, wing);
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(k * r * 0.14f, r * 0.1f), c + new Vector2(k * r * 0.6f, -r * 0.1f), t, wing);
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(k * r * 0.14f, r * 0.2f), c + new Vector2(k * r * 0.48f, r * 0.14f), t * 0.85f, wing);
                 }
-                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.25f), r * 0.14f, w);
+                var heart = new Color(226, 70, 76);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.1f, -r * 0.02f), r * 0.14f, heart);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.1f, -r * 0.02f), r * 0.14f, heart);
+                for (int i = 0; i < 5; i++) {
+                    float y = r * 0.02f + i * r * 0.055f, half = r * (0.23f - i * 0.05f);
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(-half, y), c + new Vector2(half, y), r * 0.07f, heart);
+                }
                 break;
+            }
             case TroveItemId.Clone:
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.25f, 0), r * 0.25f, w);
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.25f, 0), r * 0.25f, new Color(255, 255, 255, 140));
@@ -1098,11 +1138,15 @@ public static class TroveHud {
                 ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.3f, -r * 0.6f), c + new Vector2(0, -r * 0.15f), t * 0.5f, w);
                 ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.3f, -r * 0.6f), c + new Vector2(0, -r * 0.15f), t * 0.5f, w);
                 break;
-            case TroveItemId.MirrorShield:
-                ToggleSwitch.DrawDisc(sb, c, r * 0.5f, w);
-                ToggleSwitch.DrawDisc(sb, c, r * 0.4f, new Color(170, 200, 230));
-                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.2f, -r * 0.2f), c + new Vector2(r * 0.05f, -r * 0.3f), t * 0.6f, w);
+            case TroveItemId.MirrorShield: {
+                var frame = new Color(70, 112, 168);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.56f, frame);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.44f, new Color(186, 222, 250));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.06f, r * 0.08f), r * 0.34f, new Color(150, 198, 240));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.26f, -r * 0.08f), c + new Vector2(-r * 0.02f, -r * 0.3f), t * 0.7f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.12f, r * 0.08f), c + new Vector2(r * 0.02f, -r * 0.05f), t * 0.45f, w);
                 break;
+            }
             case TroveItemId.BountyHunter:
                 ToggleSwitch.DrawDisc(sb, c, r * 0.5f, new Color(255, 220, 90));
                 Text(sb, "$", c, r * 0.022f, new Color(120, 80, 10));
@@ -1189,10 +1233,15 @@ public static class TroveHud {
                 ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.6f, r * 0.2f), c + new Vector2(r * 0.6f, -r * 0.2f), r * 0.16f, new Color(60, 60, 70));
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.45f, r * 0.15f), r * 0.2f, new Color(60, 60, 70));
                 break;
-            case TroveItemId.HeartyMeal:
-                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.12f, -r * 0.08f), r * 0.36f, new Color(170, 100, 50));
-                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.1f, r * 0.15f), c + new Vector2(r * 0.45f, r * 0.5f), r * 0.14f, w);
+            case TroveItemId.HeartyMeal: {
+                // a drumstick
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.08f, r * 0.12f), c + new Vector2(r * 0.46f, r * 0.5f), r * 0.15f, w);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.42f, r * 0.56f), r * 0.1f, w);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.54f, r * 0.44f), r * 0.1f, w);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.12f, -r * 0.1f), r * 0.42f, new Color(238, 150, 70));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.2f, -r * 0.2f), r * 0.2f, new Color(252, 190, 110));
                 break;
+            }
             case TroveItemId.MagicMushroom:
                 ToggleSwitch.DrawLine(sb, c + new Vector2(0, r * 0.1f), c + new Vector2(0, r * 0.5f), r * 0.3f, new Color(245, 235, 210));
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(0, -r * 0.05f), r * 0.48f, new Color(220, 40, 40));
@@ -1200,11 +1249,17 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.18f, -r * 0.22f), r * 0.08f, w);
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.05f, r * 0.05f), r * 0.07f, w);
                 break;
-            case TroveItemId.GlassCannon:
-                ToggleSwitch.DrawDisc(sb, c, r * 0.48f, new Color(255, 255, 255, 170));
-                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.1f, -r * 0.45f), c + new Vector2(r * 0.05f, -r * 0.05f), t * 0.5f, new Color(40, 80, 120));
-                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.05f, -r * 0.05f), c + new Vector2(-r * 0.15f, r * 0.4f), t * 0.5f, new Color(40, 80, 120));
+            case TroveItemId.GlassCannon: {
+                var ring = new Color(52, 116, 160);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.56f, ring);
+                ToggleSwitch.DrawDisc(sb, c, r * 0.46f, new Color(214, 242, 255));
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.16f, -r * 0.18f), r * 0.12f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.02f, -r * 0.44f), c + new Vector2(r * 0.12f, -r * 0.08f), t * 0.5f, ring);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.12f, -r * 0.08f), c + new Vector2(-r * 0.08f, r * 0.14f), t * 0.5f, ring);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.08f, r * 0.14f), c + new Vector2(r * 0.06f, r * 0.42f), t * 0.5f, ring);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.12f, -r * 0.08f), c + new Vector2(r * 0.4f, r * 0.02f), t * 0.4f, ring);
                 break;
+            }
             case TroveItemId.Featherweight:
                 ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.45f, r * 0.45f), c + new Vector2(r * 0.4f, -r * 0.4f), t * 0.5f, w);
                 for (int i = 1; i < 5; i++) {
@@ -1248,12 +1303,19 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, c, r * 0.55f, new Color(60, 60, 70));
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.18f, -r * 0.18f), r * 0.16f, Color.White * 0.6f);
                 break;
-            case TroveItemId.HolyMantle:
-                // a glowing ring over a shield
-                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.12f), r * 0.42f, new Color(150, 170, 200));
-                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.12f), r * 0.3f, new Color(200, 215, 235));
-                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.3f, -r * 0.5f), c + new Vector2(r * 0.3f, -r * 0.5f), t * 0.9f, new Color(255, 220, 90));
+            case TroveItemId.HolyMantle: {
+                // a halo over a shield
+                var steel = new Color(96, 118, 176);
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.1f), r * 0.4f, steel);
+                for (int i = 0; i < 5; i++) {
+                    float y = r * 0.2f + i * r * 0.08f, half = r * (0.36f - i * 0.085f);
+                    ToggleSwitch.DrawLine(sb, c + new Vector2(-half, y), c + new Vector2(half, y), r * 0.1f, steel);
+                }
+                ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.1f), r * 0.27f, new Color(176, 196, 236));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.34f, -r * 0.52f), c + new Vector2(r * 0.34f, -r * 0.52f), t * 1.25f, new Color(196, 140, 24));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.3f, -r * 0.52f), c + new Vector2(r * 0.3f, -r * 0.52f), t * 0.65f, new Color(255, 226, 110));
                 break;
+            }
             case TroveItemId.Pyromaniac:
                 // a flame
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.18f), r * 0.38f, new Color(255, 110, 30));
@@ -1287,11 +1349,17 @@ public static class TroveHud {
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.25f, -r * 0.1f), r * 0.28f, new Color(20, 20, 28));
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.25f, -r * 0.05f), r * 0.1f, new Color(120, 90, 200) * 0.8f);
                 break;
-            case TroveItemId.TeleportPads:
-                ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.32f, r * 0.15f), r * 0.24f, new Color(170, 110, 255));
-                ToggleSwitch.DrawDisc(sb, c + new Vector2(r * 0.32f, -r * 0.15f), r * 0.24f, new Color(170, 110, 255));
-                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.32f, r * 0.15f), c + new Vector2(r * 0.32f, -r * 0.15f), t * 0.4f, w * 0.7f);
+            case TroveItemId.TeleportPads: {
+                foreach (float k in new[] { -1f, 1f }) {
+                    var at = c + new Vector2(k * r * 0.32f, -k * r * 0.16f);
+                    ToggleSwitch.DrawDisc(sb, at, r * 0.29f, w);
+                    ToggleSwitch.DrawDisc(sb, at, r * 0.2f, new Color(84, 40, 160));
+                    ToggleSwitch.DrawDisc(sb, at, r * 0.1f, new Color(130, 235, 255));
+                }
+                for (int i = -1; i <= 1; i++)
+                    ToggleSwitch.DrawDisc(sb, c + new Vector2(i * r * 0.09f, -i * r * 0.045f) + new Vector2(r * 0.02f, r * 0.36f) * 0f, r * 0.035f, w);
                 break;
+            }
             case TroveItemId.Battery: {
                 var cell = new Rectangle((int)(c.X - r * 0.25f), (int)(c.Y - r * 0.4f), (int)(r * 0.5f), (int)(r * 0.8f));
                 ToggleSwitch.DrawRoundedRect(sb, cell, r * 0.06f, new Color(50, 50, 55));
@@ -1351,16 +1419,25 @@ public static class TroveHud {
                     ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.45f, i * r * 0.2f), c + new Vector2(r * 0.5f, i * r * 0.2f), t * 0.7f, new Color(150, 155, 170));
                 ToggleSwitch.DrawDisc(sb, c + new Vector2(-r * 0.4f, 0), r * 0.25f, new Color(90, 90, 100));
                 break;
-            case TroveItemId.LightweightAlloy:
-                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.5f, r * 0.2f), c + new Vector2(r * 0.4f, -r * 0.3f), t * 1.6f, new Color(170, 245, 240));
-                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.4f, r * 0.45f), c + new Vector2(r * 0.1f, r * 0.15f), t * 0.5f, Color.White * 0.7f);
-                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.55f, -r * 0.05f), c + new Vector2(-r * 0.15f, -r * 0.28f), t * 0.5f, Color.White * 0.7f);
+            case TroveItemId.LightweightAlloy: {
+                // a light bar of metal, moving fast
+                var edge = new Color(36, 132, 136);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.42f, r * 0.16f), c + new Vector2(r * 0.5f, -r * 0.3f), t * 2.3f, edge);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.38f, r * 0.14f), c + new Vector2(r * 0.46f, -r * 0.28f), t * 1.4f, new Color(238, 255, 255));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.6f, r * 0.48f), c + new Vector2(-r * 0.05f, r * 0.2f), t * 0.6f, edge);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.3f, r * 0.56f), c + new Vector2(r * 0.12f, r * 0.34f), t * 0.6f, edge);
                 break;
-            case TroveItemId.CoffeeThermos:
-                ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(c.X - r * 0.25f), (int)(c.Y - r * 0.35f), (int)(r * 0.5f), (int)(r * 0.8f)), r * 0.1f, new Color(160, 105, 60));
-                ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(c.X - r * 0.2f), (int)(c.Y - r * 0.5f), (int)(r * 0.4f), (int)(r * 0.16f)), r * 0.05f, new Color(90, 90, 100));
-                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.05f, -r * 0.6f), c + new Vector2(r * 0.05f, -r * 0.8f), t * 0.4f, Color.White * 0.7f);
+            }
+            case TroveItemId.CoffeeThermos: {
+                var body = new Rectangle((int)(c.X - r * 0.27f), (int)(c.Y - r * 0.3f), (int)(r * 0.54f), (int)(r * 0.82f));
+                ToggleSwitch.DrawRoundedRect(sb, body, r * 0.1f, new Color(222, 226, 234));
+                ToggleSwitch.DrawRoundedRect(sb, new Rectangle(body.X, (int)(c.Y - r * 0.02f), body.Width, (int)(r * 0.22f)), 0, new Color(208, 62, 54));
+                ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(c.X - r * 0.2f), (int)(c.Y - r * 0.48f), (int)(r * 0.4f), (int)(r * 0.2f)), r * 0.05f, new Color(58, 42, 34));
+                ToggleSwitch.DrawLine(sb, c + new Vector2(-r * 0.15f, -r * 0.2f), c + new Vector2(-r * 0.15f, r * 0.42f), t * 0.5f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.42f, -r * 0.5f), c + new Vector2(r * 0.52f, -r * 0.72f), t * 0.5f, w);
+                ToggleSwitch.DrawLine(sb, c + new Vector2(r * 0.28f, -r * 0.58f), c + new Vector2(r * 0.36f, -r * 0.76f), t * 0.5f, w);
                 break;
+            }
             case TroveItemId.Boost: {
                 // two flame chevrons pointing forward
                 var flame = new Color(255, 230, 120);
@@ -1501,9 +1578,9 @@ public static class TroveHud {
             if (mine.Has(syn)) {
                 var font = FontGlobals.RebirthFont;
                 var t = "* " + syn.Name;
-                sb.DrawString(font, t, new Vector2(panel.X + 2, sy) + new Vector2(2), Color.Black * 0.7f, new Vector2(0.42f * s), 0f, Vector2.Zero);
-                sb.DrawString(font, t, new Vector2(panel.X + 2, sy), new Color(255, 215, 80), new Vector2(0.42f * s), 0f, Vector2.Zero);
-                sy += font.MeasureString(t).Y * 0.42f * s * 1.1f;
+                sb.DrawString(font, t, new Vector2(panel.X + 2, sy) + new Vector2(2), Color.Black * 0.7f, new Vector2(0.6f * s), 0f, Vector2.Zero);
+                sb.DrawString(font, t, new Vector2(panel.X + 2, sy), new Color(255, 215, 80), new Vector2(0.6f * s), 0f, Vector2.Zero);
+                sy += font.MeasureString(t).Y * 0.6f * s * 1.1f;
             }
     }
 
@@ -1558,7 +1635,7 @@ public static class TroveHud {
         var box = new Rectangle((int)(c.X - 430 * s), (int)(c.Y - 50 * s), (int)(860 * s), (int)(100 * s));
         ToggleSwitch.DrawRoundedRect(sb, box, 22 * s, new Color(60, 30, 90) * (0.95f * a));
         Text(sb, $"SYNERGY!  {ls.Synergy.Name.ToUpperInvariant()}", new Vector2(c.X, box.Y + 32 * s), 0.85f * s, new Color(255, 215, 80) * a, border: true);
-        Text(sb, ls.Synergy.Description, new Vector2(c.X, box.Y + 74 * s), 0.55f * s, Color.White * a);
+        Text(sb, ls.Synergy.Description, new Vector2(c.X, box.Y + 74 * s), 0.72f * s, Color.White * a);
     }
 
     // ---- the boss's health, across the top of the screen
@@ -1596,11 +1673,19 @@ public static class TroveHud {
         sb.DrawString(font, lp.Def.Description, new Vector2(box.X + 130 * s, box.Y + 82 * s), new Color(80, 62, 46) * a, new Vector2(0.62f * s), 0f, new Vector2(0, font.MeasureString("A").Y / 2f));
     }
 
+    private static readonly Vector2[] _borderOffsets = [new(-2, 0), new(2, 0), new(0, -2), new(0, 2)];
     internal static void Text(SpriteBatch sb, string t, Vector2 center, float scale, Color color, bool border = false) {
         var font = FontGlobals.RebirthFont;
         var m = font.MeasureString(t);
+        // nothing on the HUD is smaller than this (tags and counters were hard to read on a phone)
+        scale = Math.Max(scale, 0.6f * S);
+        if (ToggleSwitch.Override is { } shade) {
+            // (an icon's shadow pass)
+            sb.DrawString(font, t, center + ToggleSwitch.Shift, shade, new Vector2(scale), 0f, m / 2f);
+            return;
+        }
         if (border)
-            foreach (var o in new[] { new Vector2(-2, 0), new Vector2(2, 0), new Vector2(0, -2), new Vector2(0, 2) })
+            foreach (var o in _borderOffsets)
                 sb.DrawString(font, t, center + o, Color.Black * 0.8f, new Vector2(scale), 0f, m / 2f);
         sb.DrawString(font, t, center, color, new Vector2(scale), 0f, m / 2f);
     }
@@ -1670,9 +1755,21 @@ public static class TroveHud {
         var face = pressing ? new Rectangle(r.X, r.Y + lip / 2, r.Width, r.Height - lip / 2) : new Rectangle(r.X, r.Y, r.Width, r.Height - lip);
         ToggleSwitch.DrawRoundedRect(sb, new Rectangle(r.X, r.Y + lip, r.Width, r.Height - lip), r.Height * 0.3f, UITextButton.PhoneEdge);
         ToggleSwitch.DrawRoundedRect(sb, face, r.Height * 0.3f, pressing ? UITextButton.PhonePressed : fill);
+        var inkCol = new Color(40, 30, 22);
+        if (label is "<" or ">") {
+            // arrows are drawn (the font's are thin and small)
+            var c = face.Center.ToVector2();
+            float a = face.Height * 0.2f, dir = label == "<" ? -1f : 1f, thick = face.Height * 0.11f;
+            var tip = c + new Vector2(dir * a * 0.6f, 0);
+            ToggleSwitch.DrawLine(sb, tip, tip + new Vector2(-dir * a * 1.1f, -a), thick, inkCol);
+            ToggleSwitch.DrawLine(sb, tip, tip + new Vector2(-dir * a * 1.1f, a), thick, inkCol);
+            ToggleSwitch.DrawDisc(sb, tip, thick / 2f, inkCol);
+            return;
+        }
         var font = FontGlobals.RebirthFont;
         var m = font.MeasureString(label);
-        sb.DrawString(font, label, face.Center.ToVector2(), new Color(40, 30, 22), new Vector2(face.Height * 0.4f / Math.Max(1f, m.Y)), 0f, m / 2f);
+        float sc = Math.Min(face.Height * 0.46f / Math.Max(1f, m.Y), (face.Width - face.Height * 0.4f) / Math.Max(1f, m.X));
+        sb.DrawString(font, label, face.Center.ToVector2(), inkCol, new Vector2(sc), 0f, m / 2f);
     }
 
     // ---- door pictures (made once): a wooden rim around a dark arch, with bars while the room isn't cleared

@@ -134,7 +134,7 @@ public static class BattleHud {
                 TroveHud.Text(sb, "1st", new Vector2(box.X + 28 * s, box.Center.Y), 0.32f * s, Color.White, border: true);
             var font = FontGlobals.RebirthFont;
             string name = f.Name.Length > 11 ? f.Name[..10] + "." : f.Name;
-            sb.DrawString(font, name, new Vector2(box.X + 54 * s, box.Center.Y), (f.Alive ? Color.White : Color.Gray), new Vector2(0.5f * s), 0f,
+            sb.DrawString(font, name, new Vector2(box.X + 54 * s, box.Center.Y), (f.Alive ? Color.White : Color.Gray), new Vector2(0.62f * s), 0f,
                 new Vector2(0, font.MeasureString("A").Y / 2f));
             TroveHud.Text(sb, f.Wins.ToString(), new Vector2(box.Right - 26 * s, box.Center.Y), 0.75f * s, new Color(255, 215, 80), border: true);
             // king of the hill: how long they've held it
@@ -294,7 +294,7 @@ public static class BattleHud {
         string who = Client.IsConnected() ? $"{humans} player{(humans == 1 ? "" : "s")} connected"
             : LocalCoop.Active ? "2 players on this device" : "1 player on this device";
         int total = humans + BattleMode.CpuCount;
-        TroveHud.Text(sb, $"{who}  -  {total} tanks", new Vector2(panel.Center.X, panel.Y + 140 * s), 0.6f * s, UITextButton.PhoneEdge);
+        TroveHud.Text(sb, $"{who}  -  {total} tanks", new Vector2(panel.Center.X, panel.Y + 142 * s), 1.0f * s, UITextButton.PhoneEdge);
 
         bool offline = !Client.IsConnected();
         var rows = new List<(string Label, string Value, Action Prev, Action Next)> {
@@ -309,15 +309,15 @@ public static class BattleHud {
                 () => BattleMode.Cpus = BattleMode.CpuCount <= min ? max : BattleMode.CpuCount - 1,
                 () => BattleMode.Cpus = BattleMode.CpuCount >= max ? min : BattleMode.CpuCount + 1));
         }
-        float rowY = panel.Y + 215 * s, rowH = 100 * s;
+        float rowY = panel.Y + 196 * s, rowH = 96 * s;
         foreach (var (label, value, prev, next) in rows) {
             var font = FontGlobals.RebirthFont;
-            sb.DrawString(font, label, new Vector2(panel.X + 90 * s, rowY + rowH / 2f), ink, new Vector2(0.8f * s), 0f, new Vector2(0, font.MeasureString("A").Y / 2f));
+            sb.DrawString(font, label, new Vector2(panel.X + 90 * s, rowY + rowH / 2f), ink, new Vector2(1.35f * s), 0f, new Vector2(0, font.MeasureString("A").Y / 2f));
             var left = new Rectangle((int)(panel.X + 560 * s), (int)(rowY + 10 * s), (int)(110 * s), (int)(rowH - 20 * s));
             var right = new Rectangle((int)(panel.Right - 200 * s), (int)(rowY + 10 * s), (int)(110 * s), (int)(rowH - 20 * s));
             TroveHud.Button(sb, left, "<", Color.White, _down, _press);
             TroveHud.Button(sb, right, ">", Color.White, _down, _press);
-            TroveHud.Text(sb, value, new Vector2((left.Right + right.X) / 2f, rowY + rowH / 2f), 0.85f * s, new Color(170, 50, 40));
+            TroveHud.Text(sb, value, new Vector2((left.Right + right.X) / 2f, rowY + rowH / 2f), 1.4f * s, new Color(170, 50, 40));
             if (Tapped(left)) prev();
             if (Tapped(right)) next();
             rowY += rowH;
@@ -328,9 +328,9 @@ public static class BattleHud {
             _ => "Be the last tank standing",
         };
         TroveHud.Text(sb, tip + (BattleMode.Match == BattleMatch.Deathmatch ? "" : " (or be the last tank standing)"),
-            new Vector2(panel.Center.X, rowY + 30 * s), 0.5f * s, UITextButton.PhoneEdge);
+            new Vector2(panel.Center.X, rowY + 34 * s), 0.9f * s, UITextButton.PhoneEdge);
 
-        float bw = 380 * s, bh = 120 * s, by = panel.Bottom - 60 * s - bh;
+        float bw = 380 * s, bh = 110 * s, by = panel.Bottom - 46 * s - bh;
         var back = new Rectangle((int)(panel.Center.X - bw - 30 * s), (int)by, (int)bw, (int)bh);
         var start = new Rectangle((int)(panel.Center.X + 30 * s), (int)by, (int)bw, (int)bh);
         bool canStart = !Client.IsConnected() || Client.IsHost();

@@ -72,11 +72,23 @@ public static class ToggleSwitch {
     /// <summary>A filled circle (straight alpha; use with BlendState.NonPremultiplied).</summary>
     public static void DrawDisc(SpriteBatch sb, Vector2 center, float radius, Color color) {
         EnsureTextures(sb.GraphicsDevice);
-        DrawCircle(sb, center, radius, color);
+        DrawCircle(sb, center + Shift, radius, Tint(color));
     }
+
+    /// <summary>While set, every shape is drawn in this color (as see-through as the shape was) and moved by
+    /// <see cref="Shift"/>: drawing something twice, first like this, gives it a drop shadow.</summary>
+    public static Color? Override;
+    public static Vector2 Shift;
+    /// <summary>Circles come from a straight-alpha texture while set (for drawing into a texture with its own blending).</summary>
+    public static bool StraightAlpha;
+
+    private static Color Tint(Color c) => Override is { } o ? new Color(o.R, o.G, o.B, (byte)(o.A * c.A / 255)) : c;
 
     public static void DrawLine(SpriteBatch sb, Vector2 a, Vector2 b, float thickness, Color color) {
         EnsureTextures(sb.GraphicsDevice);
+        a += Shift;
+        b += Shift;
+        color = Tint(color);
         var d = b - a;
         sb.Draw(_pixel!, a, null, color, MathF.Atan2(d.Y, d.X), new Vector2(0, 0.5f), new Vector2(d.Length(), thickness), SpriteEffects.None, 0f);
     }
@@ -86,6 +98,10 @@ public static class ToggleSwitch {
         EnsureTextures(sb.GraphicsDevice);
         if (r.Width <= 0 || r.Height <= 0)
             return;
+        if (Override is not null || Shift != Vector2.Zero) {
+            r.Offset((int)MathF.Round(Shift.X), (int)MathF.Round(Shift.Y));
+            color = Tint(color);
+        }
         int ri = (int)MathF.Round(MathF.Min(radius, MathF.Min(r.Width, r.Height) / 2f));
         if (ri <= 0) {
             sb.Draw(_pixel!, r, color);
@@ -94,18 +110,18 @@ public static class ToggleSwitch {
         const int H = TexSize / 2;
         int midW = r.Width - 2 * ri, midH = r.Height - 2 * ri;
         // corners: the four quarters of the circle
-        sb.Draw(_circle!, new Rectangle(r.X, r.Y, ri, ri), new Rectangle(0, 0, H, H), color);
-        sb.Draw(_circle!, new Rectangle(r.Right - ri, r.Y, ri, ri), new Rectangle(H, 0, H, H), color);
-        sb.Draw(_circle!, new Rectangle(r.X, r.Bottom - ri, ri, ri), new Rectangle(0, H, H, H), color);
-        sb.Draw(_circle!, new Rectangle(r.Right - ri, r.Bottom - ri, ri, ri), new Rectangle(H, H, H, H), color);
+        sb.Draw(Circle, new Rectangle(r.X, r.Y, ri, ri), new Rectangle(0, 0, H, H), color);
+        sb.Draw(Circle, new Rectangle(r.Right - ri, r.Y, ri, ri), new Rectangle(H, 0, H, H), color);
+        sb.Draw(Circle, new Rectangle(r.X, r.Bottom - ri, ri, ri), new Rectangle(0, H, H, H), color);
+        sb.Draw(Circle, new Rectangle(r.Right - ri, r.Bottom - ri, ri, ri), new Rectangle(H, H, H, H), color);
         // edges: a one-texel slice through the circle's middle, stretched
         if (midW > 0) {
-            sb.Draw(_circle!, new Rectangle(r.X + ri, r.Y, midW, ri), new Rectangle(H, 0, 1, H), color);
-            sb.Draw(_circle!, new Rectangle(r.X + ri, r.Bottom - ri, midW, ri), new Rectangle(H, H, 1, H), color);
+            sb.Draw(Circle, new Rectangle(r.X + ri, r.Y, midW, ri), new Rectangle(H, 0, 1, H), color);
+            sb.Draw(Circle, new Rectangle(r.X + ri, r.Bottom - ri, midW, ri), new Rectangle(H, H, 1, H), color);
         }
         if (midH > 0) {
-            sb.Draw(_circle!, new Rectangle(r.X, r.Y + ri, ri, midH), new Rectangle(0, H, H, 1), color);
-            sb.Draw(_circle!, new Rectangle(r.Right - ri, r.Y + ri, ri, midH), new Rectangle(H, H, H, 1), color);
+            sb.Draw(Circle, new Rectangle(r.X, r.Y + ri, ri, midH), new Rectangle(0, H, H, 1), color);
+            sb.Draw(Circle, new Rectangle(r.Right - ri, r.Y + ri, ri, midH), new Rectangle(H, H, H, 1), color);
         }
         if (midW > 0 && midH > 0)
             sb.Draw(_pixel!, new Rectangle(r.X + ri, r.Y + ri, midW, midH), color);
@@ -124,15 +140,19 @@ public static class ToggleSwitch {
     }
 
     private static void DrawCircle(SpriteBatch sb, Vector2 center, float radius, Color color) {
-        var scale = radius * 2f / _circle!.Width;
-        sb.Draw(_circle, center, null, color, 0f, new Vector2(_circle.Width / 2f), scale, SpriteEffects.None, 0f);
+        var tex = Circle;
+        var scale = radius * 2f / tex.Width;
+        sb.Draw(tex, center, null, color, 0f, new Vector2(tex.Width / 2f), scale, SpriteEffects.None, 0f);
     }
 
     private const int TexSize = 256;
+    private static Texture2D? _circleStraight;
+    private static Texture2D Circle => StraightAlpha ? _circleStraight! : _circle!;
 
     private static void EnsureTextures(GraphicsDevice gd) {
-        if (_circle is { IsDisposed: false } && _pixel is { IsDisposed: false })
+        if (_circle is { IsDisposed: false } && _pixel is { IsDisposed: false } && _circleStraight is { IsDisposed: false })
             return;
+        _circleStraight = new Texture2D(gd, TexSize, TexSize, true, SurfaceFormat.Color);
 
         // a circle with every mip level drawn exactly (so small circles stay round and smooth instead of jaggy)
         _circle = new Texture2D(gd, TexSize, TexSize, true, SurfaceFormat.Color);
@@ -154,6 +174,9 @@ public static class ToggleSwitch {
                     data[y * size + x] = new Color(a, a, a, a);
                 }
             _circle.SetData(level, null, data, 0, data.Length);
+            for (int i = 0; i < data.Length; i++)
+                data[i] = new Color(255, 255, 255, (int)data[i].A);
+            _circleStraight.SetData(level, null, data, 0, data.Length);
         }
 
         _pixel = new Texture2D(gd, 1, 1);

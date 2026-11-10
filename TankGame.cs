@@ -186,6 +186,14 @@ public class TankGame : Game {
     }
 
     protected override void Initialize() {
+        Perf.Scene = () => {
+            string scene = MainMenuUI.IsActive ? "menu" : LevelEditorUI.IsActive ? "editor" : GameContent.Systems.Troves.TroveRun.Battle ? "battle" : GameContent.Systems.Troves.TroveRun.Active ? "troves" : "mission";
+            int tanks = 0;
+            foreach (var t in GameHandler.AllTanks)
+                if (t is { IsDestroyed: false })
+                    tanks++;
+            return $"{scene} tanks={tanks} particles={GameHandler.Particles.CurrentParticles.Count} lights={TanksRebirth.Graphics.DynamicLighting.LightingSystem.IsActive}";
+        };
         SaveFile.Setup();
         if (File.Exists(Path.Combine(SaveFile.Directory, SaveFile.Name)))
             SaveFile.Deserialize();
@@ -623,6 +631,7 @@ public class TankGame : Game {
             _lastStatsSave = CurrentSessionTimer.Elapsed.TotalSeconds;
             System.Threading.Tasks.Task.Run(SaveStats);
         }
+        Perf.Open();
         try {
             /*if (Debugger.IsAttached) {
                 SteamworksUtils.SetSteamStatus("balls", "inspector");
@@ -666,6 +675,8 @@ public class TankGame : Game {
             IsCrashInfoVisible = true;
             RuntimeData.CrashInfo = new(e.Message, e.StackTrace ?? "No stack trace available.", e);
         }
+        Perf.Mark(Perf.S.UpdateRest);
+        Perf.Close();
     }
     private void HandleLogic(GameTime gameTime) {
         MouseUtils.MousePosition = new(InputUtils.CurrentMouseSnapshot.X, InputUtils.CurrentMouseSnapshot.Y);
@@ -772,12 +783,15 @@ public class TankGame : Game {
         bool shouldUpdate = Client.IsConnected() || (IsActive && !GameUI.Paused && !CampaignCompleteUI.IsViewingResults);
         if (!IsCrashInfoVisible) {
             if (shouldUpdate) {
+                Perf.Mark(Perf.S.UpdateRest);
                 GameHandler.UpdateAll(gameTime);
+                Perf.Mark(Perf.S.Logic);
 
                 // questionable as to why it causes hella lag on game start
                 // TODO: try and find out why this happens lol.
                 if (float.IsFinite(RuntimeData.DeltaTime))
                     Tank.CollisionsWorld.Step(RuntimeData.DeltaTime);
+                Perf.Mark(Perf.S.Physics);
             }
         }
         foreach (var bind in Keybind.AllKeybinds)
@@ -844,19 +858,28 @@ public class TankGame : Game {
         GraphicsDevice.SetRenderTarget(null);
     }
     protected override void Draw(GameTime gameTime) {
+        Perf.Open();
+        // (made once; before anything is drawn, because it switches render targets)
+        GameContent.UI.TroveIcons.EnsureBuilt(GraphicsDevice);
         PrepareAllRTs();
 
         DrawGameElements();
+        Perf.Mark(Perf.S.Present);
 
         DrawNonInteractiveUI();
+        Perf.Mark(Perf.S.MenuUI);
 
         DrawInteractiveUI();
+        Perf.Mark(Perf.S.GameUI);
 
         DrawCursor();
 
         TouchControls.Draw(SpriteRenderer);
 
         PostDrawEverything?.Invoke(gameTime);
+        Perf.Mark(Perf.S.Touch);
+        Perf.Close();
+        Perf.FrameEnd(gameTime.ElapsedGameTime.TotalSeconds);
 
         RuntimeData.RenderTime = gameTime.ElapsedGameTime;
         RuntimeData.RenderFPS = Math.Round(1f / gameTime.ElapsedGameTime.TotalSeconds);
@@ -950,9 +973,11 @@ public class TankGame : Game {
     public void PrepareAllRTs() {
         // switch to RT, begin SB, do drawing, end SB, SetRenderTarget(null), begin SB again, draw RT, end SB
         PrepareGameBuffers(SpriteRenderer);
+        Perf.Mark(Perf.S.Scene3D);
         MainMenuUI.PrepareTextBuffers(GraphicsDevice, SpriteRenderer);
 
         IntermissionSystem.PrepareBuffers(GraphicsDevice, SpriteRenderer);
+        Perf.Mark(Perf.S.MenuText);
     }
 
     public static void DrawGameElements() {

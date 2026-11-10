@@ -57,6 +57,8 @@ public static class TroveEnemies {
     private static bool Authority => !Client.IsConnected() || Client.IsHost();
 
     public static EnemyVariant VariantOf(Tank t) => _info.TryGetValue(t, out var i) ? i.Variant : EnemyVariant.None;
+    /// <summary>True while a kamikaze or crawler's fuse is lit.</summary>
+    public static bool IsFused(Tank t) => _info.TryGetValue(t, out var i) && i.FuseAt >= 0;
     public static GunnerKind GunnerOf(Tank t) => _info.TryGetValue(t, out var i) ? i.Gunner : GunnerKind.Triple;
     public static IEnumerable<(Tank Tank, EnemyVariant Variant)> All => _info.Where(k => !k.Key.IsDestroyed).Select(k => (k.Key, k.Value.Variant));
 

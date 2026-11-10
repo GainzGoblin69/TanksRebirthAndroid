@@ -20,8 +20,10 @@ public static class WindowUtils
     public static float ToResolutionY(this float input) => ToResolution(input).Y;
     public static float ToResolutionX(this int input) => ToResolution(input).X;
     public static float ToResolutionY(this int input) => ToResolution(input).Y;
-    public static int WindowWidth => TankGame.Instance.Window.ClientBounds.Width;
-    public static int WindowHeight => TankGame.Instance.Window.ClientBounds.Height;
+    /// <summary>For drawing tests without a game window: a made-up window size.</summary>
+    public static Point? TestSize;
+    public static int WindowWidth => TestSize?.X ?? TankGame.Instance.Window.ClientBounds.Width;
+    public static int WindowHeight => TestSize?.Y ?? TankGame.Instance.Window.ClientBounds.Height;
     public static Vector2 WindowBounds => new(WindowWidth, WindowHeight);
     public static Vector2 WindowCenter => WindowBounds / 2;
     public static Vector2 WindowBottom => new(WindowWidth / 2, WindowHeight);
