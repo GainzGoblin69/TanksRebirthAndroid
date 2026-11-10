@@ -284,8 +284,8 @@ public class MainActivity : AndroidGameActivity {
     private void HideSplashWhenReady() {
         if (_splash is not { } splash)
             return;
-        // the whole animation, plus a moment on the finished logo
-        bool ready = _firstFrameAt is not null && splash.Elapsed >= SplashView.Length + 0.8f;
+        // the whole intro plays once, then it leaves while the logo is up (not mid-loop)
+        bool ready = _firstFrameAt is not null && splash.AtRest;
         bool tooLong = SystemClock.UptimeMillis() - _splashShownAt > 20000; // never hide the game for good
         if (!ready && !tooLong) {
             new Handler(Looper.MainLooper!).PostDelayed(HideSplashWhenReady, 100);
