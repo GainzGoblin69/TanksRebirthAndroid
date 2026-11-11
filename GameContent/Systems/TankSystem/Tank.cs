@@ -482,12 +482,16 @@ public abstract class Tank {
         }
         // a NaN anywhere (a bad push, a zero-length direction) would freeze the physics and break the AI for good:
         // drop the bad motion and put the tank back where it last was
-        if (!float.IsFinite(Velocity.X) || !float.IsFinite(Velocity.Y))
-            Velocity = Vector2.Zero;
-        if (!float.IsFinite(KnockbackVelocity.X) || !float.IsFinite(KnockbackVelocity.Y))
-            KnockbackVelocity = Vector2.Zero;
         var here = Physics.Position;
-        if (!float.IsFinite(here.X) || !float.IsFinite(here.Y)) {
+        bool badVel = !float.IsFinite(Velocity.X) || !float.IsFinite(Velocity.Y), badKnock = !float.IsFinite(KnockbackVelocity.X) || !float.IsFinite(KnockbackVelocity.Y);
+        bool badPos = !float.IsFinite(here.X) || !float.IsFinite(here.Y);
+        if ((badVel || badKnock || badPos) && _nanLogs++ < 10)
+            TankGame.ClientLog.Write($"[NaN] tank #{WorldId} ({GetType().Name}) caught in Update: vel={Velocity} knock={KnockbackVelocity} pos={here} rot={ChassisRotation} want={DesiredChassisRotation} speed={Speed} dt={RuntimeData.DeltaTime}", Internals.LogType.Warn);
+        if (badVel)
+            Velocity = Vector2.Zero;
+        if (badKnock)
+            KnockbackVelocity = Vector2.Zero;
+        if (badPos) {
             Physics.Position = _lastGoodPhysicsPos;
             Physics.LinearVelocity = Vector2.Zero;
         }
@@ -655,6 +659,7 @@ public abstract class Tank {
     /// <summary>Set by Tank Troves: changes a tank's movement each update (floor themes), or null to leave it.</summary>
     public static Func<Tank, Vector2, Vector2?>? VelocityFilter;
     private Vector2 _lastGoodPhysicsPos;
+    private static int _nanLogs;
     public void DoDamageTextPopup(Color color) {
         var part = GameHandler.Particles.MakeParticle(Position3D + new Vector3(0, 15, 0),
             TankGame.GameLanguage.Hit);
