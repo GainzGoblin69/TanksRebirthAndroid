@@ -480,6 +480,19 @@ public abstract class Tank {
             Velocity = Vector2.Zero;
             KnockbackVelocity = Vector2.Zero;
         }
+        // a NaN anywhere (a bad push, a zero-length direction) would freeze the physics and break the AI for good:
+        // drop the bad motion and put the tank back where it last was
+        if (!float.IsFinite(Velocity.X) || !float.IsFinite(Velocity.Y))
+            Velocity = Vector2.Zero;
+        if (!float.IsFinite(KnockbackVelocity.X) || !float.IsFinite(KnockbackVelocity.Y))
+            KnockbackVelocity = Vector2.Zero;
+        var here = Physics.Position;
+        if (!float.IsFinite(here.X) || !float.IsFinite(here.Y)) {
+            Physics.Position = _lastGoodPhysicsPos;
+            Physics.LinearVelocity = Vector2.Zero;
+        }
+        else
+            _lastGoodPhysicsPos = here;
         // magical multiplication number to maintain values like 1.8 max speed with the original game
         Physics.LinearVelocity = (Velocity * 0.55f + KnockbackVelocity) / UNITS_PER_METER;
 
@@ -641,6 +654,7 @@ public abstract class Tank {
     public static Func<Tank, bool>? MovementLocked;
     /// <summary>Set by Tank Troves: changes a tank's movement each update (floor themes), or null to leave it.</summary>
     public static Func<Tank, Vector2, Vector2?>? VelocityFilter;
+    private Vector2 _lastGoodPhysicsPos;
     public void DoDamageTextPopup(Color color) {
         var part = GameHandler.Particles.MakeParticle(Position3D + new Vector3(0, 15, 0),
             TankGame.GameLanguage.Hit);

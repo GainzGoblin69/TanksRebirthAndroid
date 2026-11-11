@@ -130,7 +130,7 @@ public static class TroveBlocks {
                 b.SwapTexture(Tex("floor_conveyor_0"));
                 // its direction comes from the room's layout (kept in the stack height: 1 = up the screen, then clockwise)
                 b.State = Math.Max(0, b.Stack - 1) & 3;
-                b.Yaw = -(int)b.State * MathHelper.PiOver2;
+                b.Yaw = MathHelper.Pi - (int)b.State * MathHelper.PiOver2; // (the texture's arrows point down)
                 break;
             case TroveBlockID.Spikes: b.SwapTexture(Tex("floor_spikes_down")); break;
             case TroveBlockID.Lava: b.SwapTexture(Tex("floor_lava_0")); break;

@@ -189,6 +189,8 @@ public partial class AITank {
     /// <summary>Whether a circle at <paramref name="position"/> touches a solid block or the edge of the arena (and which way is out).</summary>
     public static bool TouchesWall(Vector2 position, out Vector2 normal, float scanRadius = WALL_SWEEP_RADIUS) {
         normal = Vector2.Zero;
+        if (!float.IsFinite(position.X) || !float.IsFinite(position.Y))
+            return false;
         bool hit = false;
         float radius = GameUtils.Value_WiiTanksUnits(scanRadius);
         var half = new Vector2(Block.SIDE_LENGTH / 2f);
