@@ -588,6 +588,10 @@ public class Shell : IAITankDanger {
                 else if (BreaksCork && block is { Properties.IsDestructible: true } && (dir != CollisionDirection.None || corner)) {
                     block.Destroy(); // heavy shells smash breakable blocks and keep going
                 }
+                else if (block is not null && (dir != CollisionDirection.None || corner) && _wallRicCooldown <= 0 && _ticks > TOO_SHORT_TICKS
+                    && HitsBlock?.Invoke(block, this, dir, corner) == true) {
+                    // a Tank Troves material decided what happens (glass shatters, hay soaks it up, a mirror sends it back...)
+                }
                 else if (Type == ShellID.Missile && block is not null && (dir != CollisionDirection.None || corner)) {
                     // missiles break through destructible blocks and keep going; anything else stops them
                     if (block.Properties.IsDestructible)
@@ -741,6 +745,11 @@ public class Shell : IAITankDanger {
     /// Ricochets this <see cref="Shell"/>.
     /// </summary>
     /// <param name="horizontal">Whether or not the ricochet is done off of a horizontal axis.</param>
+    /// <summary>Lets something other than a plain wall decide what a shell does when it hits a block (true = handled).</summary>
+    public static Func<Block, Shell, CollisionDirection, bool, bool>? HitsBlock;
+    /// <summary>Ignore walls for a moment (after being sent somewhere new).</summary>
+    public void WallCooldown(float ticks) => _wallRicCooldown = ticks;
+
     public void Ricochet(bool horizontal) {
         const string ricochetSound = "Assets/sounds/bullet_ricochet.ogg";
 

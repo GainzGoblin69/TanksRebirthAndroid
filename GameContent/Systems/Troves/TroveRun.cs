@@ -285,6 +285,7 @@ public static class TroveRun {
             if (System.IO.File.Exists(tp) && Enum.TryParse<FloorTheme>(System.IO.File.ReadAllLines(tp).ElementAtOrDefault(4)?.Trim(), out var th))
                 TroveThemes.TestTheme = th; // 5th line: a floor theme to always show up
             TroveGen.TestCorkFloor = System.IO.File.Exists(tp) && System.IO.File.ReadAllLines(tp).ElementAtOrDefault(5)?.Trim() == "cork"; // 6th: "cork"
+            TroveMaterials.TestShowcase = System.IO.File.Exists(tp) && System.IO.File.ReadAllLines(tp).ElementAtOrDefault(7)?.Trim() == "materials"; // 8th: "materials"
         }
         catch { }
         try {
@@ -471,6 +472,7 @@ Internals.Perf.Mark(Internals.Perf.S.TrRun);
         TroveDrops.Update();
         Internals.Perf.Mark(Internals.Perf.S.TrEnemies);
         TroveThemes.Update();
+        TroveBlocks.Update();
         Internals.Perf.Mark(Internals.Perf.S.TrThemes);
         if (!CampaignGlobals.InMission || Ended != EndKind.None || GameUI.Paused || Room is not { } room)
             return;
@@ -641,6 +643,7 @@ Internals.Perf.Mark(Internals.Perf.S.TrRun);
     private static void Retry() => FadeThen(() => LoadRoom(_entry));
 
     private static void LoadRoom(TroveDir? entry) {
+        TroveBlocks.Reset();
         if (Floor is null || Room is not { } room)
             return;
         _entry = entry;
@@ -685,14 +688,17 @@ Internals.Perf.Mark(Internals.Perf.S.TrRun);
     /// Rolled from the run's seed and the block's spot, so every phone gets the same result without sending anything,
     /// and each cork block only gets one chance per run (coming back to the room can't farm it).</summary>
     internal static void OnBlockBroken(Block block) {
-        if (!Active || !CampaignGlobals.InMission || Room is not { } room || block.Type != BlockID.Cork || _fadeDir != 0)
+        if (!Active || !CampaignGlobals.InMission || Room is not { } room || _fadeDir != 0
+            || block.Type != BlockID.Cork && !TroveBlockID.IsBreakable(block.Type))
             return;
         var g = TroveGen.ToGrid(block.Position);
-        int bi = room.Blocks.FindIndex(b => b.X == g.X && b.Y == g.Y && b.Type == BlockID.Cork);
-        if (bi < 0) // only the room's own cork (not Wall Builder's)
+        int bi = room.Blocks.FindIndex(b => b.X == g.X && b.Y == g.Y && b.Type == block.Type);
+        if (bi < 0) // only the room's own blocks (not Wall Builder's)
             return;
-        // broken cork stays broken: it's gone from the room's layout, so it isn't there when you come back
+        // broken blocks stay broken: gone from the room's layout, so they aren't there when you come back
         room.Blocks.RemoveAt(bi);
+        if (block.Type != BlockID.Cork)
+            return; // (crates roll their own pickups)
         if (Battle) {
             // Battle: only the items hidden in this arena's cork
             if (room.Hidden.Remove(g, out var hid)) {

@@ -119,7 +119,7 @@ adb exec-out screencap -p > diag/run2-levelrun.png
 
 # Tank Troves: pause, Quit, then Play > Single Player > Tank Troves; the first room of floor 1
 # (test setup: start with a pile of items that make synergies, and an item on the floor of the first room)
-adb shell "printf 'MagicMushroom HighCaliber RapidBarrel NitroTreads ArmorPlating TripleShot NitroBoost Turbocharger\nGlassCannon\nHive\ntour\nBlizzard\ncork\ndrops\n' > '$EXT/troves_test.txt'"
+adb shell "printf 'MagicMushroom HighCaliber RapidBarrel NitroTreads ArmorPlating TripleShot NitroBoost Turbocharger\nGlassCannon\nHive\ntour\nBlizzard\n-\ndrops\nmaterials\n' > '$EXT/troves_test.txt'"
 # and dynamic lighting on for the run (1.9's lighting system)
 adb shell "printf '3\n3\n' > '$EXT/lighting_test.txt'"  # Ultra, everything lit (+ Window Sun)
 adb shell input keyevent KEYCODE_BACK; sleep 2
@@ -135,7 +135,11 @@ adb exec-out screencap -p > diag/run2-troves-fire.png
 sleep 4
 adb exec-out screencap -p > diag/run2-troves-boss.png
 # the tour keeps hopping rooms with more and more items: give it a minute, then check the app is still running
-sleep 150
+# (rooms on the way get themed or mixed materials: grab a few to check they look right)
+sleep 20; adb exec-out screencap -p > diag/run2-troves-mat1.png
+sleep 1; adb exec-out screencap -p > diag/run2-troves-mat2.png
+sleep 2; adb exec-out screencap -p > diag/run2-troves-mat3.png
+sleep 127
 adb exec-out screencap -p > diag/run2-troves-tour.png
 adb shell dumpsys meminfo $PKG > diag/run2-tour-meminfo.txt 2>&1
 adb shell pidof $PKG > diag/run2-tour-pid.txt 2>&1

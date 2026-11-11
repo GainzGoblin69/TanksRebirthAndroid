@@ -352,6 +352,9 @@ public static class TroveGen {
             BuildRoom(f, room, rng);
         }
         // some enemies are special (scouts, brutes, splitters...): rolled separately, so the layouts stay the same
+        // some rooms are dressed in other materials (glass, steel, ice, crates...): rolled separately as well
+        foreach (var room in f.Rooms.Values)
+            TroveMaterials.Apply(f, room, seed);
         foreach (var room in f.Rooms.Values)
             TroveEnemies.AssignVariants(f, room, seed);
         f.Rooms[f.Start].Cleared = true;
@@ -359,7 +362,7 @@ public static class TroveGen {
     }
 
     // corridor cells from each door to the middle, always kept clear
-    private static bool InCorridor(int x, int y, TroveDir d) => d switch {
+    internal static bool InCorridor(int x, int y, TroveDir d) => d switch {
         TroveDir.North => x is >= 9 and <= 12 && y <= 9,
         TroveDir.South => x is >= 9 and <= 12 && y >= 7,
         TroveDir.West => y is >= 7 and <= 9 && x <= 12,
@@ -758,7 +761,7 @@ public static class TroveGen {
     // ------------------------------------------------------------------ turning a room into a playable mission
 
     /// <summary>Where players appear when they come in through <paramref name="entry"/> (null = start of floor).</summary>
-    private static Point[] SpawnCells(TroveDir? entry) => entry switch {
+    internal static Point[] SpawnCells(TroveDir? entry) => entry switch {
         TroveDir.North => [new(10, 2), new(11, 2), new(9, 3), new(12, 3)],
         TroveDir.South => [new(10, 14), new(11, 14), new(9, 13), new(12, 13)],
         TroveDir.West => [new(2, 8), new(2, 7), new(3, 9), new(3, 7)],

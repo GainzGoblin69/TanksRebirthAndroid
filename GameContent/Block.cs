@@ -143,6 +143,29 @@ public class Block : IGameObject
 
     /// <summary>Change this <see cref="Block"/>'s texture.</summary>
     public void SwapTexture(Texture2D texture) => _texture = texture;
+    public Texture2D Texture => _texture;
+
+    /// <summary>Sets up block types the base game doesn't know (Tank Troves' materials): returns true if it handled the type.</summary>
+    public static Func<Block, int, bool>? CustomSwap;
+    /// <summary>Draws a block its own way (true = drawn, skip the normal model).</summary>
+    public static Func<Block, bool>? CustomRender;
+    /// <summary>Drawn with see-through parts (glass, grates, bushes...).</summary>
+    public bool Translucent;
+    /// <summary>How see-through it's drawn (with <see cref="Translucent"/>).</summary>
+    public float Alpha = 1f;
+    /// <summary>Turned around the vertical axis (conveyors).</summary>
+    public float Yaw;
+    /// <summary>Hits left / a phase / anything a custom block type wants to remember.</summary>
+    public float State;
+    /// <summary>The block's model is lifted (0) or sunk into the floor (1): gates opening, spikes retracting.</summary>
+    public float Sink;
+    /// <summary>A sensor body: tanks pass through it (its collisions are only reported).</summary>
+    public void SetPassable(bool passable) {
+        if (Physics is null)
+            return;
+        foreach (var f in Physics.FixtureList)
+            f.IsSensor = passable;
+    }
     public void Swap(int type) {
         Type = type;
 
@@ -179,10 +202,11 @@ public class Block : IGameObject
                 Properties.CanStack = false;
                 break;
             default:
-                ModdedData?.PostInitialize();
+                if (CustomSwap?.Invoke(this, type) != true)
+                    ModdedData?.PostInitialize();
                 break;
         }
-        if (Properties.HasShadow) {
+        if (Properties.HasShadow && _shadow is null) {
             // fix this, but dont worry about it for now
             _shadow = GameHandler.Particles.MakeParticle(Position3D, GameResources.GetGameResource<Texture2D>($"Assets/textures/tank_shadow"));
             _shadow.TextureCrop = null;
@@ -218,15 +242,12 @@ public class Block : IGameObject
             _ => ""
         };
 
-        if (Properties.IsCollidable) {
+        // (custom types are set up first: whether tanks can pass them decides the body)
+        bool custom = type > BlockID.Teleporter && CustomSwap is not null;
+        {
             Physics = Tank.CollisionsWorld.CreateRectangle(SIDE_LENGTH / Tank.UNITS_PER_METER, SIDE_LENGTH / Tank.UNITS_PER_METER, 1f, position / Tank.UNITS_PER_METER, 0f, BodyType.Static);
             Physics.Tag = this;
-            // breakable blocks are their own collision group (Tank Troves' Ghost Treads drive through them)
-            if (Properties.IsDestructible)
-                Physics.SetCollisionCategories(Category.Cat2);
         }
-        else
-            Position = position;
 
         for (int i = 0; i < ModLoader.ModBlocks.Length; i++) {
             var modBlock = ModLoader.ModBlocks[i];
@@ -239,6 +260,12 @@ public class Block : IGameObject
         }
 
         Swap(type);
+        // breakable blocks are their own collision group (Tank Troves' Ghost Treads drive through them)
+        if (Properties.IsDestructible)
+            Physics.SetCollisionCategories(Category.Cat2);
+        // (only the new types: the stock ones keep their bodies exactly as before)
+        if (custom && !Properties.IsCollidable)
+            SetPassable(true);
 
         Id = Array.FindIndex(AllBlocks, block => block is null);
 
@@ -372,8 +399,21 @@ public class Block : IGameObject
         if (!GameScene.ShouldRenderAll)
             return;
         // TODO: seeing this, don't make this poor CPU have overhead (use derived types!)
+        if (CustomRender?.Invoke(this) == true) {
+            OnPostRender?.Invoke(this);
+            return;
+        }
         if (Type != BlockID.Teleporter) {
-            World = Matrix.CreateScale(_scaling) * Matrix.CreateTranslation(Position3D - _offset);
+            World = Matrix.CreateScale(_scaling) * Matrix.CreateRotationY(Yaw) * Matrix.CreateTranslation(Position3D - _offset - new Vector3(0, Sink * HeightFromGround, 0));
+            var gd = TankGame.Instance.GraphicsDevice;
+            BlendState? oldBlend = null;
+            DepthStencilState? oldDepth = null;
+            if (Translucent) {
+                oldBlend = gd.BlendState;
+                oldDepth = gd.DepthStencilState;
+                gd.BlendState = BlendState.NonPremultiplied;
+                gd.DepthStencilState = DepthStencilState.DepthRead;
+            }
 
             Projection = CameraGlobals.GameProjection;
             View = CameraGlobals.GameView;
@@ -398,9 +438,13 @@ public class Block : IGameObject
 
                     effect.DirectionalLight0.Direction *= 0.1f;
 
-                    effect.Alpha = 1f;
+                    effect.Alpha = Translucent ? Alpha : 1f;
                 }
                 mesh.Draw();
+            }
+            if (Translucent) {
+                gd.BlendState = oldBlend;
+                gd.DepthStencilState = oldDepth;
             }
         }
         else {

@@ -812,15 +812,16 @@ public static class TroveItems {
         Graphics.DynamicLighting.LightManager.HeadlightTint = HeadlightColor;
         Graphics.DynamicLighting.LightManager.ExtraHeadlightTanks = () => !TroveRun.Active || TroveBosses.Boss is not { } bt || bt.Properties.Invisible ? []
             : TroveBosses.Twin is { } tw ? [bt, tw] : [bt];
-        Graphics.DynamicLighting.LightManager.ExtraLights = () => { TroveThemes.AddLights(); if (TroveRun.Active && CampaignGlobals.InMission) AddUnderglowLights(); TroveLights.AddFrameLights(); };
+        Graphics.DynamicLighting.LightManager.ExtraLights = () => { TroveThemes.AddLights(); if (TroveRun.Active && CampaignGlobals.InMission) AddUnderglowLights(); TroveLights.AddFrameLights(); TroveBlocks.AddFrameLights(); };
         Graphics.DynamicLighting.LightManager.SceneDarkness = SceneDarkness;
         AITank.CustomRender = TroveEnemyModels.Render;
         AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady || IcedUntil.TryGetValue(t, out var iu) && Now < iu;
         // Smoke Bomb: enemies can't see you
         AITank.IsHidden = t => TroveRun.Active && t is PlayerTank pt && pt.PlayerId is >= 0 and < 4
-            && (Now < P(pt.PlayerId).SmokeUntil || TroveThemes.HiddenInBush(t));
-        // floor themes: quicksand slows, ice slides
-        Tank.VelocityFilter = (t, v) => TroveRun.Active ? DriftFilter(t, TroveBosses.SlowFilter(t, OilFilter(t, TroveThemes.FilterVelocity(t, v) ?? v))) : null;
+            && (Now < P(pt.PlayerId).SmokeUntil || TroveThemes.HiddenInBush(t) || TroveBlocks.InBush(t));
+        // floor themes: quicksand slows, ice slides (and the rooms' mud and ice floors)
+        Tank.VelocityFilter = (t, v) => TroveRun.Active ? DriftFilter(t, TroveBosses.SlowFilter(t, OilFilter(t, TroveBlocks.FilterVelocity(t, TroveThemes.FilterVelocity(t, v) ?? v)))) : null;
+        TroveBlocks.Init();
         // Pyromaniac: explosions give you a shield instead of hurting you
         Explosion.Absorbs = (tank, _) => {
             if (!TroveRun.Active || tank is not PlayerTank pt || pt.PlayerId is < 0 or >= 4 || !P(pt.PlayerId).Has(TroveItemId.Pyromaniac))
