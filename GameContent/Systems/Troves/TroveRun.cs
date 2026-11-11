@@ -240,8 +240,9 @@ public static class TroveRun {
     ];
     private static void SetFloorTint() {
         var theme = Floor is { } f ? TroveThemes.Def(f.Theme, f.Number) : null;
-        Graphics.GameScene.FloorTint = theme?.FloorTint ?? FloorTints[Math.Clamp(FloorNumber - 1, 0, FloorTints.Length - 1)];
-        Block.Tint = theme?.BlockTint ?? Vector3.One;
+        // (never brighter than the floor's own colours: a tint above 1 blows the lit floor out to white)
+        Graphics.GameScene.FloorTint = Vector3.Min(Vector3.One, theme?.FloorTint ?? FloorTints[Math.Clamp(FloorNumber - 1, 0, FloorTints.Length - 1)]);
+        Block.Tint = Vector3.Min(Vector3.One, theme?.BlockTint ?? Vector3.One);
     }
 
     public static void Stop() {

@@ -25,7 +25,8 @@ public static class TroveLights {
 
         // ---- items lying around: the room's prize on its pedestal, and anything dropped on the floor
         if (TroveRun.Room is { } room) {
-            if (room.Pickup is { } prize && !room.PickupTaken)
+            // (only once it's showing: a fight room's prize stays hidden until the room is cleared)
+            if (room.PickupVisible && room.Pickup is { } prize)
                 GameplayLights.AddGlow(At(TroveRun.PickupPoint, 14), TroveItems.Def(prize).Color, 1.1f + 0.3f * Pulse(2.4f), 80f, 3);
             foreach (var g in room.GroundDrops)
                 if (!g.Taken)

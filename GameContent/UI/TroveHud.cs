@@ -108,8 +108,8 @@ public static class TroveHud {
                 }
                 break;
             case FloorTheme.Blizzard: {
-                // a white haze toward the edges and snow blowing across the screen
-                sb.Draw(_vignette, new Rectangle(0, 0, W, H), new Color(235, 242, 255) * 0.55f);
+                // a cold blue-grey haze toward the edges (not white: that washed the whole room out) and snow blowing across
+                sb.Draw(_vignette, new Rectangle(0, 0, W, H), new Color(120, 140, 170) * 0.3f);
                 foreach (var (fx, fy, sp, sz) in _flakes) {
                     float x = (fx * W + t * 220 * s * sp) % (W + 40) - 20;
                     float y = (fy * H + t * 90 * s * sp + MathF.Sin(t * 2 + fx * 20) * 20 * s) % (H + 40) - 20;

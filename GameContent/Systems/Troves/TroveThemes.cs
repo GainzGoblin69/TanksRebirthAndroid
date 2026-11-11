@@ -31,7 +31,7 @@ public static class TroveThemes {
         new(FloorTheme.IceCave, 3, "The Ice Cave", new(0.78f, 0.92f, 1.08f), new(0.82f, 0.95f, 1.1f), new Color(80, 150, 210), "The floor is slippery"),
         new(FloorTheme.Volcano, 4, "The Volcano", new(0.6f, 0.35f, 0.3f), new(0.7f, 0.45f, 0.4f), new Color(160, 40, 20), "Glowing lava cracks burn"),
         new(FloorTheme.Haunted, 5, "The Haunted Vault", new(0.48f, 0.38f, 0.62f), new(0.55f, 0.45f, 0.7f), new Color(70, 40, 100), "Thick fog: you can only see close by"),
-        new(FloorTheme.Blizzard, 1, "The Blizzard", new(0.95f, 0.98f, 1.1f), new(0.9f, 0.95f, 1.05f), new Color(150, 180, 210), "Snow drifts slow you down, and the snow hides what's far away"),
+        new(FloorTheme.Blizzard, 1, "The Blizzard", new(0.8f, 0.86f, 0.96f), new(0.84f, 0.89f, 0.97f), new Color(150, 180, 210), "Snow drifts slow you down, and the snow hides what's far away"),
         new(FloorTheme.Swamp, 2, "The Swamp", new(0.62f, 0.72f, 0.48f), new(0.6f, 0.68f, 0.5f), new Color(70, 95, 50), "Sticky mud pools slow tanks down"),
         new(FloorTheme.Factory, 3, "The Factory", new(0.62f, 0.66f, 0.72f), new(0.7f, 0.72f, 0.78f), new Color(150, 30, 30), "Red alert! Steam vents burst every few seconds"),
         new(FloorTheme.Crystal, 4, "The Crystal Caves", new(0.42f, 0.42f, 0.62f), new(0.5f, 0.5f, 0.72f), new Color(60, 120, 170), "A dark cave lit by glowing crystals"),
@@ -157,7 +157,7 @@ public static class TroveThemes {
                 }
                 break;
             case FloorTheme.Blizzard:
-                Scatter(Deco.Snow, 22, 1.0f, 0.85f);
+                Scatter(Deco.Snow, 14, 1.0f, 0.5f);
                 Hazards(Deco.Drift, 3 + rng.Next(3), 28f, 1.3f);
                 break;
             case FloorTheme.NeonCity: {
@@ -588,7 +588,7 @@ public static class TroveThemes {
                 break;
             case Deco.Drift:
                 for (int i = 0; i < 7; i++)
-                    Dot(32 + MathF.Cos(i * 0.9f) * (i % 3) * 8, 32 + MathF.Sin(i * 0.9f) * (i % 3) * 6, 16 - (i % 3) * 2, new Color(245, 250, 255, 235), 6f);
+                    Dot(32 + MathF.Cos(i * 0.9f) * (i % 3) * 8, 32 + MathF.Sin(i * 0.9f) * (i % 3) * 6, 16 - (i % 3) * 2, new Color(232, 240, 252, 190), 6f);
                 break;
             case Deco.Neon:
                 // a glowing neon tube sign (tinted by the particle colour)
