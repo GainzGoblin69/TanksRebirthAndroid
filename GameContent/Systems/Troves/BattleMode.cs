@@ -311,7 +311,6 @@ public static class BattleMode {
 
     /// <summary>A round's tanks just appeared: everyone for themselves, hit points, bases.</summary>
     public static void OnRoundLoaded() {
-        NanWatch.Clear();
         StandingsUntil = -1;
         _lastStanding = 0;
         FlagCarrier = -1;

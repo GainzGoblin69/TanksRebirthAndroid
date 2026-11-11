@@ -347,14 +347,14 @@ public static class TroveThemes {
                     return null;
                 }
                 var last = _slide.TryGetValue(t, out var l) ? l : v;
-                var now = Vector2.Lerp(last, v, (Current == FloorTheme.SpaceStation ? 0.12f : 0.07f) * TanksRebirth.RuntimeData.DeltaTime);
+                var now = Vector2.Lerp(last, v, MathF.Min(1f, (Current == FloorTheme.SpaceStation ? 0.12f : 0.07f) * TanksRebirth.RuntimeData.DeltaTime));
                 _slide[t] = now;
                 return now;
             }
             case FloorTheme.IceCave: {
                 // keep most of the last movement: turning and stopping take a moment
                 var last = _slide.TryGetValue(t, out var l) ? l : v;
-                var now = Vector2.Lerp(last, v, 0.06f * TanksRebirth.RuntimeData.DeltaTime);
+                var now = Vector2.Lerp(last, v, MathF.Min(1f, 0.06f * TanksRebirth.RuntimeData.DeltaTime));
                 _slide[t] = now;
                 return now;
             }

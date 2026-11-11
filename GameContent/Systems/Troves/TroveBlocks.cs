@@ -391,7 +391,7 @@ public static class TroveBlocks {
                     break;
                 case TroveBlockID.Bush:
                     // a player inside sees through it
-                    b.Alpha = MathHelper.Lerp(b.Alpha, PlayerInside(b) ? 0.45f : 1f, 0.2f * dt);
+                    b.Alpha = MathHelper.Lerp(b.Alpha, PlayerInside(b) ? 0.45f : 1f, MathF.Min(1f, 0.2f * dt));
                     break;
                 case TroveBlockID.Ice:
                     // fire melts it
@@ -552,7 +552,7 @@ public static class TroveBlocks {
             return v;
         }
         var last = _slide.TryGetValue(t, out var l) ? l : v;
-        var now = Vector2.Lerp(last, v, 0.06f * TanksRebirth.RuntimeData.DeltaTime);
+        var now = Vector2.Lerp(last, v, MathF.Min(1f, 0.06f * TanksRebirth.RuntimeData.DeltaTime));
         _slide[t] = now;
         return now;
     }

@@ -471,7 +471,10 @@ public class PlayerTank : Tank {
         }
 
         if (!rotationMet) {
-            Speed *= Properties.Deceleration * (1f - RuntimeData.DeltaTime);
+            // slowing down: at 60 fps (DeltaTime 1) this stops the tank within a frame, and faster frame rates take a couple of
+            // frames. A slow frame (DeltaTime over 1) used to make the factor negative, so on a phone running under ~22 fps the
+            // speed flipped sign and grew every frame until it hit infinity (the tank froze and broke the AI): stop it instead
+            Speed *= Properties.Deceleration * MathF.Max(0f, 1f - RuntimeData.DeltaTime);
             IsTurning = true;
             if (Speed < 0)
                 Speed = 0;

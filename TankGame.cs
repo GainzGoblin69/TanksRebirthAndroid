@@ -186,7 +186,6 @@ public class TankGame : Game {
     }
 
     protected override void Initialize() {
-        Perf.NanCheck = GameContent.Systems.NanWatch.Check;
         Perf.Scene = () => {
             string scene = MainMenuUI.IsActive ? "menu" : LevelEditorUI.IsActive ? "editor" : GameContent.Systems.Troves.TroveRun.Battle ? "battle" : GameContent.Systems.Troves.TroveRun.Active ? "troves" : "mission";
             int tanks = 0;

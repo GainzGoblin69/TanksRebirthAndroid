@@ -480,8 +480,8 @@ public abstract class Tank {
             Velocity = Vector2.Zero;
             KnockbackVelocity = Vector2.Zero;
         }
-        // a NaN anywhere (a bad push, a zero-length direction) would freeze the physics and break the AI for good:
-        // drop the bad motion and put the tank back where it last was
+        // a last line of defence: a NaN or infinity in the motion would freeze the tank and break the AI for good,
+        // so drop the bad motion and put the tank back where it last was (logged, so a new cause shows up)
         var here = Physics.Position;
         bool badVel = !float.IsFinite(Velocity.X) || !float.IsFinite(Velocity.Y), badKnock = !float.IsFinite(KnockbackVelocity.X) || !float.IsFinite(KnockbackVelocity.Y);
         bool badPos = !float.IsFinite(here.X) || !float.IsFinite(here.Y);
@@ -541,7 +541,10 @@ public abstract class Tank {
                 Speed = Properties.MaxSpeed;
         }
         else
-            Speed *= Properties.Deceleration * (1f - RuntimeData.DeltaTime);
+            // slowing down: at 60 fps (DeltaTime 1) this stops the tank within a frame, and faster frame rates take a couple of
+            // frames. A slow frame (DeltaTime over 1) used to make the factor negative, so on a phone running under ~22 fps the
+            // speed flipped sign and grew every frame until it hit infinity (the tank froze and broke the AI): stop it instead
+            Speed *= Properties.Deceleration * MathF.Max(0f, 1f - RuntimeData.DeltaTime);
 
         // bigkitty told me that stuns instantly apply zero-velocity
         if (CurShootStun > 0 || CurMineStun > 0 || Properties.Stationary || (!CampaignGlobals.InMission && !MainMenuUI.IsActive)) {

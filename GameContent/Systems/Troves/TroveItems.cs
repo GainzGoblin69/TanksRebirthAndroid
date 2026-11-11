@@ -1823,7 +1823,7 @@ public static class TroveItems {
         }
         var last = _oilSlide.TryGetValue(t, out var l) ? l : v;
         // a little steering, and a little spin
-        var now = Vector2.Lerp(last, v, 0.02f * TanksRebirth.RuntimeData.DeltaTime).Rotate(0.02f * TanksRebirth.RuntimeData.DeltaTime);
+        var now = Vector2.Lerp(last, v, MathF.Min(1f, 0.02f * TanksRebirth.RuntimeData.DeltaTime)).Rotate(0.02f * TanksRebirth.RuntimeData.DeltaTime);
         if (now.LengthSquared() < 0.3f && v.LengthSquared() > 0.01f)
             now = Vector2.Normalize(v) * 0.6f; // once in, it never quite stops
         _oilSlide[t] = now;
@@ -2335,8 +2335,10 @@ public static class TroveItems {
                         if (target is null)
                             continue;
                         float speed = mine.Velocity.Length();
+                        if (speed < 0.01f || Vector2.DistanceSquared(target.Position, mine.Position) < 0.01f)
+                            continue; // (a still mine, or one right on its target: no direction to steer)
                         var want = Vector2.Normalize(target.Position - mine.Position) * speed;
-                        mine.Velocity = Vector2.Normalize(Vector2.Lerp(mine.Velocity, want, pull * TanksRebirth.RuntimeData.DeltaTime)) * speed;
+                        mine.Velocity = Vector2.Normalize(Vector2.Lerp(mine.Velocity, want, MathF.Min(1f, pull * TanksRebirth.RuntimeData.DeltaTime))) * speed;
                     }
                 }
                 // Afterburner: drop fire while moving
@@ -2456,8 +2458,10 @@ public static class TroveItems {
                 foreach (var s in Shell.AllShells)
                     if (s is not null && s.Owner is not null && IsEnemy(s.Owner) && Vector2.Distance(s.Position, wat) < 160f) {
                         float sp = s.Velocity.Length();
+                        if (sp < 0.01f)
+                            continue;
                         var want = Vector2.Normalize(wat - s.Position + new Vector2(0.01f)) * sp;
-                        s.Velocity = Vector2.Normalize(Vector2.Lerp(s.Velocity, want, 0.12f * TanksRebirth.RuntimeData.DeltaTime)) * sp;
+                        s.Velocity = Vector2.Normalize(Vector2.Lerp(s.Velocity, want, MathF.Min(1f, 0.12f * TanksRebirth.RuntimeData.DeltaTime))) * sp;
                     }
                 if (!Client.IsConnected() || Client.IsHost())
                     foreach (var e in GameHandler.AllAITanks)

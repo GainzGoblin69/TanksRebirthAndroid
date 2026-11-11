@@ -24,12 +24,9 @@ public static class Perf {
     static double _sinceLog;
     /// <summary>What's on screen ("menu", "mission", "troves"...), set by the game each frame.</summary>
     public static Func<string>? Scene;
-    /// <summary>Called after each part of the frame (the NaN watch).</summary>
-    public static Action<S>? NanCheck;
 
     /// <summary>Everything since the last mark belongs to <paramref name="s"/>.</summary>
     public static void Mark(S s) {
-        NanCheck?.Invoke(s);
         long now = Stopwatch.GetTimestamp();
         _ticks[(int)s] += now - _mark;
         _mark = now;
