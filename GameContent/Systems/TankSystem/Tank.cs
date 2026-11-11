@@ -764,7 +764,8 @@ public abstract class Tank {
             return;
         // will be TankRotation, Position, Scaling.FlattenZ()
         var fp = TankFootprint.Place(this, -ChassisRotation, alt);
-        fp.Position += new Vector3(0, 0.15f, 0);
+        if (fp is not null)
+            fp.Position += new Vector3(0, 0.15f, 0);
     }
 
     /// <summary>Shoot a <see cref="Shell"/> from this <see cref="Tank"/>.</summary>

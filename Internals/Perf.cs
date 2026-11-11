@@ -11,7 +11,7 @@ namespace TanksRebirth.Internals;
 public static class Perf {
     public enum S {
         // update
-        UpdMisc, Players, AI, Shots, Blocks, Particles, MenuUpd, PostUpd, Logic, Physics, UpdateRest,
+        UpdMisc, Players, AI, Shots, Blocks, Particles, MenuUpd, PostUpd, Logic, Physics, Net, TrItems, TrBoss, TrEnemies, TrThemes, TrRun, UpdateRest,
         // draw
         Room, World, Tanks, BlocksDraw, ShotsDraw, PartDraw, Lights, PostDraw, Scene3D, MenuText, Present, MenuUI, GameUI, Touch, Count
     }

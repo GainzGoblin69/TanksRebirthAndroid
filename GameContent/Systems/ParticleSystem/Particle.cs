@@ -245,7 +245,10 @@ public class Particle
     public void Destroy() {
         UniqueBehavior = null;
 
-        if (System.CurrentParticles.Contains(this))
-            System.CurrentParticles.RemoveAt(Id);
+        // (found by its slot: searching the whole list took a while with thousands of particles)
+        var list = System.CurrentParticles;
+        if (Id >= 0 && Id < list.Count && ReferenceEquals(list[Id], this))
+            list.RemoveAt(Id);
+        Id = -1;
     }
 }

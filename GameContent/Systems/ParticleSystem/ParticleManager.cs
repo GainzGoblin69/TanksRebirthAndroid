@@ -43,6 +43,9 @@ public class ParticleManager
         }
     }
 
+    /// <summary>Phones draw particles in batches; this turns it off (for comparing).</summary>
+    public static bool UseBatching = true;
+
     public void RenderParticles(bool renderInReverseOrder = false) {
         if (!GameScene.ShouldRenderAll)
             return;
@@ -58,6 +61,11 @@ public class ParticleManager
         Particle.EffectHandle.Projection = SystemProjection;
         Particle.EffectHandle.FogEnabled = false;
 
+        // phones: many particles per draw (see ParticleBatch)
+        if (OperatingSystem.IsAndroid() && UseBatching) {
+            ParticleBatch.Render(this, renderInReverseOrder);
+            return;
+        }
         if (renderInReverseOrder) {
             for (int i = CurrentParticles.Count - 1; i >= 0; i--)
                 CurrentParticles[i]?.Render();

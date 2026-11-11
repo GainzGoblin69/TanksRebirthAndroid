@@ -724,7 +724,9 @@ public class TankGame : Game {
         ReviveSystem.Update();
         MissileUpgrade.Update();
         MPEndScreen.Update();
+        Perf.Mark(Perf.S.Net);
         GameContent.Systems.Troves.TroveRun.Update();
+        Perf.Mark(Perf.S.TrRun);
 
         if (RuntimeData.RunTime % 60 < RuntimeData.DeltaTime && !OperatingSystem.IsAndroid())
             Task.Run(DiscordRichPresence.Update);

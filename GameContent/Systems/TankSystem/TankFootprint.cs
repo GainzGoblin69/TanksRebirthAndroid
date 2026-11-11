@@ -41,19 +41,22 @@ public class TankFootprint {
     public int Id = 0;
 
     //public static DecalSystem DecalHandler; // = new(TankGame.SpriteRenderer, TankGame.Instance.GraphicsDevice);
+    /// <summary>Footprints still on the floor, oldest first.</summary>
+    private static readonly System.Collections.Generic.Queue<TankFootprint> _live = new();
+    /// <summary>How many footprints can be on the floor at once. Phones keep far fewer: each one is drawn on its own,
+    /// and the menu's battle used to pile up thousands of them (the frame rate sank the longer it ran).</summary>
+    public static int Limit => OperatingSystem.IsAndroid() ? Math.Min(700, AllFootprints.Length) : AllFootprints.Length;
+
+    /// <summary>After every footprint was removed.</summary>
+    public static void ForgetAll() => _live.Clear();
+
     public static TankFootprint Place(Tank? owner, float rotation, bool alt = false) {
         if (owner == null) return null;
-        var index = Array.IndexOf(AllFootprints, null);
-        if (index < 0) {
-            var oldest = AllFootprints.Select(x => x._track.LifeTime).Max();
-
-            index = Array.FindIndex(AllFootprints, x => x._track.LifeTime == oldest);
-
-            // remove oldest footprint
-            AllFootprints[index].Remove();
-
-            return new(owner, rotation, alt);
-        }
+        // the oldest go first
+        while (_live.Count > 0 && (_live.Count >= Limit || Array.IndexOf(AllFootprints, null) < 0))
+            _live.Dequeue().Remove();
+        if (Array.IndexOf(AllFootprints, null) < 0)
+            return null!;
         return new(owner, rotation, alt);
     }
     public TankFootprint(Tank owner, float rotation, bool alt = false) {
@@ -96,6 +99,7 @@ public class TankFootprint {
         };
 
         AllFootprints[Id] = this;
+        _live.Enqueue(this);
 
         /*DecalHandler.AddDecal(texture, MatrixUtils.ConvertWorldToScreen(Vector3.Zero,
             Matrix.CreateTranslation(Position), TankGame.GameView,
@@ -105,7 +109,9 @@ public class TankFootprint {
     public void Update() => lifeTime++;
     public void Remove() {
         _track?.Destroy();
-
+        _track = null!;
+        if (Id >= 0 && Id < AllFootprints.Length && AllFootprints[Id] == this)
+            AllFootprints[Id] = null!;
     }
 }
 /*public class TankFootprint {

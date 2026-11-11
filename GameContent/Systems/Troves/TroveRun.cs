@@ -455,7 +455,9 @@ public static class TroveRun {
                 _fadeDir = 0;
         }
 
+Internals.Perf.Mark(Internals.Perf.S.TrRun);
         TroveItems.Update();
+        Internals.Perf.Mark(Internals.Perf.S.TrItems);
         if (CampaignGlobals.InMission && Ended == EndKind.None)
             TourStep();
         if (_testDrops && CampaignGlobals.InMission && PlayTime > _testDropAt && TroveDrops.Pending.Count < 3) {
@@ -464,9 +466,12 @@ public static class TroveRun {
         }
         TroveBosses.Update();
         TroveBosses.UpdateBossOrbiters();
+        Internals.Perf.Mark(Internals.Perf.S.TrBoss);
         TroveEnemies.Update();
         TroveDrops.Update();
+        Internals.Perf.Mark(Internals.Perf.S.TrEnemies);
         TroveThemes.Update();
+        Internals.Perf.Mark(Internals.Perf.S.TrThemes);
         if (!CampaignGlobals.InMission || Ended != EndKind.None || GameUI.Paused || Room is not { } room)
             return;
         PlayTime += Dt;

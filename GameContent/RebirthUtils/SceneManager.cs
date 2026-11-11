@@ -288,6 +288,7 @@ public static class SceneManager {
             TankFootprint.AllFootprints[i]?.Remove();
             TankFootprint.AllFootprints[i] = null;
         }
+        TankFootprint.ForgetAll();
     }
     public static void StartTnkScene() {
         DebugManager.DebuggingEnabled = false;
