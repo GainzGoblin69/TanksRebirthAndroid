@@ -506,7 +506,18 @@ public partial class AITank : Tank {
         // Tank Troves' turrets, bunkers, nests and crawlers have shapes of their own
         if (CustomRender?.Invoke(this) == true)
             return;
-
+        // a painted skin (the bosses') is drawn with the unwrapped tank
+        var skinMesh = TankPaint.MeshFor(_tankTexture);
+        if (skinMesh is not null && (skinMesh.IsPlayerModel || !skinMesh.Begin(Model)))
+            skinMesh = null;
+        try {
+            RenderModel();
+        }
+        finally {
+            skinMesh?.End();
+        }
+    }
+    private void RenderModel() {
         for (int i = 0; i < (Lighting.AccurateShadows ? 2 : 1); i++) {
             foreach (ModelMesh mesh in Model.Meshes) {
                 foreach (BasicEffect effect in mesh.Effects) {

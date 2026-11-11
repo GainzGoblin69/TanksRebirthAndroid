@@ -287,6 +287,8 @@ public class Block : IGameObject
     public void Destroy() {
         if (Properties.IsDestructible) {
             const int PARTICLE_COUNT = 12;
+            // cork bursting apart gives a warm flash
+            TanksRebirth.Graphics.DynamicLighting.GameplayLights.Flash(Position3D + new Vector3(0, 12, 0), new Color(255, 206, 140), 1.5f, 70f, 0.25f, priority: 3);
 
             ModdedData?.OnDestroy();
 

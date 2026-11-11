@@ -812,7 +812,7 @@ public static class TroveItems {
         Graphics.DynamicLighting.LightManager.HeadlightTint = HeadlightColor;
         Graphics.DynamicLighting.LightManager.ExtraHeadlightTanks = () => !TroveRun.Active || TroveBosses.Boss is not { } bt || bt.Properties.Invisible ? []
             : TroveBosses.Twin is { } tw ? [bt, tw] : [bt];
-        Graphics.DynamicLighting.LightManager.ExtraLights = () => { TroveThemes.AddLights(); if (TroveRun.Active && CampaignGlobals.InMission) AddUnderglowLights(); };
+        Graphics.DynamicLighting.LightManager.ExtraLights = () => { TroveThemes.AddLights(); if (TroveRun.Active && CampaignGlobals.InMission) AddUnderglowLights(); TroveLights.AddFrameLights(); };
         Graphics.DynamicLighting.LightManager.SceneDarkness = SceneDarkness;
         AITank.CustomRender = TroveEnemyModels.Render;
         AITank.IsFrozen = t => Frozen && IsEnemy(t) || TroveRun.InReady || IcedUntil.TryGetValue(t, out var iu) && Now < iu;
@@ -993,6 +993,8 @@ public static class TroveItems {
         var p = Players[playerId];
         bool local = IsLocal(playerId);
         if (local) TanksRebirth.Internals.Common.Framework.Input.Haptics.ItemPickup();
+        if (GameHandler.AllPlayerTanks[playerId] is { IsDestroyed: false } taker)
+            Graphics.DynamicLighting.GameplayLights.Flash(taker.Position3D + new Vector3(0, 14, 0), def.Color, 2.4f, 130f, 0.55f, priority: 4);
         var synergiesBefore = Synergies.Where(p.Has).ToList();
         int stack = def.Kind == TroveItemKind.Passive ? p.Count(id) + 1 : 1;
         LastPickup = (def, Now, stack);
@@ -1181,6 +1183,8 @@ public static class TroveItems {
         var id = p.Active!.Value;
         var tank = GameHandler.AllPlayerTanks[playerId];
         if (IsLocal(playerId)) TanksRebirth.Internals.Common.Framework.Input.Haptics.ItemUse();
+        if (tank is { IsDestroyed: false })
+            Graphics.DynamicLighting.GameplayLights.Flash(tank.Position3D + new Vector3(0, 14, 0), Def(id).Color, 2.2f, 120f, 0.4f, priority: 4);
         switch (id) {
             case TroveItemId.Rocket:
                 MissileUpgrade.StartShots(playerId, 5);

@@ -122,7 +122,7 @@ public class PlayerTank : Tank {
         // the tank color picked in the Tank Color screen (if any) replaces the standard player texture
         int colorIndex = copyTier == -1 && isPlayerModel ? PlayerColors.ColorIndexFor(playerType) : -1;
         if (colorIndex >= 0)
-            texAsset = PlayerColors.MakeTexture(TankGame.Instance.GraphicsDevice, colorIndex);
+            texAsset = PlayerColors.MakeTexture(TankGame.Instance.GraphicsDevice, colorIndex, isPlayerModel);
         else if (copyTier == -1)
             texAsset = Assets[$"plrtank_" + PlayerID.Collection.GetKey(playerType)!.ToLower()];
         else {
@@ -746,6 +746,18 @@ public class PlayerTank : Tank {
         DrawExtras();
         if (Properties.Invisible && CampaignGlobals.InMission)
             return;
+        // a painted skin is drawn with the unwrapped tank (same shape, texture spread over every face)
+        var skinMesh = TankPaint.MeshFor(_tankTexture);
+        if (skinMesh is not null && (skinMesh.IsPlayerModel != _isPlayerModel || !skinMesh.Begin(Model)))
+            skinMesh = null;
+        try {
+            RenderModel();
+        }
+        finally {
+            skinMesh?.End();
+        }
+    }
+    private void RenderModel() {
         for (int i = 0; i < (Lighting.AccurateShadows ? 2 : 1); i++) {
             foreach (ModelMesh mesh in Model.Meshes) {
                 foreach (BasicEffect effect in mesh.Effects) {

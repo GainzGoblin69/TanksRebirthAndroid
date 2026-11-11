@@ -238,6 +238,10 @@ public class ParticleManager
         }
     }
     public void MakeShineSpot(Vector3 position, Color color, float scale) {
+        // a big sparkle (a pickup, a teleport, a summon, a pop) lights up what's around it for a moment;
+        // the small ones are trails and stay just sparkles
+        if (scale >= 0.75f && ReferenceEquals(this, GameHandler.Particles))
+            Graphics.DynamicLighting.GameplayLights.Flash(position + new Vector3(0, 6, 0), color, 1.3f + scale * 0.9f, 50f + 45f * scale, 0.22f + 0.12f * scale, priority: 4);
         var p = MakeParticle(position, GameResources.GetGameResource<Texture2D>("Assets/textures/misc/light_star"));
         p.Scale = new(scale);
         p.Color = color;

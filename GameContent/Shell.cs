@@ -753,6 +753,8 @@ public class Shell : IAITankDanger {
             Velocity.X = -Velocity.X;
         else
             Velocity.Y = -Velocity.Y;
+        // a spark of light where it glances off the wall
+        TanksRebirth.Graphics.DynamicLighting.GameplayLights.Flash(Position3D + new Vector3(0, 8, 0), Tint ?? new Color(255, 232, 170), 1.2f, 48f, 0.16f, priority: 3);
 
         // Tank Troves: Ricochet Master and Split Shot
         if (GrowsOnBounce && Velocity.Length() < 12f) {
@@ -898,6 +900,10 @@ public class Shell : IAITankDanger {
     public void Destroy(DestructionContext context, bool playSound = true, bool wasSentByAnotherClient = false) {
         ShootSound?.Instance?.Stop(true);
         // a small flash where the shell popped (a bigger one when it hit a tank)
+        // (two shells meeting spark white-hot, and brighter; both shells flash, so it reads as one sharp burst)
+        if (context == DestructionContext.WithShell)
+            TanksRebirth.Graphics.DynamicLighting.GameplayLights.Flash(Position3D + new Vector3(0, 10, 0), new Color(225, 235, 255), 2.6f, 120f, 0.32f, shadows: true, priority: 5);
+        else
         TanksRebirth.Graphics.DynamicLighting.GameplayLights.Flash(Position3D + new Vector3(0, 10, 0), new Color(255, 190, 110),
             context == DestructionContext.WithHostileTank ? 2.2f : 1.4f, context == DestructionContext.WithHostileTank ? 100f : 65f, 0.28f, priority: 4);
         // ParticleSystem.MakeSparkEmission(Position, 10);

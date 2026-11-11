@@ -47,7 +47,10 @@ public static class GameplayLights {
     public static void AddHeadlight(Vector3 relativePosition, Vector2 forward, bool isLocalPlayer) => AddHeadlight(relativePosition, forward, isLocalPlayer, DefaultHeadlight);
 
     /// <summary>A soft coloured glow (floor themes: crystals, alarm lights).</summary>
-    public static void AddGlow(Vector3 position, Color color, float intensity, float range) {
+    public static void AddGlow(Vector3 position, Color color, float intensity, float range) => AddGlow(position, color, intensity, range, 3);
+
+    /// <summary>A soft coloured glow; when there are too many lights, lower priorities are dropped first.</summary>
+    public static void AddGlow(Vector3 position, Color color, float intensity, float range, int priority) {
         var light = NextPoint();
         light.Position = position;
         light.Color = color;
@@ -55,7 +58,7 @@ public static class GameplayLights {
         light.Range = range;
         light.Wrap = 0.4f;
         light.CastsShadows = false;
-        light.Priority = 3;
+        light.Priority = priority;
         LightingSystem.AddFrameLight(light);
     }
 

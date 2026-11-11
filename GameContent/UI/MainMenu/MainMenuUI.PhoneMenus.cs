@@ -771,9 +771,16 @@ public static partial class MainMenuUI {
         int count = PlayerColors.Count;
         if (_colorTex.Length != count)
             _colorTex = new Texture2D?[count];
+        // (special skins are painted in detail, which takes a moment each: one per frame, so the screen opens at once)
+        bool paintedOne = false;
         for (int i = 0; i < count; i++) {
-            if (_colorTex[i] is null || _colorTex[i]!.IsDisposed)
-                _colorTex[i] = PlayerColors.MakeTexture(gd, i);
+            if (_colorTex[i] is null || _colorTex[i]!.IsDisposed) {
+                bool slow = i >= PlayerColors.Palette.Length;
+                if (slow && paintedOne)
+                    continue;
+                _colorTex[i] = PlayerColors.MakeTexture(gd, i, small: true);
+                paintedOne |= slow;
+            }
             else if (PlayerColors.IsAnimated(i))
                 PlayerColors.Animate(_colorTex[i]!, i);
         }
@@ -843,7 +850,7 @@ public static partial class MainMenuUI {
             bool open = PlayerColors.IsUnlocked(i);
             int textRoom = special ? (open ? 46 : 62) : 62;
             var modelRect = new Rectangle(r.X, r.Y + (int)(2 * s), r.Width, r.Height - (int)(textRoom * s));
-            DrawTankPreview(gd, modelRect, open ? _colorTex[i]! : _lockedTex, i == chosen || (special && i == _infoSkin) ? yaw : 0.6f);
+            DrawTankPreview(gd, modelRect, open && _colorTex[i] is { IsDisposed: false } ready ? ready : _lockedTex, i == chosen || (special && i == _infoSkin) ? yaw : 0.6f);
         }
         sb.Begin(SpriteSortMode.Deferred, BlendState.NonPremultiplied, SamplerState.LinearClamp, null, null);
         float badge = special ? 15 : 20;
@@ -967,6 +974,11 @@ public static partial class MainMenuUI {
             _previewBones = new Matrix[model.Bones.Count];
         model.CopyAbsoluteBoneTransformsTo(_previewBones);
 
+        // a painted skin is drawn with the unwrapped tank
+        var skinMesh = TankPaint.MeshFor(tex);
+        if (skinMesh is not null && (!skinMesh.IsPlayerModel || !skinMesh.Begin(model)))
+            skinMesh = null;
+        try {
         foreach (var mesh in model.Meshes) {
             if (mesh.Name == "Shadow")
                 continue;
@@ -981,6 +993,10 @@ public static partial class MainMenuUI {
                 effect.SetDefaultGameLighting_IngameEntities(specular: true, ambientMultiplier: 2f);
             }
             mesh.Draw();
+        }
+        }
+        finally {
+            skinMesh?.End();
         }
 
         model.Root.Transform = oldRoot;

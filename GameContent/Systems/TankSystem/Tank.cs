@@ -612,6 +612,8 @@ public abstract class Tank {
                 $"Assets/sounds/armor_ding_{Client.ClientRandom.Next(1, 3)}.ogg", SoundContext.Effect, position: Position3D);
 
             ding.Instance.Pitch = Client.ClientRandom.NextFloat(-0.1f, 0.1f);
+            // the hit glances off the armor with a cold flash
+            TanksRebirth.Graphics.DynamicLighting.GameplayLights.Flash(Position3D + new Vector3(0, 14, 0), new Color(170, 225, 255), 2.0f, 85f, 0.25f, priority: 4);
             //if (CameraGlobals.IsUsingFirstPresonCamera)
             //    SoundUtils.CreateSpatialSound(ding, Position3D, CameraGlobals.RebirthFreecam.Position, 1.25f);
             OnDamage?.Invoke(this, Properties.Armor.HitPoints == 0, context);

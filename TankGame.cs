@@ -860,6 +860,7 @@ public class TankGame : Game {
         GraphicsDevice.SetRenderTarget(null);
     }
     protected override void Draw(GameTime gameTime) {
+        TankPaint.NextFrame();
         Perf.Open();
         // (made once; before anything is drawn, because it switches render targets)
         GameContent.UI.TroveIcons.EnsureBuilt(GraphicsDevice);

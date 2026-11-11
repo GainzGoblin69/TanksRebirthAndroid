@@ -220,6 +220,7 @@ public static class TroveBosses {
         }
         var def = PickFor(floor, seed);
         Current = def;
+        Dress(boss, def.Kind);
         var rng = new Random(unchecked(seed * 31 + floor));
         var props = boss.Properties;
         switch (def.Kind) {
@@ -252,6 +253,7 @@ public static class TroveBosses {
                 t.Properties.Armor = new TankArmor(t, armor);
                 t.Properties.ShellLimit += 1;
                 Twin = t;
+                Dress(t, def.Kind);
                 break;
             }
             case BossKind.Hive:
@@ -300,7 +302,27 @@ public static class TroveBosses {
 
     // ------------------------------------------------------------------ every update
 
+    // each boss's paint job, made the first time it's met
+    private static readonly Dictionary<BossKind, Microsoft.Xna.Framework.Graphics.Texture2D> _skins = [];
+
+    /// <summary>Gives a boss its own paint job (stripes, scales, flames, a skull on the turret...).</summary>
+    private static void Dress(AITank boss, BossKind kind) {
+        try {
+            if (TankDesigns.ForBoss(kind) is not { } design || !TankSkinMesh.Enemy.Usable(boss.Model))
+                return;
+            if (!_skins.TryGetValue(kind, out var tex) || tex.IsDisposed)
+                _skins[kind] = tex = TankPaint.Make(TankGame.Instance.GraphicsDevice, false, design);
+            boss.SwapTankTexture(tex);
+        }
+        catch (Exception e) {
+            TankGame.ClientLog?.Write($"Boss paint failed (it keeps its tank's colors): {e.Message}", Internals.LogType.Warn);
+        }
+    }
+
     public static void Update() {
+        // paint that moves (glowing cracks, circuits, flames)
+        if (Boss is { IsDestroyed: false } dressed && dressed.TankTexture is { } skin && TankPaint.IsPainted(skin))
+            TankPaint.Tick(skin);
         if (!TroveRun.Active || !CampaignGlobals.InMission || Boss is null)
             return;
         EveryPhone();

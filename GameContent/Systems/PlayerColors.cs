@@ -149,7 +149,7 @@ public static class PlayerColors {
     /// <summary>Plain colors and special skins together: indexes past the palette are skins.</summary>
     public static int Count => Palette.Length + Skins.Length;
     public static Skin? SkinAt(int index) => index >= Palette.Length && index < Count ? Skins[index - Palette.Length] : null;
-    public static bool IsAnimated(int index) => SkinAt(index)?.Animated == true;
+    public static bool IsAnimated(int index) => SkinAt(index) is { } s && (s.Animated || TankDesigns.ForSkin(s.Name)?.Animated == true);
     public static bool IsUnlocked(int index) => index >= 0 && index < Count && (SkinAt(index) is not { } sk || Unlocks.Has(sk.Unlock));
     public static string NameOf(int index) => SkinAt(index)?.Name ?? (index >= 0 && index < Palette.Length ? Palette[index].Name : "");
 
@@ -174,9 +174,21 @@ public static class PlayerColors {
     private static float Time => (float)(DateTime.UtcNow.TimeOfDay.TotalSeconds % 3600.0);
 
     /// <summary>A texture for any choice (plain color or skin).</summary>
-    public static Texture2D MakeTexture(GraphicsDevice gd, int index) {
-        if (SkinAt(index) is null)
+    public static Texture2D MakeTexture(GraphicsDevice gd, int index, bool playerModel = true, bool small = false) {
+        if (SkinAt(index) is not { } skin)
             return MakeTexture(gd, Palette[Math.Clamp(index, 0, Palette.Length - 1)]);
+        // a special skin is painted onto the unwrapped tank (camouflage, wheels, markings...) when the model allows it
+        try {
+            if (TankDesigns.ForSkin(skin.Name) is { } design) {
+                var mesh = playerModel ? TankSkinMesh.Player : TankSkinMesh.Enemy;
+                var model = playerModel ? Globals.Assets.ModelGlobals.TankPlayer.Asset : Globals.Assets.ModelGlobals.TankEnemy.Asset;
+                if (mesh.Usable(model))
+                    return TankPaint.Make(gd, playerModel, design, small);
+            }
+        }
+        catch (Exception e) {
+            TankGame.ClientLog?.Write($"Painted skin failed (using the simple one): {e.Message}", Internals.LogType.Warn);
+        }
         var tex = new Texture2D(gd, 32, 32);
         Animate(tex, index);
         return tex;
@@ -187,6 +199,10 @@ public static class PlayerColors {
     public static void Animate(Texture2D tex, int index) {
         if (SkinAt(index) is not { } sk || tex.IsDisposed)
             return;
+        if (TankPaint.IsPainted(tex)) {
+            TankPaint.Tick(tex);
+            return;
+        }
         lock (_skinData) {
             FillSkin(_skinData, sk, Time);
             tex.SetData(_skinData);

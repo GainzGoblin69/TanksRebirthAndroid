@@ -19,7 +19,6 @@ namespace TanksRebirth.GameContent.UI;
 
 /// <summary>Tank Troves on screen: the mouse-hole doors, the minimap, the floor name, room fades and the end screen.</summary>
 public static class TroveHud {
-    private static Texture2D? _hole, _holeLocked, _holeBoss, _holeItem, _holeChallenge, _holeSecret, _holeMini;
     private static Vector2 _press = new(-1);
     private static bool _down, _wasDown;
 
@@ -70,7 +69,6 @@ public static class TroveHud {
             return;
         if (TroveRun.Floor is not { } floor || TroveRun.Room is not { } room)
             return;
-        EnsureTextures(sb.GraphicsDevice);
         DrawDoors(sb, floor, room);
     }
 
@@ -1479,7 +1477,17 @@ public static class TroveHud {
         }
     }
 
+    // how far the gates have lifted (0 shut .. 1 open), and the room that's for
+    private static float _gateLift;
+    private static Point _gateRoom = new(int.MinValue, 0);
+
     private static void DrawDoors(SpriteBatch sb, TroveFloor floor, TroveRoom room) {
+        // the gates lift when the room is cleared (a room that's already clear has them up from the start)
+        if (_gateRoom != room.Cell) {
+            _gateRoom = room.Cell;
+            _gateLift = room.Cleared ? 1f : 0f;
+        }
+        _gateLift = MathHelper.Clamp(_gateLift + (room.Cleared ? 1f : -1f) * RuntimeData.DeltaTime / 60f * 1.7f, 0f, 1f);
         var center = ToScreen(Vector2.Zero);
         foreach (var d in TroveGen.Doors(floor, room)) {
             var pt = TroveRun.DoorPoint(d);
@@ -1489,19 +1497,67 @@ public static class TroveHud {
                 continue;
             outward.Normalize();
             // size: about 3 blocks wide on screen
-            var side = new Vector2(-outward.Y, outward.X);
             var probe = ToScreen(pt + (d is TroveDir.North or TroveDir.South ? new Vector2(Block.SIDE_LENGTH * 1.5f, 0) : new Vector2(0, Block.SIDE_LENGTH * 1.5f)));
-            float width = Math.Max(30f, Vector2.Distance(probe, screen) * 2f);
+            float width = Math.Max(30f, Vector2.Distance(probe, screen) * 2f) * 1.12f;
             var s = TroveGen.Step(d);
             var neighbor = floor.Rooms[new Point(room.Cell.X + s.X, room.Cell.Y + s.Y)];
-            var tex = !room.Cleared ? _holeLocked! : neighbor.Kind == TroveRoomKind.Boss ? _holeBoss!
-                : neighbor.Kind == TroveRoomKind.Item && neighbor.Seen ? _holeItem!
-                : neighbor.Kind == TroveRoomKind.Challenge && neighbor.Seen ? _holeChallenge!
-                : neighbor.Kind == TroveRoomKind.MiniBoss && neighbor.Seen && !neighbor.Cleared ? _holeMini!
-                : neighbor.Kind == TroveRoomKind.Secret ? _holeSecret! : _hole!;
+            // what's behind it shows once you know (the boss and a found secret always do)
+            var kind = neighbor.Kind == TroveRoomKind.Boss || neighbor.Kind == TroveRoomKind.Secret ? neighbor.Kind
+                : neighbor.Seen && neighbor.Kind is TroveRoomKind.Item or TroveRoomKind.Challenge ? neighbor.Kind
+                : neighbor.Seen && neighbor.Kind == TroveRoomKind.MiniBoss && !neighbor.Cleared ? neighbor.Kind : TroveRoomKind.Normal;
             float rot = MathF.Atan2(outward.Y, outward.X) + MathHelper.PiOver2;
-            float scale = width / tex.Width;
-            sb.Draw(tex, screen, null, Color.White, rot, new Vector2(tex.Width / 2f, tex.Height), scale, SpriteEffects.None, 0f);
+            DrawDoor(sb, screen, rot, width, kind, _gateLift, (float)TroveRun.PlayTime + (int)d * 0.7f);
+        }
+    }
+
+    /// <summary>One doorway: a stone arch (tinted for what's behind it) around a dark passage with a glow, an iron gate
+    /// that lifts once the room is cleared, a mark on the keystone, and arrows on the floor pointing in while it's open.</summary>
+    internal static void DrawDoor(SpriteBatch sb, Vector2 at, float rot, float width, TroveRoomKind kind, float lift, float time) {
+        EnsureTextures(sb.GraphicsDevice);
+        var frame = _doorFrame!;
+        float scale = width / frame.Width;
+        var origin = new Vector2(frame.Width / 2f, frame.Height);
+        var kindCol = Systems.Troves.TroveLights.DoorColor(kind, false);
+        bool plain = kind is TroveRoomKind.Normal or TroveRoomKind.Start;
+        var stone = plain ? new Color(176, 150, 118) : Color.Lerp(new Color(170, 156, 140), kindCol, 0.5f);
+
+        sb.Draw(_doorInside!, at, null, Color.White, rot, origin, scale, SpriteEffects.None, 0f);
+        // the light from the next room: steady once open, a faint ember while shut
+        float open = MathHelper.SmoothStep(0f, 1f, lift);
+        float glow = (0.16f + 0.84f * open) * (0.72f + 0.28f * MathF.Sin(time * 2.2f));
+        sb.Draw(_doorGlow!, at, null, new Color(kindCol.R, kindCol.G, kindCol.B, (byte)(255 * MathHelper.Clamp(glow, 0f, 1f))), rot, origin, scale, SpriteEffects.None, 0f);
+        // the gate, sliding up into the arch
+        int step = (int)MathF.Round(lift * _doorGates.Length);
+        if (step < _doorGates.Length)
+            sb.Draw(_doorGates[step]!, at, null, Color.White, rot, origin, scale, SpriteEffects.None, 0f);
+        sb.Draw(frame, at, null, stone, rot, origin, scale, SpriteEffects.None, 0f);
+
+        // the keystone's mark
+        var up = new Vector2(MathF.Sin(rot), -MathF.Cos(rot));
+        string? mark = kind switch { TroveRoomKind.Boss => "!", TroveRoomKind.MiniBoss => "!", TroveRoomKind.Item => "$", TroveRoomKind.Secret => "?", TroveRoomKind.Challenge => "X", _ => null };
+        if (mark is not null) {
+            var key = at + up * (frame.Height - 17f) * scale;
+            float kr = 17f * scale;
+            ToggleSwitch.DrawDisc(sb, key, kr * 1.18f, new Color(30, 22, 18));
+            ToggleSwitch.DrawDisc(sb, key, kr, kindCol);
+            ToggleSwitch.DrawDisc(sb, key - new Vector2(0, kr * 0.12f), kr * 0.8f, Color.Lerp(kindCol, Color.White, 0.22f));
+            var font = FontGlobals.RebirthFont;
+            var m = font.MeasureString(mark);
+            sb.DrawString(font, mark, key, new Color(40, 24, 16), new Vector2(kr * 1.25f / Math.Max(1f, m.Y)), 0f, m / 2f);
+        }
+
+        // arrows on the floor, sliding toward the open door
+        if (open > 0.05f) {
+            var side = new Vector2(up.Y, -up.X);
+            for (int i = 0; i < 2; i++) {
+                float k = (time * 0.9f + i * 0.5f) % 1f;
+                float a = open * MathF.Sin(k * MathHelper.Pi) * 0.75f;
+                var tip = at - up * width * (0.42f - 0.26f * k);
+                float arm = width * 0.11f, thick = Math.Max(2f, width * 0.035f);
+                var col = new Color(kindCol.R, kindCol.G, kindCol.B, (byte)(255 * a));
+                ToggleSwitch.DrawLine(sb, tip, tip - up * arm * 0.8f + side * arm, thick, col);
+                ToggleSwitch.DrawLine(sb, tip, tip - up * arm * 0.8f - side * arm, thick, col);
+            }
         }
     }
 
@@ -1772,43 +1828,115 @@ public static class TroveHud {
         sb.DrawString(font, label, face.Center.ToVector2(), inkCol, new Vector2(sc), 0f, m / 2f);
     }
 
-    // ---- door pictures (made once): a wooden rim around a dark arch, with bars while the room isn't cleared
+    // ---- door pictures (made once): the stone arch, the passage inside, its glow, and the gate at each height
+    private static Texture2D? _doorFrame, _doorInside, _doorGlow;
+    private static readonly Texture2D?[] _doorGates = new Texture2D?[7];
+    private const int DoorW = 256, DoorH = 224;
+    private const float DoorR = 116f, DoorBand = 27f;
+
     private static void EnsureTextures(GraphicsDevice gd) {
-        if (_hole is { IsDisposed: false })
+        if (_doorFrame is { IsDisposed: false } && _doorGates[0] is { IsDisposed: false })
             return;
-        _hole = MakeHole(gd, new Color(150, 112, 70), false);
-        _holeLocked = MakeHole(gd, new Color(120, 96, 70), true);
-        _holeBoss = MakeHole(gd, new Color(170, 34, 26), false);
-        _holeItem = MakeHole(gd, new Color(220, 175, 40), false);
-        _holeChallenge = MakeHole(gd, new Color(140, 50, 170), false);
-        _holeSecret = MakeHole(gd, new Color(120, 120, 130), false);
-        _holeMini = MakeHole(gd, new Color(230, 120, 30), false);
+        _doorFrame = MakeDoor(gd, 0, 0f);
+        _doorInside = MakeDoor(gd, 1, 0f);
+        _doorGlow = MakeDoor(gd, 2, 0f);
+        for (int i = 0; i < _doorGates.Length; i++)
+            _doorGates[i] = MakeDoor(gd, 3, i / (float)_doorGates.Length);
     }
 
-    private static Texture2D MakeHole(GraphicsDevice gd, Color rim, bool bars) {
-        const int W = 128, H = 104;
+    private static float Hash(int x, int y) {
+        uint h = (uint)(x * 374761393 + y * 668265263);
+        h = (h ^ (h >> 13)) * 1274126177;
+        return ((h ^ (h >> 16)) & 0xffff) / 65535f;
+    }
+
+    /// <summary>A layer of the door picture. 0 = the stone arch (grey, tinted when drawn), 1 = the passage inside,
+    /// 2 = the glow (white, tinted when drawn), 3 = the iron gate lifted by <paramref name="lift"/>.</summary>
+    private static Texture2D MakeDoor(GraphicsDevice gd, int layer, float lift) {
+        const int W = DoorW, H = DoorH;
         var data = new Color[W * H];
-        float cx = W / 2f, r = W / 2f - 1, inner = r - 13;
+        float cx = W / 2f, cy = DoorR + 10f; // the arch's center; straight legs below it down to the wall line
+        float inner = DoorR - DoorBand;
         for (int y = 0; y < H; y++)
             for (int x = 0; x < W; x++) {
-                // an arch: half circle on top of a short rectangle (bottom edge = the wall line)
-                float dy = Math.Max(0, (r) - y); // distance above the circle centre line (centre at y = r)
-                float dist = y < r ? MathF.Sqrt((x + 0.5f - cx) * (x + 0.5f - cx) + (r - y) * (r - y)) : MathF.Abs(x + 0.5f - cx);
-                Color c = Color.Transparent;
-                if (dist <= r) {
-                    c = rim;
-                    if (dist <= inner) {
-                        // inside: dark, a little lighter toward the bottom
-                        float t = y / (float)H;
-                        c = Color.Lerp(new Color(10, 6, 4), new Color(32, 22, 16), t);
-                        if (bars && ((int)(x - cx + 200) % 22) < 6)
-                            c = new Color(130, 120, 110);
+                float px = x + 0.5f - cx, py = y + 0.5f - cy;
+                // distance from the arch's middle line: round above the center, straight below
+                float dist = py < 0 ? MathF.Sqrt(px * px + py * py) : MathF.Abs(px);
+                float ang = MathF.Atan2(px, -py); // 0 = straight up
+                bool keystone = py < 0 && MathF.Abs(ang) < 0.17f;
+                float outer = DoorR + (keystone ? 9f : 0f);
+                float r = 0, g = 0, b = 0, a = 0;
+                switch (layer) {
+                    case 0: {
+                        if (dist > outer || dist < inner - (keystone ? 5f : 0f))
+                            break;
+                        a = Math.Clamp(outer - dist, 0f, 1f) * Math.Clamp(dist - (inner - (keystone ? 5f : 0f)), 0f, 1f);
+                        // stone: lit from above, a bright outer bevel, shade toward the opening, a little grain
+                        float l = 0.74f + 0.14f * (1f - y / (float)H) + (Hash(x / 2, y / 2) - 0.5f) * 0.07f;
+                        l += Math.Clamp(1f - (outer - dist) / 5f, 0f, 1f) * 0.2f;
+                        l -= Math.Clamp(1f - (dist - inner) / 8f, 0f, 1f) * 0.34f;
+                        // the joints between the stones: wedges around the arch, courses down the legs
+                        float joint;
+                        if (py < 0) {
+                            float seg = (ang + MathHelper.Pi) / (MathHelper.Pi / 5.5f);
+                            joint = MathF.Abs(seg - MathF.Round(seg)) * (MathHelper.Pi / 5.5f) * dist;
+                        }
+                        else
+                            joint = MathF.Abs((py + 17f) % 34f - 17f);
+                        if (joint < 2.2f && !keystone)
+                            l -= 0.3f * (1f - joint / 2.2f);
+                        if (keystone)
+                            l += 0.1f;
+                        l = Math.Clamp(l, 0f, 1.15f);
+                        r = g = b = Math.Min(1f, l);
+                        break;
                     }
-                    // soft outer edge
-                    float edge = Math.Clamp(r - dist, 0f, 1f);
-                    c = new Color((byte)(c.R * edge), (byte)(c.G * edge), (byte)(c.B * edge), (byte)(255 * edge));
+                    case 1: {
+                        if (dist > inner + 1f)
+                            break;
+                        a = 1f;
+                        // dark, deeper toward the top and toward the stone
+                        float t = y / (float)H;
+                        float shade = Math.Clamp((inner - dist) / 22f, 0f, 1f);
+                        float l = (0.03f + 0.1f * t * t) * (0.45f + 0.55f * shade);
+                        r = l * 1.05f; g = l * 0.85f; b = l * 0.8f;
+                        break;
+                    }
+                    case 2: {
+                        if (dist > inner + 1f)
+                            break;
+                        // light spilling in along the floor of the passage, strongest at the bottom middle
+                        float t = Math.Clamp((y - H * 0.28f) / (H * 0.72f), 0f, 1f);
+                        float mid = 1f - 0.45f * Math.Clamp(MathF.Abs(px) / inner, 0f, 1f);
+                        a = MathF.Pow(t, 1.6f) * mid * 0.9f;
+                        r = g = b = 1f;
+                        break;
+                    }
+                    default: {
+                        if (dist > inner + 1f)
+                            break;
+                        // the gate's own coordinates (it slides up by "lift" of its height)
+                        float gy = y + lift * (H - 6f);
+                        if (gy > H - 4f)
+                            break; // below the gate's foot
+                        float vx = MathF.Abs((px + 300f) % 30f - 15f);          // upright bars
+                        float hy = MathF.Abs((gy + 8f) % 46f - 23f);            // cross bars
+                        bool spike = gy > H - 24f;                               // the feet taper to points
+                        float vHalf = spike ? 5f * (H - 4f - gy) / 20f : 5f;
+                        bool onV = vx < vHalf, onH = hy < 4.5f && !spike;
+                        if (!onV && !onH)
+                            break;
+                        a = 1f;
+                        // round iron: brighter along each bar's middle
+                        float l = onV ? 0.62f - 0.3f * (vx / 5f) : 0.52f - 0.24f * (hy / 4.5f);
+                        if (onV && hy < 7f && !spike)
+                            l = 0.8f - 0.25f * MathF.Max(vx / 5f, hy / 7f); // a rivet where they cross
+                        l *= 0.75f + 0.25f * Math.Clamp((inner - dist) / 16f, 0f, 1f); // in the arch's shadow at the edges
+                        r = l * 0.92f; g = l * 0.95f; b = l * 1.05f;
+                        break;
+                    }
                 }
-                data[y * W + x] = c;
+                data[y * W + x] = new Color(r, g, b, a);
             }
         var tex = new Texture2D(gd, W, H);
         tex.SetData(data);
