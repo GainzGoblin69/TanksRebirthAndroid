@@ -151,6 +151,9 @@ public class Block : IGameObject
     public static Func<Block, bool>? CustomRender;
     /// <summary>Drawn with see-through parts (glass, grates, bushes...).</summary>
     public bool Translucent;
+    /// <summary>A see-through block still marks its spot in the depth buffer (so the shadows drawn after it don't land on
+    /// top of it and turn it black); flat pieces lying on the floor don't need to.</summary>
+    public bool TranslucentDepthWrite = true;
     /// <summary>How see-through it's drawn (with <see cref="Translucent"/>).</summary>
     public float Alpha = 1f;
     /// <summary>Turned around the vertical axis (conveyors).</summary>
@@ -412,7 +415,7 @@ public class Block : IGameObject
                 oldBlend = gd.BlendState;
                 oldDepth = gd.DepthStencilState;
                 gd.BlendState = BlendState.NonPremultiplied;
-                gd.DepthStencilState = DepthStencilState.DepthRead;
+                gd.DepthStencilState = TranslucentDepthWrite ? DepthStencilState.Default : DepthStencilState.DepthRead;
             }
 
             Projection = CameraGlobals.GameProjection;

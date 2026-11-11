@@ -694,19 +694,15 @@ public static class TroveHud {
         return lines;
     }
 
-    // ---- an item in the middle of the room (on a stone pedestal in item and secret rooms), with what it does above it
+    // ---- an item floating in the middle of the room, with what it does above it
     private static void DrawPedestal(SpriteBatch sb, TroveRoom room) {
         var c = ToScreen(TroveRun.PickupPoint);
         var edge = ToScreen(TroveRun.PickupPoint + new Vector2(Block.SIDE_LENGTH * 0.8f, 0));
         float r = Math.Max(14f, Vector2.Distance(c, edge));
         float bob = MathF.Sin((float)TroveRun.PlayTime * 3f) * r * 0.12f;
-        if (room.Kind is TroveRoomKind.Item or TroveRoomKind.Secret) {
-            ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.25f), r * 1.15f, Color.Black * 0.35f);
-            ToggleSwitch.DrawDisc(sb, c, r * 1.05f, new Color(110, 104, 98));
-            ToggleSwitch.DrawDisc(sb, c, r * 0.85f, new Color(150, 144, 136));
-        }
-        else
-            ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.2f), r * 0.8f, Color.Black * 0.3f);
+        // just a soft shadow on the floor under the floating item (it shrinks as the item bobs up)
+        float lift = 0.5f + 0.5f * MathF.Sin((float)TroveRun.PlayTime * 3f);
+        ToggleSwitch.DrawDisc(sb, c + new Vector2(0, r * 0.15f), r * (0.62f - 0.08f * lift), Color.Black * (0.26f - 0.06f * lift));
         var iconAt = c - new Vector2(0, r * 0.9f + bob);
         ToggleSwitch.DrawDisc(sb, iconAt, r * 1.15f, new Color(255, 220, 120) * 0.3f); // glow
         DrawItemIcon(sb, room.Pickup!.Value, iconAt, r * 0.8f);

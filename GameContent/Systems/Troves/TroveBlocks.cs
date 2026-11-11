@@ -124,8 +124,8 @@ public static class TroveBlocks {
                 break;
             case TroveBlockID.Magnet: b.SwapTexture(Tex("block_magnet")); break;
             case TroveBlockID.Gate: b.SwapTexture(Tex("block_gate_closed")); b.Translucent = true; break;
-            case TroveBlockID.Mud: b.SwapTexture(Tex("floor_mud")); b.Translucent = true; break;
-            case TroveBlockID.IceFloor: b.SwapTexture(Tex("floor_ice")); b.Translucent = true; break;
+            case TroveBlockID.Mud: b.SwapTexture(Tex("floor_mud")); b.Translucent = true; b.TranslucentDepthWrite = false; break;
+            case TroveBlockID.IceFloor: b.SwapTexture(Tex("floor_ice")); b.Translucent = true; b.TranslucentDepthWrite = false; break;
             case TroveBlockID.Conveyor:
                 b.SwapTexture(Tex("floor_conveyor_0"));
                 // its direction comes from the room's layout (kept in the stack height: 1 = up the screen, then clockwise)
