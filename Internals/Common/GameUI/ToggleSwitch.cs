@@ -154,6 +154,16 @@ public static class ToggleSwitch {
 
     /// <summary>The circle picture that blends correctly in this batch: straight alpha for NonPremultiplied batches
     /// (the premultiplied one left a thin dark line around every shape there), premultiplied otherwise.</summary>
+    /// <summary>True if this batch blends straight-alpha pictures (NonPremultiplied); false for premultiplied ones.</summary>
+    public static bool IsStraight(SpriteBatch sb) {
+        try {
+            return ReferenceEquals(_blendField?.GetValue(sb), BlendState.NonPremultiplied);
+        }
+        catch {
+            return false;
+        }
+    }
+
     private static Texture2D CircleFor(SpriteBatch sb) {
         if (StraightAlpha)
             return _circleStraight!;

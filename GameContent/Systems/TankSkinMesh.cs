@@ -289,13 +289,13 @@ public sealed class TankSkinMesh {
         if (_chassisVb is { IsDisposed: false } && _cannonVb is { IsDisposed: false })
             return;
         (VertexBuffer, IndexBuffer) Make(int start, int count) {
-            var verts = new VertexPositionNormalTexture[count];
+            var verts = new SkinVertex[count];
             var idx = new short[count];
             for (int i = 0; i < count; i++) {
-                verts[i] = new VertexPositionNormalTexture(_pos[start + i], _nrm[start + i], _uv[start + i]);
+                verts[i] = new SkinVertex { Position = _pos[start + i], Normal = _nrm[start + i], Color = Color.White, Uv = _uv[start + i] };
                 idx[i] = (short)i;
             }
-            var vb = new VertexBuffer(gd, VertexPositionNormalTexture.VertexDeclaration, count, BufferUsage.WriteOnly);
+            var vb = new VertexBuffer(gd, SkinVertex.Declaration, count, BufferUsage.WriteOnly);
             vb.SetData(verts);
             var ib = new IndexBuffer(gd, IndexElementSize.SixteenBits, count, BufferUsage.WriteOnly);
             ib.SetData(idx);
@@ -303,6 +303,22 @@ public sealed class TankSkinMesh {
         }
         (_chassisVb, _chassisIb) = Make(0, _chassisVerts);
         (_cannonVb, _cannonIb) = Make(_chassisVerts, _cannonVerts);
+    }
+
+    /// <summary>A corner of the unwrapped tank. It carries a (white) color because the game's tank models do, and
+    /// their effect multiplies by it: without one, phones read it as black.</summary>
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
+    private struct SkinVertex : IVertexType {
+        public Vector3 Position;
+        public Vector3 Normal;
+        public Color Color;
+        public Vector2 Uv;
+        public static readonly VertexDeclaration Declaration = new(36,
+            new VertexElement(0, VertexElementFormat.Vector3, VertexElementUsage.Position, 0),
+            new VertexElement(12, VertexElementFormat.Vector3, VertexElementUsage.Normal, 0),
+            new VertexElement(24, VertexElementFormat.Color, VertexElementUsage.Color, 0),
+            new VertexElement(28, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 0));
+        readonly VertexDeclaration IVertexType.VertexDeclaration => Declaration;
     }
 
     private readonly struct Saved(ModelMeshPart part) {
@@ -417,6 +433,7 @@ public sealed class TankSkinMesh {
         _previewFx ??= new BasicEffect(gd);
         var fx = _previewFx;
         fx.TextureEnabled = true;
+        fx.VertexColorEnabled = true; // (as the game's tank models have it)
         fx.Texture = texture;
         fx.View = view;
         fx.Projection = projection;

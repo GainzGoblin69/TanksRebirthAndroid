@@ -1514,22 +1514,26 @@ public static class TroveHud {
     /// that lifts once the room is cleared, a mark on the keystone, and arrows on the floor pointing in while it's open.</summary>
     internal static void DrawDoor(SpriteBatch sb, Vector2 at, float rot, float width, TroveRoomKind kind, float lift, float time) {
         EnsureTextures(sb.GraphicsDevice);
-        var frame = _doorFrame!;
+        // (the pictures come in both kinds of alpha: this is drawn inside whichever batch the game has open)
+        bool pm = !ToggleSwitch.IsStraight(sb);
+        int set = pm ? 1 : 0;
+        var frame = _doorFrame[set]!;
         float scale = width / frame.Width;
         var origin = new Vector2(frame.Width / 2f, frame.Height);
         var kindCol = Systems.Troves.TroveLights.DoorColor(kind, false);
         bool plain = kind is TroveRoomKind.Normal or TroveRoomKind.Start;
         var stone = plain ? new Color(176, 150, 118) : Color.Lerp(new Color(170, 156, 140), kindCol, 0.5f);
 
-        sb.Draw(_doorInside!, at, null, Color.White, rot, origin, scale, SpriteEffects.None, 0f);
+        sb.Draw(_doorInside[set]!, at, null, Color.White, rot, origin, scale, SpriteEffects.None, 0f);
         // the light from the next room: steady once open, a faint ember while shut
         float open = MathHelper.SmoothStep(0f, 1f, lift);
         float glow = (0.16f + 0.84f * open) * (0.72f + 0.28f * MathF.Sin(time * 2.2f));
-        sb.Draw(_doorGlow!, at, null, new Color(kindCol.R, kindCol.G, kindCol.B, (byte)(255 * MathHelper.Clamp(glow, 0f, 1f))), rot, origin, scale, SpriteEffects.None, 0f);
+        glow = MathHelper.Clamp(glow, 0f, 1f);
+        sb.Draw(_doorGlow[set]!, at, null, pm ? kindCol * glow : new Color(kindCol.R, kindCol.G, kindCol.B, (byte)(255 * glow)), rot, origin, scale, SpriteEffects.None, 0f);
         // the gate, sliding up into the arch
-        int step = (int)MathF.Round(lift * _doorGates.Length);
-        if (step < _doorGates.Length)
-            sb.Draw(_doorGates[step]!, at, null, Color.White, rot, origin, scale, SpriteEffects.None, 0f);
+        int step = (int)MathF.Round(lift * GateSteps);
+        if (step < GateSteps)
+            sb.Draw(_doorGates[set, step]!, at, null, Color.White, rot, origin, scale, SpriteEffects.None, 0f);
         sb.Draw(frame, at, null, stone, rot, origin, scale, SpriteEffects.None, 0f);
 
         // the keystone's mark
@@ -1554,7 +1558,7 @@ public static class TroveHud {
                 float a = open * MathF.Sin(k * MathHelper.Pi) * 0.75f;
                 var tip = at - up * width * (0.42f - 0.26f * k);
                 float arm = width * 0.11f, thick = Math.Max(2f, width * 0.035f);
-                var col = new Color(kindCol.R, kindCol.G, kindCol.B, (byte)(255 * a));
+                var col = pm ? kindCol * a : new Color(kindCol.R, kindCol.G, kindCol.B, (byte)(255 * a));
                 ToggleSwitch.DrawLine(sb, tip, tip - up * arm * 0.8f + side * arm, thick, col);
                 ToggleSwitch.DrawLine(sb, tip, tip - up * arm * 0.8f - side * arm, thick, col);
             }
@@ -1829,19 +1833,23 @@ public static class TroveHud {
     }
 
     // ---- door pictures (made once): the stone arch, the passage inside, its glow, and the gate at each height
-    private static Texture2D? _doorFrame, _doorInside, _doorGlow;
-    private static readonly Texture2D?[] _doorGates = new Texture2D?[7];
+    private const int GateSteps = 7;
+    // [0] straight alpha, [1] premultiplied
+    private static readonly Texture2D?[] _doorFrame = new Texture2D?[2], _doorInside = new Texture2D?[2], _doorGlow = new Texture2D?[2];
+    private static readonly Texture2D?[,] _doorGates = new Texture2D?[2, GateSteps];
     private const int DoorW = 256, DoorH = 224;
     private const float DoorR = 116f, DoorBand = 27f;
 
     private static void EnsureTextures(GraphicsDevice gd) {
-        if (_doorFrame is { IsDisposed: false } && _doorGates[0] is { IsDisposed: false })
+        if (_doorFrame[0] is { IsDisposed: false } && _doorGates[1, GateSteps - 1] is { IsDisposed: false })
             return;
-        _doorFrame = MakeDoor(gd, 0, 0f);
-        _doorInside = MakeDoor(gd, 1, 0f);
-        _doorGlow = MakeDoor(gd, 2, 0f);
-        for (int i = 0; i < _doorGates.Length; i++)
-            _doorGates[i] = MakeDoor(gd, 3, i / (float)_doorGates.Length);
+        for (int set = 0; set < 2; set++) {
+            _doorFrame[set] = MakeDoor(gd, 0, 0f, set == 1);
+            _doorInside[set] = MakeDoor(gd, 1, 0f, set == 1);
+            _doorGlow[set] = MakeDoor(gd, 2, 0f, set == 1);
+            for (int i = 0; i < GateSteps; i++)
+                _doorGates[set, i] = MakeDoor(gd, 3, i / (float)GateSteps, set == 1);
+        }
     }
 
     private static float Hash(int x, int y) {
@@ -1852,7 +1860,7 @@ public static class TroveHud {
 
     /// <summary>A layer of the door picture. 0 = the stone arch (grey, tinted when drawn), 1 = the passage inside,
     /// 2 = the glow (white, tinted when drawn), 3 = the iron gate lifted by <paramref name="lift"/>.</summary>
-    private static Texture2D MakeDoor(GraphicsDevice gd, int layer, float lift) {
+    private static Texture2D MakeDoor(GraphicsDevice gd, int layer, float lift, bool premultiplied) {
         const int W = DoorW, H = DoorH;
         var data = new Color[W * H];
         float cx = W / 2f, cy = DoorR + 10f; // the arch's center; straight legs below it down to the wall line
@@ -1936,7 +1944,7 @@ public static class TroveHud {
                         break;
                     }
                 }
-                data[y * W + x] = new Color(r, g, b, a);
+                data[y * W + x] = premultiplied ? new Color(r * a, g * a, b * a, a) : new Color(r, g, b, a);
             }
         var tex = new Texture2D(gd, W, H);
         tex.SetData(data);
