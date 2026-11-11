@@ -39,17 +39,21 @@ public static class TouchControls {
     public static bool MissileBlink { get; set; }
     /// <summary>Boost: whether the BOOST button is held down (it shows while Tank Troves reports a bar).</summary>
     public static bool BoostHeld { get; private set; }
-    private static float _boostFill;
-    private static bool _boostOn;
+    private static float _boostFill, _boostOver;
+    private static bool _boostOn, _boostCharging;
     private static double _boostSetAt = -10;
     private static int _boostId = -1;
     /// <summary>Tank Troves, every frame while you have boost: how full the bar is (0-1), and whether it's burning.</summary>
-    public static void SetBoost(float fill, bool on) {
+    /// <param name="fill">The bar (0..1).</param><param name="over">Overcharge on top of it (0..1 of the most you can hold).</param>
+    /// <param name="charging">The bar was used up and is filling back up (it can't be used until it's full).</param>
+    public static void SetBoost(float fill, bool on, float over = 0f, bool charging = false) {
         _boostFill = fill;
+        _boostOver = over;
+        _boostCharging = charging;
         _boostOn = on;
         _boostSetAt = _clock.Elapsed.TotalSeconds;
     }
-    private static bool BoostVisible => _clock.Elapsed.TotalSeconds - _boostSetAt < 0.25 && _boostFill > 0;
+    private static bool BoostVisible => _clock.Elapsed.TotalSeconds - _boostSetAt < 0.25 && (_boostFill > 0 || _boostOver > 0 || _boostCharging);
     /// <summary>Where the ITEM button is (Tank Troves draws the carried items under it).</summary>
     public static Vector2 ItemButtonCenter => MissileButtonCenter;
     public static float ItemButtonRadius => ButtonRadius;
@@ -394,19 +398,33 @@ public static class TouchControls {
         // BOOST: hold it to drive twice as fast; the ring around it is the bar, emptying as you use it
         if (BoostVisible) {
             var bc = BoostButtonCenter;
-            bool on = BoostHeld;
-            DrawCircle(sb, _disc!, bc, ButtonRadius, (on ? new Color(255, 120, 20) : new Color(200, 90, 20)) * (on ? 0.75f : 0.5f));
+            bool on = BoostHeld && _boostOn;
+            bool dim = _boostCharging && _boostOver <= 0; // nothing to use right now
+            DrawCircle(sb, _disc!, bc, ButtonRadius, (on ? new Color(255, 120, 20) : dim ? new Color(60, 80, 110) : new Color(200, 90, 20)) * (on ? 0.75f : 0.5f));
             DrawCircle(sb, _ring!, bc, ButtonRadius, Color.White * 0.6f);
             const int segs = 36;
             int lit = (int)MathF.Ceiling(_boostFill * segs);
             float rr = ButtonRadius * 1.16f;
             for (int i = 0; i < segs; i++) {
                 float a = -MathHelper.PiOver2 + (i + 0.5f) * MathHelper.TwoPi / segs;
-                var col = i < lit ? (_boostFill < 0.25f ? new Color(255, 80, 60) : new Color(255, 190, 60)) : Color.Black * 0.35f;
+                var col = i >= lit ? Color.Black * 0.35f
+                    : _boostCharging ? new Color(110, 170, 255) * 0.8f
+                    : _boostFill < 0.25f ? new Color(255, 80, 60) : new Color(255, 190, 60);
                 DrawCircle(sb, _disc!, bc + new Vector2(MathF.Cos(a), MathF.Sin(a)) * rr, ButtonRadius * 0.085f, col);
             }
+            // Overcharge: an outer ring of bright dots (used before the bar)
+            if (_boostOver > 0) {
+                int olit = (int)MathF.Ceiling(_boostOver * segs);
+                float orr = ButtonRadius * 1.34f;
+                float glow = 0.75f + 0.25f * MathF.Sin((float)_clock.Elapsed.TotalSeconds * 6f);
+                for (int i = 0; i < olit; i++) {
+                    float a = -MathHelper.PiOver2 + (i + 0.5f) * MathHelper.TwoPi / segs;
+                    DrawCircle(sb, _disc!, bc + new Vector2(MathF.Cos(a), MathF.Sin(a)) * orr, ButtonRadius * 0.075f, new Color(120, 240, 255) * glow);
+                }
+            }
             DrawLabel(sb, "BOOST", bc - new Vector2(0, ButtonRadius * 0.14f), 0.45f);
-            DrawLabel(sb, $"{(int)MathF.Ceiling(_boostFill * 100)}%", bc + new Vector2(0, ButtonRadius * 0.3f), 0.38f);
+            string sub = _boostOver > 0 ? "OVER" : _boostCharging ? "CHARGING" : $"{(int)MathF.Ceiling(_boostFill * 100)}%";
+            DrawLabel(sb, sub, bc + new Vector2(0, ButtonRadius * 0.3f), _boostCharging && _boostOver <= 0 ? 0.3f : 0.38f);
         }
 
         // pause button (two bars); lives on the second screen when there is one

@@ -368,16 +368,34 @@ public static class TroveHud {
         // Boost: a bar under each of this phone's tanks that empties while boosting
         for (int i = 0; i < 4; i++) {
             var bp = TroveItems.Players[i];
-            if (bp.BoostMax <= 0 || bp.BoostFuel <= 0 || !TroveItems.IsLocal(i) || GameHandler.AllPlayerTanks[i] is not { IsDestroyed: false } bt)
+            if (bp.BoostMax <= 0 || !TroveItems.IsLocal(i) || GameHandler.AllPlayerTanks[i] is not { IsDestroyed: false } bt)
                 continue;
-            float f = bp.BoostFuel / bp.BoostMax;
-            float w = 64 * s * MathF.Sqrt(bp.BoostMax), h = 9 * s;
+            // (a full bar that isn't being used and no Overcharge: nothing to show)
+            if (bp.BoostFuel >= 1f && bp.BoostOver <= 0 && !bp.Boosting)
+                continue;
+            float f = bp.BoostFuel;
+            float w = 64 * s, h = 9 * s;
             var bc = ToScreen(bt.Position) + new Vector2(0, 38 * s);
             var outer = new Rectangle((int)(bc.X - w / 2 - 2 * s), (int)(bc.Y - h / 2 - 2 * s), (int)(w + 4 * s), (int)(h + 4 * s));
             ToggleSwitch.DrawRoundedRect(sb, outer, outer.Height / 2f, Color.Black * 0.55f);
-            var col = f < 0.25f ? new Color(255, 80, 60) : bp.Boosting ? new Color(255, 225, 120) : new Color(255, 160, 40);
+            var col = bp.BoostRecharging ? new Color(110, 170, 255) * 0.75f
+                : f < 0.25f ? new Color(255, 80, 60) : bp.Boosting && bp.BoostOver <= 0 ? new Color(255, 225, 120) : new Color(255, 160, 40);
             if (f > 0)
                 ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(bc.X - w / 2), (int)(bc.Y - h / 2), Math.Max((int)h, (int)(w * f)), (int)h), h / 2f, col);
+            // Overcharge: a glowing bar just above, one section per bar's worth (used first)
+            if (bp.BoostOver > 0) {
+                float oh = 6 * s, oy = bc.Y - h / 2 - 4 * s - oh;
+                float glow = 0.8f + 0.2f * MathF.Sin((float)TroveRun.PlayTime * 8f);
+                var oo = new Rectangle((int)(bc.X - w / 2 - 2 * s), (int)(oy - 2 * s), (int)(w + 4 * s), (int)(oh + 4 * s));
+                ToggleSwitch.DrawRoundedRect(sb, oo, oo.Height / 2f, Color.Black * 0.55f);
+                float of = bp.BoostOver / TroveItems.OVERCHARGE_MAX;
+                ToggleSwitch.DrawRoundedRect(sb, new Rectangle((int)(bc.X - w / 2), (int)oy, Math.Max((int)oh, (int)(w * of)), (int)oh), oh / 2f,
+                    (bp.Boosting ? new Color(200, 250, 255) : new Color(110, 230, 255)) * glow);
+                for (int k = 1; k < (int)TroveItems.OVERCHARGE_MAX; k++) {
+                    float dx = bc.X - w / 2 + w * k / TroveItems.OVERCHARGE_MAX;
+                    sb.Draw(TextureGlobals.Pixels[Color.White], new Rectangle((int)dx, (int)oy, Math.Max(1, (int)s), (int)oh), Color.Black * 0.5f);
+                }
+            }
         }
 
         // Pyro Baron's fire, Chrono Tank's time bubbles, the Phantom's laser sight

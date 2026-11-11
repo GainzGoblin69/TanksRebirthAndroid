@@ -166,7 +166,7 @@ public static class TroveItems {
         new(TroveItemId.LightweightAlloy, "Lightweight Alloy", "Faster, turns quicker, and drifts around corners", TroveItemKind.Passive, new Color(170, 245, 240)),
         new(TroveItemId.CoffeeThermos, "Coffee Thermos", "Much faster driving and shooting for the first 10 seconds of every room", TroveItemKind.Passive, new Color(160, 105, 60)),
         new(TroveItemId.ChargeShot, "Charge Shot", "Hold fire for 2 seconds, then let go: a super-fast shot that goes through enemies (let go early to cancel)", TroveItemKind.Passive, new Color(120, 200, 255)),
-        new(TroveItemId.Boost, "Boost", "Hold BOOST (right trigger on a controller) to drive twice as fast until the bar runs out", TroveItemKind.Instant, new Color(255, 140, 40)),
+        new(TroveItemId.Boost, "Boost", "Hold BOOST (right trigger on a controller) to drive twice as fast. Your bar recharges once it's empty; extra Boosts you find Overcharge it", TroveItemKind.Instant, new Color(255, 140, 40)),
     ];
     // looked up by id (the list above isn't in the enum's order)
     private static readonly TroveItemDef[] _byId = BuildIndex();
@@ -397,9 +397,12 @@ public static class TroveItems {
         public float BaseSpeed, DriveTime, GatlingHold;
         public uint BaseCooldown;
         public bool Dynamic;
-        /// <summary>Boost (found in cork): how much is left and how big the bar is (0 = no boost), and whether it's on right now.</summary>
-        public float BoostFuel, BoostMax;
-        public bool Boosting;
+        /// <summary>Boost: how much of the bar is left and whether there is a bar at all (BoostMax 0 = no boost), and whether it's on
+        /// right now. Once the bar is used up it recharges on a timer (BoostRecharge counts up to 1); Boost pickups add
+        /// Overcharge on top, used first and kept until it's used up.</summary>
+        public float BoostFuel, BoostMax, BoostOver, BoostRecharge;
+        public bool Boosting, BoostRecharging;
+        public bool CanBoost => BoostOver > 0 || BoostFuel > 0 && !BoostRecharging;
         public int RoomsForRegen, KillsForVampire;
         public double DashUntil = -1, TeslaAt;
         public double MirrorUntil = -1, CloneUntil = -1, LastFireDrop;
@@ -498,14 +501,19 @@ public static class TroveItems {
             p.Shields = 1;
             p.BoostMax = 1f;
             p.BoostFuel = 1f;
+            p.BoostOver = 0f;
+            p.BoostRecharging = false;
         }
     }
 
     /// <summary>A new floor: everyone's Boost bar is full again (and everyone has one).</summary>
     public static void FloorBoost() {
         foreach (var p in Players) {
-            p.BoostMax = Math.Max(p.BoostMax, 1f);
-            p.BoostFuel = p.BoostMax;
+            // (any Overcharge is kept)
+            p.BoostMax = 1f;
+            p.BoostFuel = 1f;
+            p.BoostRecharging = false;
+            p.BoostRecharge = 0f;
         }
     }
 
@@ -556,17 +564,36 @@ public static class TroveItems {
             return;
         float dt = TanksRebirth.RuntimeData.DeltaTime / 60f;
         float speed = 1f, fire = 1f;
-        // Boost: twice as fast while it's held (on top of every other speed item), draining the bar
+        // Boost: twice as fast while it's held (on top of every other speed item), using Overcharge first, then the bar;
+        // an empty bar fills back up over BOOST_RECHARGE_SECONDS (and can't be used until it's full)
         bool wasBoosting = p.Boosting;
-        p.Boosting = p.BoostFuel > 0 && BoostInput(p.Id) && !TroveRun.InReady && !TanksRebirth.GameContent.UI.GameUI.Paused
+        if (p.BoostRecharging && !TroveRun.InReady && !TanksRebirth.GameContent.UI.GameUI.Paused) {
+            p.BoostRecharge = Math.Min(1f, p.BoostRecharge + dt / BOOST_RECHARGE_SECONDS);
+            p.BoostFuel = p.BoostRecharge;
+            if (p.BoostRecharge >= 1f) {
+                p.BoostRecharging = false;
+                p.BoostFuel = 1f;
+                if (IsLocal(p.Id))
+                    SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.6f, pitchOverride: 0.5f);
+            }
+        }
+        p.Boosting = p.CanBoost && BoostInput(p.Id) && !TroveRun.InReady && !TanksRebirth.GameContent.UI.GameUI.Paused
             && t.Velocity.Length() > p.BaseSpeed * 0.15f;
         if (p.Boosting) {
             speed *= 2f;
-            p.BoostFuel = Math.Max(0f, p.BoostFuel - dt / BOOST_SECONDS);
+            float use = dt / BOOST_SECONDS;
+            if (p.BoostOver > 0)
+                p.BoostOver = Math.Max(0f, p.BoostOver - use);
+            else {
+                p.BoostFuel = Math.Max(0f, p.BoostFuel - use);
+                if (p.BoostFuel <= 0) {
+                    p.BoostRecharging = true;
+                    p.BoostRecharge = 0f;
+                    SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.6f, pitchOverride: -0.6f);
+                }
+            }
             if (!wasBoosting)
                 SoundPlayer.PlaySoundInstance("Assets/sounds/tnk_shoot_rocket.ogg", SoundContext.Effect, 0.35f, pitchOverride: -0.3f);
-            if (p.BoostFuel <= 0)
-                SoundPlayer.PlaySoundInstance("Assets/sounds/menu/menu_tick.ogg", SoundContext.Effect, 0.6f, pitchOverride: -0.6f);
         }
         if (p.Has(TroveItemId.Turbocharger)) {
             bool driving = t.Velocity.Length() > p.BaseSpeed * 0.3f;
@@ -627,9 +654,13 @@ public static class TroveItems {
 
     /// <summary>A full Boost bar lasts this many seconds of boosting.</summary>
     public const float BOOST_SECONDS = 4f;
+    /// <summary>How long an emptied Boost bar takes to fill back up.</summary>
+    public const float BOOST_RECHARGE_SECONDS = 12f;
+    /// <summary>Overcharge from one Boost pickup (in bars), and the most you can hold.</summary>
+    public const float OVERCHARGE_PER_PICKUP = 1f, OVERCHARGE_MAX = 3f;
 
     /// <summary>This player has boost left (the right trigger boosts instead of shooting then).</summary>
-    public static bool HasBoost(int playerId) => TroveRun.Active && playerId is >= 0 and < 4 && Players[playerId].BoostFuel > 0;
+    public static bool HasBoost(int playerId) => TroveRun.Active && playerId is >= 0 and < 4 && Players[playerId].BoostMax > 0;
 
     /// <summary>Whether this player is holding boost: the BOOST button, the right trigger, or Shift.</summary>
     public static bool BoostInput(int playerId) {
@@ -1017,9 +1048,14 @@ public static class TroveItems {
                     p.ReadyTimes[charged] = -100;
                 }
                 else if (id == TroveItemId.Boost) {
-                    // a full bar; finding more makes the bar bigger (up to twice as long)
-                    p.BoostMax = p.BoostMax <= 0 ? 1f : Math.Min(2f, p.BoostMax + 0.5f);
-                    p.BoostFuel = p.BoostMax;
+                    // Overcharge: extra boost on top of the bar, used first and kept until it's gone (no bar yet: a full one)
+                    if (p.BoostMax <= 0) {
+                        p.BoostMax = 1f;
+                        p.BoostFuel = 1f;
+                        p.BoostRecharging = false;
+                    }
+                    else
+                        p.BoostOver = Math.Min(OVERCHARGE_MAX, p.BoostOver + OVERCHARGE_PER_PICKUP);
                 }
                 else if (id == TroveItemId.MysteryPill && local) {
                     // usually good: the last two effects are the bad ones (1 in 4)
@@ -2209,8 +2245,8 @@ public static class TroveItems {
             ReadyChimes();
         // the BOOST button shows this phone's player's bar
         var me = Players[MyPlayer];
-        if (me.BoostFuel > 0 && me.BoostMax > 0 && CampaignGlobals.InMission)
-            TanksRebirth.Internals.Common.Framework.Input.TouchControls.SetBoost(me.BoostFuel / me.BoostMax, me.Boosting);
+        if (me.BoostMax > 0 && CampaignGlobals.InMission)
+            TanksRebirth.Internals.Common.Framework.Input.TouchControls.SetBoost(me.BoostFuel, me.Boosting, me.BoostOver / OVERCHARGE_MAX, me.BoostRecharging);
         for (int i = 0; i < 4; i++) {
             var t = GameHandler.AllPlayerTanks[i];
             if (t is null)
