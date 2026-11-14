@@ -21,6 +21,7 @@ namespace TanksRebirth.GameContent.Systems;
 #pragma warning disable
 public static class IntermissionSystem {
     public static RenderTarget2D BackgroundBuffer;
+    private static readonly Texture2D?[] _portraits = new Texture2D?[4];
     public static RenderTarget2D BannerBuffer;
     public static RenderTarget2D BonusBannerBuffer;
     public static RenderTarget2D BonusBannerTextBuffer;
@@ -362,6 +363,12 @@ public static class IntermissionSystem {
 
         #region RenderToBackground
 
+        // each player's own tank (their colour or skin), side-on, for under the banner (drawn first: switching render
+        // targets clears them)
+        var playerCount = Server.CurrentClientCount > 0 ? Server.CurrentClientCount : Server.CurrentClientCount + 1;
+        for (int i = 0; i < Math.Min(playerCount, _portraits.Length); i++)
+            _portraits[i] = TankPortrait.RenderSide(device, i);
+
         device.SetRenderTarget(BackgroundBuffer);
 
         device.Clear(RenderGlobals.BackBufferColor);
@@ -422,9 +429,14 @@ public static class IntermissionSystem {
                 new Vector2(0.3f).ToResolution(),
                 1f,
                 Anchor.Center, shadowDistScale: 1.5f, shadowAlpha: 0.5f);
-            DrawUtils.DrawTextureWithShadow(spriteBatch, tnk2d, pos - new Vector2(130, 0).ToResolution(), Vector2.One,
-                brighterPlayerColor, Vector2.One * 1.5f, 1f, Anchor.Center,
-                shadowDistScale: 1f, shadowAlpha: 0.5f);
+            if (i < _portraits.Length && _portraits[i] is { IsDisposed: false } portrait)
+                DrawUtils.DrawTextureWithShadow(spriteBatch, portrait, pos - new Vector2(190, 10).ToResolution(), Vector2.One,
+                    Color.White, Vector2.One.ToResolution() * 0.75f, 1f, Anchor.Center,
+                    shadowDistScale: 1.5f, shadowAlpha: 0.35f);
+            else
+                DrawUtils.DrawTextureWithShadow(spriteBatch, tnk2d, pos - new Vector2(130, 0).ToResolution(), Vector2.One,
+                    brighterPlayerColor, Vector2.One * 1.5f, 1f, Anchor.Center,
+                    shadowDistScale: 1f, shadowAlpha: 0.5f);
         }
 
         oldBlack = BlackAlpha;

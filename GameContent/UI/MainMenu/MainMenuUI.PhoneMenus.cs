@@ -941,66 +941,9 @@ public static partial class MainMenuUI {
         ToggleSwitch.DrawDisc(sb, new Vector2(body.Center.X, body.Center.Y - size * 0.05f), size * 0.18f, new Color(214, 208, 198));
     }
 
-    private static Matrix[] _previewBones = [];
 
     /// <summary>Draws the player tank model with a given texture inside a screen rectangle.</summary>
-    private static void DrawTankPreview(GraphicsDevice gd, Rectangle rect, Texture2D tex, float yaw) {
-        var model = ModelGlobals.TankPlayer.Asset;
-        if (model is null || rect.Width <= 0 || rect.Height <= 0)
-            return;
-        var bounds = new Rectangle(0, 0, gd.PresentationParameters.BackBufferWidth, gd.PresentationParameters.BackBufferHeight);
-        rect = Rectangle.Intersect(rect, bounds);
-        if (rect.Width <= 0 || rect.Height <= 0)
-            return;
-
-        var oldViewport = gd.Viewport;
-        gd.Viewport = new Viewport(rect);
-        gd.DepthStencilState = DepthStencilState.Default;
-        gd.BlendState = BlendState.Opaque;
-        gd.RasterizerState = RasterizerState.CullCounterClockwise;
-        gd.SamplerStates[0] = SamplerState.PointClamp;
-
-        float aspect = rect.Width / (float)rect.Height;
-        const float viewHeight = 34f;
-        var projection = Matrix.CreateOrthographic(viewHeight * aspect, viewHeight, -500f, 500f);
-        var view = Matrix.CreateLookAt(new Vector3(0, 70, 70), new Vector3(0, 6, 0), Vector3.Up);
-
-        var oldRoot = model.Root.Transform;
-        var cannon = model.Meshes["Cannon"];
-        var oldCannon = cannon.ParentBone.Transform;
-        model.Root.Transform = Matrix.CreateRotationY(yaw);
-        cannon.ParentBone.Transform = Matrix.Identity;
-        if (_previewBones.Length != model.Bones.Count)
-            _previewBones = new Matrix[model.Bones.Count];
-        model.CopyAbsoluteBoneTransformsTo(_previewBones);
-
-        // a painted skin is drawn with the unwrapped tank
-        var skinMesh = TankPaint.MeshFor(tex);
-        if (skinMesh is not null && (!skinMesh.IsPlayerModel || !skinMesh.Begin(model)))
-            skinMesh = null;
-        try {
-        foreach (var mesh in model.Meshes) {
-            if (mesh.Name == "Shadow")
-                continue;
-            foreach (BasicEffect effect in mesh.Effects) {
-                effect.World = _previewBones[mesh.ParentBone.Index];
-                effect.View = view;
-                effect.Projection = projection;
-                effect.TextureEnabled = true;
-                effect.Texture = tex;
-                effect.Alpha = 1f;
-                effect.EmissiveColor = Vector3.Zero;
-                effect.SetDefaultGameLighting_IngameEntities(specular: true, ambientMultiplier: 2f);
-            }
-            mesh.Draw();
-        }
-        }
-        finally {
-            skinMesh?.End();
-        }
-
-        model.Root.Transform = oldRoot;
-        cannon.ParentBone.Transform = oldCannon;
-        gd.Viewport = oldViewport;
-    }
+    private static void DrawTankPreview(GraphicsDevice gd, Rectangle rect, Texture2D tex, float yaw)
+        => TankPortrait.DrawModel(gd, rect, tex, yaw, new Vector3(0, 70, 70), 34f,
+            gd.PresentationParameters.BackBufferWidth, gd.PresentationParameters.BackBufferHeight);
 }
