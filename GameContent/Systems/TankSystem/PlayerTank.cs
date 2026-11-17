@@ -114,6 +114,23 @@ public class PlayerTank : Tank {
     private int _colorIndex = -1;
     /// <summary>The Tank Color pick this tank wears (-1 = its standard texture).</summary>
     public int ColorIndex => _colorIndex;
+    private bool _skinnable;
+    /// <summary>Changes the Tank Color this tank wears (online: another player's pick arrived after the tank was made).</summary>
+    public void SetColorIndex(int index) {
+        if (!_skinnable || index == _colorIndex)
+            return;
+        var gd = TankGame.Instance.GraphicsDevice;
+        var old = _tankTexture;
+        _tankTexture = index >= 0
+            ? PlayerColors.MakeTexture(gd, index, true)
+            : Assets["plrtank_" + PlayerID.Collection.GetKey(PlayerType)!.ToLower()].Duplicate(gd);
+        _colorIndex = index;
+        old?.Dispose();
+        if (index >= 0)
+            Properties.DestructionColor = PlayerColors.MainOf(index);
+        else if (PlayerID.PlayerTankColors.TryGetValue(PlayerType, out var c))
+            Properties.DestructionColor = c;
+    }
     public PlayerTank(int playerType, bool isPlayerModel = true, int copyTier = -1) {
         Model = isPlayerModel ? ModelGlobals.TankPlayer.Asset : ModelGlobals.TankEnemy.Asset;
 
@@ -133,6 +150,7 @@ public class PlayerTank : Tank {
 
         _tankTexture = colorIndex >= 0 ? texAsset : texAsset.Duplicate(TankGame.Instance.GraphicsDevice);
         _colorIndex = colorIndex;
+        _skinnable = copyTier == -1 && isPlayerModel;
 
         _isPlayerModel = isPlayerModel;
         PlayerType = playerType;

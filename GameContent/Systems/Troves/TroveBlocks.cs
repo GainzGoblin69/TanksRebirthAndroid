@@ -154,6 +154,7 @@ public static class TroveBlocks {
             return false;
         bool horizontal = dir is CollisionDirection.Left or CollisionDirection.Right;
         var at = b.Position3D + new Vector3(0, 12, 0);
+        Kick(b, s);
         switch (b.Type) {
             case TroveBlockID.Rotten:
                 if (--b.State <= 0) {
@@ -204,6 +205,8 @@ public static class TroveBlocks {
                 if (s.RicochetsRemaining == 0)
                     s.RicochetsRemaining = 1;
                 Sound("clank", at, 0.55f);
+                GameHandler.Particles.MakeSparkEmission(s.Position3D, 5);
+                Graphics.DynamicLighting.GameplayLights.Flash(s.Position3D, new Color(255, 210, 140), 1.2f, 45f, 0.12f);
                 Bounce(s, dir, corner, horizontal);
                 return true;
             case TroveBlockID.Rubber:
@@ -219,7 +222,8 @@ public static class TroveBlocks {
                 s.Velocity = -s.Velocity;
                 s.WallCooldown(6);
                 Sound("clank", at, 0.6f, 0.5f);
-                GameHandler.Particles.MakeShineSpot(s.Position3D, Color.White, 0.8f);
+                GameHandler.Particles.MakeShineSpot(s.Position3D, Color.White, 1.1f);
+                Graphics.DynamicLighting.GameplayLights.Flash(s.Position3D, new Color(220, 235, 255), 1.6f, 60f, 0.15f);
                 return true;
         }
         return false;
@@ -245,20 +249,160 @@ public static class TroveBlocks {
         var at = b.Position3D;
         switch (b.Type) {
             case TroveBlockID.Glass:
-                Shards(b, new Color(200, 240, 255), 16);
+                Shards(b, new Color(200, 240, 255), 22);
+                GameHandler.Particles.MakeShineSpot(at + new Vector3(0, 12, 0), Color.White, 1.4f);
+                Graphics.DynamicLighting.GameplayLights.Flash(at + new Vector3(0, 12, 0), new Color(200, 235, 255), 1.4f, 60f, 0.18f);
                 break;
             case TroveBlockID.Ice:
-                Shards(b, new Color(210, 240, 255), 12);
+                Shards(b, new Color(210, 240, 255), 16);
+                Chips(b, new Color(235, 248, 255), 8);
+                Graphics.DynamicLighting.GameplayLights.Flash(at + new Vector3(0, 12, 0), new Color(170, 220, 255), 1.2f, 55f, 0.18f);
                 Sound("glass_break", at, 0.6f, -0.3f);
+                break;
+            case TroveBlockID.Rotten:
+                // splinters, and a cloud of dust where it stood
+                Chips(b, new Color(120, 96, 62), 14);
+                Chips(b, new Color(86, 104, 58), 5);
+                GameHandler.Particles.MakeSmokeCloud(at + new Vector3(0, 8, 0), 2, 4);
+                break;
+            case TroveBlockID.Hay:
+                Chips(b, new Color(236, 204, 120), 18);
+                Chips(b, new Color(200, 160, 80), 8);
                 break;
             case TroveBlockID.Barrel:
                 // a moment later, so a row of them goes off one after another
                 _blasts.Add((b.Position, Now + 0.12, null));
                 break;
             case TroveBlockID.Crate:
+                Chips(b, new Color(196, 148, 88), 14);
+                Chips(b, new Color(130, 92, 52), 6);
+                GameHandler.Particles.MakeSmokeCloud(at + new Vector3(0, 8, 0), 2, 3);
                 CrateDrop(b);
                 break;
         }
+        _kicks.Remove(b);
+    }
+
+    // ------------------------------------------------------------------ life: wobbles, flashes, glints, embers
+
+    // a block that was just hit: when, and which way the shell was going (it wobbles along that line)
+    private static readonly Dictionary<Block, (double At, Vector2 Dir)> _kicks = [];
+
+    private static void Kick(Block b, Shell s) {
+        var d = s.Velocity;
+        _kicks[b] = (Now, d.LengthSquared() > 0.001f ? Vector2.Normalize(d) : Vector2.UnitX);
+    }
+
+    /// <summary>How each block looks this frame: the wobble and flash after a hit, and what it does by itself.</summary>
+    private static void Animate(Block b, float dt) {
+        float t = (float)Now;
+        var squash = Vector3.One;
+        var glow = Vector3.Zero;
+        if (_kicks.TryGetValue(b, out var k)) {
+            float age = (float)(Now - k.At);
+            if (age > 0.6f)
+                _kicks.Remove(b);
+            else {
+                float fade = 1f - age / 0.6f;
+                // how much it gives, and how brightly it flashes, depends on what it's made of
+                var (give, flash) = b.Type switch {
+                    TroveBlockID.Rubber => (0.22f, new Vector3(0.25f, 0.2f, 0.05f)),
+                    TroveBlockID.Hay => (0.12f, new Vector3(0.12f, 0.1f, 0.04f)),
+                    TroveBlockID.Bush => (0.14f, Vector3.Zero),
+                    TroveBlockID.Steel or TroveBlockID.Magnet => (0.02f, new Vector3(0.5f, 0.45f, 0.35f)),
+                    TroveBlockID.Mirror => (0.02f, new Vector3(0.8f, 0.85f, 1f)),
+                    TroveBlockID.Glass or TroveBlockID.Ice => (0.03f, new Vector3(0.45f, 0.55f, 0.65f)),
+                    _ => (0.05f, new Vector3(0.3f, 0.26f, 0.2f)),
+                };
+                float wob = MathF.Sin(age * 38f) * fade * fade * give;
+                // squeezed along the shot, bulging up and sideways (and back again)
+                float ax = MathF.Abs(k.Dir.X), az = MathF.Abs(k.Dir.Y);
+                squash = new Vector3(1f - wob * ax + wob * 0.5f * az, 1f + wob * 0.6f, 1f - wob * az + wob * 0.5f * ax);
+                glow = flash * MathF.Max(0f, 1f - age / 0.18f);
+            }
+        }
+        switch (b.Type) {
+            case TroveBlockID.Bush: {
+                // sways in the breeze, and shakes its leaves when a tank pushes through
+                float sway = MathF.Sin(t * 1.7f + b.Id * 1.3f) * 0.025f;
+                squash *= new Vector3(1f + sway, 1f - sway * 0.6f, 1f - sway);
+                foreach (var tank in GameHandler.AllTanks) {
+                    if (tank is not { IsDestroyed: false } || tank.Velocity.LengthSquared() < 0.05f || !Within(tank.Position, b))
+                        continue;
+                    squash *= new Vector3(1f + 0.05f * MathF.Sin(t * 22f), 1f, 1f + 0.05f * MathF.Cos(t * 19f));
+                    if (Random.Shared.NextDouble() < 0.12 * dt)
+                        Leaf(b, tank.Position);
+                }
+                break;
+            }
+            case TroveBlockID.Magnet: {
+                // hums: a slow blue pulse, brighter with a shell in its pull
+                float pulse = 0.5f + 0.5f * MathF.Sin(t * 4f + b.Id);
+                glow += new Vector3(0.05f, 0.1f, 0.28f) * pulse * (b.State > 0 ? 2.2f : 1f);
+                b.State = 0; // (set again by Pull while a shell is near)
+                break;
+            }
+            case TroveBlockID.Glass:
+            case TroveBlockID.Ice:
+            case TroveBlockID.Mirror:
+            case TroveBlockID.IceFloor:
+                // a glint now and then
+                if (Random.Shared.NextDouble() < (b.Type == TroveBlockID.IceFloor ? 0.0025 : 0.004) * dt) {
+                    float top = b.Type == TroveBlockID.IceFloor ? 1f : b.HeightFromGround + 1f;
+                    GameHandler.Particles.MakeShineSpot(b.Position3D + new Vector3(Random.Shared.NextSingle() * 16 - 8, top, Random.Shared.NextSingle() * 16 - 8),
+                        new Color(225, 245, 255), 0.3f + Random.Shared.NextSingle() * 0.25f);
+                }
+                break;
+            case TroveBlockID.Lava:
+                // embers drifting up
+                if (Random.Shared.NextDouble() < 0.035 * dt)
+                    Ember(b);
+                break;
+            case TroveBlockID.Plate:
+                if (b.State > 0)
+                    glow += new Vector3(0.1f, 0.3f, 0.08f);
+                break;
+        }
+        b.Squash = squash;
+        b.Glow = glow;
+    }
+
+    private static void Leaf(Block b, Vector2 at) {
+        var p = GameHandler.Particles.MakeParticle(new Vector3(at.X + Random.Shared.NextSingle() * 14 - 7, 10 + Random.Shared.NextSingle() * 8, at.Y + Random.Shared.NextSingle() * 14 - 7),
+            GameResources.GetGameResource<Texture2D>("Assets/textures/misc/tank_rock"));
+        var vel = new Vector3(Random.Shared.NextSingle() * 1.6f - 0.8f, 1.2f + Random.Shared.NextSingle(), Random.Shared.NextSingle() * 1.6f - 0.8f);
+        float spin = Random.Shared.NextSingle() * 0.3f - 0.15f;
+        p.HasAdditiveBlending = false;
+        p.Scale = new(0.22f + Random.Shared.NextSingle() * 0.12f);
+        p.Color = Random.Shared.Next(3) == 0 ? new Color(120, 190, 70) : new Color(60, 140, 50);
+        p.Roll = -CameraGlobals.DEFAULT_ORTHOGRAPHIC_ANGLE;
+        p.UniqueBehavior = q => {
+            vel.Y -= 0.06f; // leaves drift down slowly
+            vel.X *= 0.97f;
+            vel.Z *= 0.97f;
+            q.Position += vel;
+            q.Rotation2D += spin;
+            q.Alpha -= 0.02f;
+            if (q.Alpha <= 0 || q.Position.Y < 0)
+                q.Destroy();
+        };
+    }
+
+    private static void Ember(Block b) {
+        var p = GameHandler.Particles.MakeParticle(b.Position3D + new Vector3(Random.Shared.NextSingle() * 18 - 9, 2, Random.Shared.NextSingle() * 18 - 9),
+            GameResources.GetGameResource<Texture2D>("Assets/textures/misc/tank_rock"));
+        float rise = 0.25f + Random.Shared.NextSingle() * 0.35f, drift = Random.Shared.NextSingle() * 6.28f;
+        p.HasAdditiveBlending = true;
+        p.Scale = new(0.1f + Random.Shared.NextSingle() * 0.1f);
+        p.Color = Random.Shared.Next(2) == 0 ? new Color(255, 170, 60) : new Color(255, 90, 30);
+        p.Roll = -CameraGlobals.DEFAULT_ORTHOGRAPHIC_ANGLE;
+        p.UniqueBehavior = q => {
+            drift += 0.12f;
+            q.Position += new Vector3(MathF.Sin(drift) * 0.15f, rise, MathF.Cos(drift * 0.7f) * 0.15f);
+            q.Alpha -= 0.012f;
+            if (q.Alpha <= 0)
+                q.Destroy();
+        };
     }
 
     /// <summary>Crates: one chance each per run at a pickup (the same on every phone).</summary>
@@ -365,6 +509,7 @@ public static class TroveBlocks {
         foreach (var b in Block.AllBlocks) {
             if (b is null || !TroveBlockID.IsTrove(b.Type))
                 continue;
+            Animate(b, dt);
             switch (b.Type) {
                 case TroveBlockID.Lava:
                     if (animate)
@@ -506,6 +651,7 @@ public static class TroveBlocks {
             float k = 0.05f * (1f - dist / 110f) * dt;
             var v = Vector2.Normalize(s.Velocity) + Vector2.Normalize(to) * k * 3f;
             s.Velocity = Vector2.Normalize(v) * speed;
+            b.State = 1; // (it hums brighter)
             if (Random.Shared.NextDouble() < 0.04 * dt)
                 GameHandler.Particles.MakeShineSpot(s.Position3D, new Color(120, 170, 255), 0.4f);
         }
@@ -560,6 +706,7 @@ public static class TroveBlocks {
     /// <summary>A new room: forget the last one's moving parts.</summary>
     public static void Reset() {
         _blasts.Clear();
+        _kicks.Clear();
         _spikedAt.Clear();
         _slide.Clear();
         _plateHeldUntil = 0;
@@ -574,6 +721,17 @@ public static class TroveBlocks {
                 case TroveBlockID.Lava:
                     Graphics.DynamicLighting.GameplayLights.AddGlow(b.Position3D + new Vector3(0, 8, 0), new Color(255, 120, 40),
                         1.1f + 0.2f * MathF.Sin((float)Now * 3f + b.Id), 50f, 2);
+                    break;
+                case TroveBlockID.Barrel when (int)(Now * 2.5 + b.Id * 0.37) % 2 == 0:
+                    // its warning lamp blinks
+                    Graphics.DynamicLighting.GameplayLights.AddGlow(b.Position3D + new Vector3(0, 24, 0), new Color(255, 40, 30), 0.7f, 26f, 1);
+                    break;
+                case TroveBlockID.Magnet:
+                    Graphics.DynamicLighting.GameplayLights.AddGlow(b.Position3D + new Vector3(0, b.HeightFromGround + 6, 0), new Color(90, 150, 255),
+                        0.45f + 0.25f * MathF.Sin((float)Now * 4f + b.Id), 34f, 1);
+                    break;
+                case TroveBlockID.Plate when b.State > 0:
+                    Graphics.DynamicLighting.GameplayLights.AddGlow(b.Position3D + new Vector3(0, 5, 0), new Color(110, 255, 90), 0.7f, 28f, 2);
                     break;
                 case TroveBlockID.Spikes when SpikesWarning(b):
                     Graphics.DynamicLighting.GameplayLights.AddGlow(b.Position3D + new Vector3(0, 6, 0), new Color(255, 50, 30), 0.8f, 30f, 2);
@@ -597,7 +755,12 @@ public static class TroveBlocks {
         fx.Texture = Tex("block_barrel");
         Draw(gd, fx, _barrelSide!);
         fx.Texture = Tex("block_barrel_lid");
+        // its warning lamp blinks: the lid lights up red
+        bool lamp = (int)(Now * 2.5 + b.Id * 0.37) % 2 == 0;
+        if (lamp)
+            fx.EmissiveColor = new Vector3(0.45f, 0.04f, 0.02f);
         Draw(gd, fx, _barrelLid!);
+        fx.EmissiveColor = Vector3.Zero;
         return true;
     }
 

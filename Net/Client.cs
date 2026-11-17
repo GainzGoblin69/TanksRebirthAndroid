@@ -434,6 +434,15 @@ public class Client {
         message.Put(a);
         NetClient.Send(message, DeliveryMethod.ReliableOrdered);
     }
+    /// <summary>Tells everyone which Tank Color (colour or skin) this player's tank wears.</summary>
+    public static void SendPlayerSkin() {
+        if (!IsConnected() || !LobbyDataReceived) return;
+        NetDataWriter message = new();
+        message.Put(PacketID.PlayerSkin);
+        message.Put((byte)NetPlay.GetMyClientId());
+        message.Put(GameContent.Systems.PlayerColors.GetChoice(0));
+        NetClient.Send(message, DeliveryMethod.ReliableOrdered);
+    }
     public static void SendReturnToMenu() {
         if (!IsConnected()) return;
         NetDataWriter message = new();

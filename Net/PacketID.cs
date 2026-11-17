@@ -73,6 +73,8 @@ public sealed class PacketID {
     public const int ReturnToMenu = 33;
     /// <summary>Phones: Tank Troves event from the host (start, move rooms, retry, next floor, end).</summary>
     public const int TroveEvent = 34;
+    /// <summary>Phones: a player's Tank Color pick (colour or skin), so everyone sees it on their tank.</summary>
+    public const int PlayerSkin = 35;
 
     public static int AddPacketId(string name) => Collection.ForcefullyInsert(name);
 

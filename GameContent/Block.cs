@@ -154,6 +154,10 @@ public class Block : IGameObject
     /// <summary>A see-through block still marks its spot in the depth buffer (so the shadows drawn after it don't land on
     /// top of it and turn it black); flat pieces lying on the floor don't need to.</summary>
     public bool TranslucentDepthWrite = true;
+    /// <summary>Stretches the drawn block around its base (a wobble when hit, a sway): 1,1,1 = as it is.</summary>
+    public Vector3 Squash = Vector3.One;
+    /// <summary>Extra light the block gives off by itself (a flash when hit, a hum).</summary>
+    public Vector3 Glow;
     /// <summary>How see-through it's drawn (with <see cref="Translucent"/>).</summary>
     public float Alpha = 1f;
     /// <summary>Turned around the vertical axis (conveyors).</summary>
@@ -408,6 +412,11 @@ public class Block : IGameObject
         }
         if (Type != BlockID.Teleporter) {
             World = Matrix.CreateScale(_scaling) * Matrix.CreateRotationY(Yaw) * Matrix.CreateTranslation(Position3D - _offset - new Vector3(0, Sink * HeightFromGround, 0));
+            if (Squash != Vector3.One) {
+                // (around the block's middle on the floor, so it stays put)
+                var foot = new Vector3(Position3D.X, 0, Position3D.Z);
+                World *= Matrix.CreateTranslation(-foot) * Matrix.CreateScale(Squash) * Matrix.CreateTranslation(foot);
+            }
             var gd = TankGame.Instance.GraphicsDevice;
             BlendState? oldBlend = null;
             DepthStencilState? oldDepth = null;
@@ -442,8 +451,13 @@ public class Block : IGameObject
                     effect.DirectionalLight0.Direction *= 0.1f;
 
                     effect.Alpha = Translucent ? Alpha : 1f;
+                    if (Glow != Vector3.Zero)
+                        effect.EmissiveColor += Glow;
                 }
                 mesh.Draw();
+                if (Glow != Vector3.Zero)
+                    foreach (BasicEffect effect in mesh.Effects)
+                        effect.EmissiveColor -= Glow;
             }
             if (Translucent) {
                 gd.BlendState = oldBlend;

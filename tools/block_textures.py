@@ -106,6 +106,13 @@ def save(name, tiles, alpha=None):
     """tiles: list of (N,N,3) arrays stacked top to bottom; alpha: matching list or None."""
     img = np.concatenate(tiles, 0)
     img = np.clip(img, 0, 1)
+    # the game lights blocks quite darkly next to its own bright wood, so the darker materials are lifted and every
+    # material gets richer colour (bright glass, ice and lava are left as they are)
+    if not any(k in name for k in ('glass', 'ice', 'lava')):
+        lum = img.mean(2, keepdims=True)
+        img = np.clip(lum + (img - lum) * 1.22, 0, 1)          # richer colour
+        img = img ** 0.78                                       # lift the mid-tones and shadows
+        img = np.clip((img - 0.5) * 1.08 + 0.52, 0, 1)          # a touch more contrast
     if alpha is not None:
         a = np.concatenate(alpha, 0)
         rgba = np.dstack([img, np.clip(a, 0, 1)])

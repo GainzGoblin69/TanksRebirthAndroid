@@ -58,6 +58,7 @@ public class NetPlay {
     private static void OnClientJoin(NetPeer peer) {
         TankGame.ClientLog.Write($"Connected to remote server.", Internals.LogType.Debug);
         ChatSystem.SendMessage("Connected to server.", Color.Lime, netSend: true);
+        GameContent.Systems.PlayerColors.ClearRemote();
 
         Client.SendClientInfo();
     }
@@ -129,6 +130,8 @@ public class NetPlay {
 
                 Server.CurrentClientCount = reader.GetInt();
                 Client.LobbyDataReceived = true;
+                // (everyone gets this whenever someone joins: say which tank colour or skin we wear, so the newcomer knows too)
+                Client.SendPlayerSkin();
 
                 SoundPlayer.PlaySoundInstance("Assets/sounds/menu/client_join.ogg", SoundContext.Effect, 0.75f);
 
@@ -447,6 +450,12 @@ public class NetPlay {
             case PacketID.ReturnToMenu:
                 MPEndScreen.ReturnFromHost();
                 break;
+            case PacketID.PlayerSkin: {
+                int skinPlayer = reader.GetByte();
+                int skinIndex = reader.GetInt();
+                GameContent.Systems.PlayerColors.SetRemote(skinPlayer, skinIndex);
+                break;
+            }
             case PacketID.TroveEvent: {
                 var tev = reader.GetInt();
                 var targ = reader.GetInt();
@@ -804,6 +813,11 @@ public class NetPlay {
                 break;
             case PacketID.TroveEvent:
                 message.Put(reader.GetInt());
+                message.Put(reader.GetInt());
+                Server.NetManager.SendToAll(message, deliveryMethod, peer);
+                break;
+            case PacketID.PlayerSkin:
+                message.Put(reader.GetByte());
                 message.Put(reader.GetInt());
                 Server.NetManager.SendToAll(message, deliveryMethod, peer);
                 break;

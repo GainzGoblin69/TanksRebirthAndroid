@@ -47,6 +47,20 @@ public static class PlayerColors {
         else
             TankGame.Settings.TankColorP2 = index;
         SaveSettings();
+        if (slot == 0)
+            Client.SendPlayerSkin(); // online: the others see the new pick from the next mission
+    }
+
+    // online: what the other players picked (-1 = not heard yet: their standard tank)
+    private static readonly int[] _remote = [-1, -1, -1, -1];
+    public static void ClearRemote() => Array.Fill(_remote, -1);
+    public static void SetRemote(int playerId, int index) {
+        if (playerId is < 0 or > 3 || playerId == NetPlay.GetMyClientId())
+            return;
+        _remote[playerId] = index >= 0 && index < Count ? index : -1;
+        // a tank already on the field changes right away
+        if (GameHandler.AllPlayerTanks[playerId] is { } tank)
+            tank.SetColorIndex(_remote[playerId]);
     }
 
     public static void SaveSettings() {
@@ -61,11 +75,12 @@ public static class PlayerColors {
 
     /// <summary>
     /// The palette index this player tank should use on this device, or -1 for its standard texture.
-    /// Offline (and same-device co-op) players 1 and 2 use their picks; online, only your own tank does.
+    /// Offline (and same-device co-op) players 1 and 2 use their picks; online, your own tank uses yours and the
+    /// others use what their phones said they picked.
     /// </summary>
     public static int ColorIndexFor(int playerId) {
         if (Client.IsConnected())
-            return playerId == NetPlay.GetMyClientId() ? GetChoice(0) : -1;
+            return playerId == NetPlay.GetMyClientId() ? GetChoice(0) : playerId is >= 0 and <= 3 ? _remote[playerId] : -1;
         if (playerId is 0 or 1)
             return GetChoice(playerId);
         return -1;
